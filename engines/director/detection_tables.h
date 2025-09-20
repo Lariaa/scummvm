@@ -999,6 +999,7 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "dieveteranen",		"Die Veteranen: So nutzlos wie eine Fuge von Bach" },
 	{ "dudenmeyer",			"Duden/Meyer Multimedia sampler" },
 	{ "flaschenfahrrad",	"Das Verkehrs-Lernspiel: Fred und das Flaschenfahrrad" },
+	{ "flugmaschinen",		"Fliegen, Flattern, Flugmaschinen" },
 	{ "frankiekaraoke",		"Frankie Tierwelt Karaoke" },
 	{ "funquiz",			"FunQuiz" },
 	{ "geograficus",		"Geograficus ... und Geografie wird zum Abenteuer" },
@@ -1024,6 +1025,7 @@ static const PlainGameDescriptor directorGames[] = {
 	{ "loewe7",				"Löwenzahn 7" },
 	{ "loewe8",				"Löwenzahn 8" },
 	{ "loewecalendar",		"Löwenzahn Adventskalender" },
+	{ "loewesteinzeit",		"Peter endeckt die Steinzeit"},
 	{ "loewespielebox",		"Löwenzahn Spielebox" },
 	{ "lulu",				"Das Buch von Lulu" },
 	{ "mathica",			"Mathica ... und Mathematik wird zum Abenteuer" },
@@ -9386,6 +9388,10 @@ static const DirectorGameDescription gameDescriptions[] = {
 	MACGAME1_l("loewe4", "", "xn--Lwenzahn 4-ecb",		"rt:6f75666ef42bcd1d34bd120d011b42b1",  114029, Common::DE_DEU, 702),
 	WINGAME1_l("loewe4", "", "SETUP/WIN95/LOEWE4.exe",	"t:4766360be9f3067a9f314b3b3a454fa7",  1818036, Common::DE_DEU, 702),
 
+	WINGAME1("loewesteinzeit", 0,	"data/131Koch.dxr", "80b7913156e36d8806b2dcdcbcd7d288", 817625, 702),
+// "START.EXE",	"13918e51d2093b5cdc92795b36454112",  1960654, detected as "OTTO"
+
+
 	MACGAME1("maisybday", "", "Maisy BDay",		"r:0944b962ebb00f4b5d5149d220f8449b", 113458,  702),
 	WINGAME1("maisybday", "", "Maisy BDay.exe", "t:26fc28194d1991645a9a42794bcb1b36", 2619122, 702),
 
@@ -9803,6 +9809,12 @@ static const DirectorGameDescription gameDescriptions[] = {
 	// Bundled with a German demo of Adibou 3
 	// TRAC report #14471
 	WINGAME1_l("frankiekaraoke", "", "FRANKIE TIERWELT - KARAOKE.EXE", "t:378fd2eba117bcaaa09da56e609e8c17", 2250316, Common::DE_DEU, 850),
+
+	// German: Fliegen, Flattern, Flugmaschinen
+	WINGAME1("flugmaschinen", "Windows 95", "FFF95.EXE", "1c1fa9c5797b8d2cdc04ad283d9e41d7", 1668305, 500),
+	WINGAME1("flugmaschinen", "Windows 3.1", "FFF31.EXE", "t:d0aaeb6a7c7fc2de55613cb456450adc", 1189887, 500),
+
+	MACGAME1("flugmaschinen", "", "xn--Floating Fluttering Flying...-", "r:06ed90580400cd9e263525f84c8075fd", 705417, 500),
 
 	// Found as mini-game on Chillin Out ECD from Smash Hits magazine
 	WINGAME1("freeallangels", "", "FREE ALL ANGELS.exe", "e24d4bab978b1a5c2326d2c56cf4d781", 2248678, 800),
