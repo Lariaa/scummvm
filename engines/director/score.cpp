@@ -2015,11 +2015,22 @@ void Score::loadFrames(Common::SeekableReadStreamEndian &stream, uint16 version,
 			prevOff = off;
 		}
 
-		// now seek to the header, which is position 0 in the list
-		_framesStream->seek(_indexStart, SEEK_SET);
-		uint32 off = _framesStream->readUint32();
-		_framesStream->seek(_frameDataOffset + off, SEEK_SET);
-		_spriteDetailAccessed[0] = true;
+		if (numEntries > 0) {
+			if (listSize == numEntries + 1) {
+				uint32 endOff = _framesStream->readUint32();
+				_spriteDetailOffsets.push_back(_frameDataOffset + endOff);
+				_spriteDetailAccessed.push_back(true);
+			} else {
+				warning("Score::loadFrames(): Unexpected sprite detail list size %d for %d entries; last entry may be truncated",
+					listSize, numEntries);
+			}
+
+			// now seek to the header, which is position 0 in the list
+			_framesStream->seek(_indexStart, SEEK_SET);
+			uint32 off = _framesStream->readUint32();
+			_framesStream->seek(_frameDataOffset + off, SEEK_SET);
+			_spriteDetailAccessed[0] = true;
+		}
 	}
 
 	if (version >= kFileVer400) {
