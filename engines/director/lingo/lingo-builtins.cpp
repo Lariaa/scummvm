@@ -3524,6 +3524,7 @@ void LB::b_sendAllSprites(int nargs) {
 	score->createScriptInstances(score->getCurrentFrameNum());
 
 	bool anyHandled = false;
+	uint savedSpriteNum = movie->_currentSpriteNum;
 	for (uint ch = 1; ch < score->_channels.size(); ch++) {
 		Channel *channel = score->_channels[ch];
 		if (!channel)
@@ -3535,7 +3536,11 @@ void LB::b_sendAllSprites(int nargs) {
 			Symbol sym = instance.u.obj->getMethod(msgName);
 			if (sym.type == VOIDSYM)
 				continue;
+			// `the spriteNum of me` must resolve to the sprite whose behavior is
+			// running (see b_sendSprite), so set it per channel around the call.
+			movie->_currentSpriteNum = ch;
 			callBehaviorHandler(instance, msgName, extraArgs);
+			movie->_currentSpriteNum = savedSpriteNum;
 			anyHandled = true;
 		}
 	}
@@ -3585,6 +3590,7 @@ void LB::b_sendSprite(int nargs) {
 		score->createScriptInstances(score->getCurrentFrameNum());
 
 	bool handled = false;
+	uint savedSpriteNum = movie->_currentSpriteNum;
 	for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
 		Datum instance = channel->_scriptInstanceList[i];
 		if (instance.type != OBJECT)
@@ -3592,7 +3598,14 @@ void LB::b_sendSprite(int nargs) {
 		Symbol sym = instance.u.obj->getMethod(msgName);
 		if (sym.type == VOIDSYM)
 			continue;
+		// Within the handler, `the spriteNum of me` must resolve to the target
+		// sprite, matching how processEvent sets _currentSpriteNum for real
+		// sprite events. Otherwise the behavior reads spriteNum 0 and operates
+		// on the wrong sprite (e.g. `set the cursor of sprite (the spriteNum of
+		// me)` ends up setting the stage cursor, sprite 0).
+		movie->_currentSpriteNum = (uint)spriteNum;
 		callBehaviorHandler(instance, msgName, extraArgs);
+		movie->_currentSpriteNum = savedSpriteNum;
 		handled = true;
 	}
 
