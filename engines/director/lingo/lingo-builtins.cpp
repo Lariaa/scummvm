@@ -3313,6 +3313,19 @@ void LB::b_puppetSprite(int nargs) {
 			Sprite *target = sc->getSpriteById(spriteId);
 			bool val = (bool)state.asInt();
 			target->_puppet = val;
+			if (!val) {
+				// Explicitly un-puppeting a sprite returns full control to the
+				// score, so also drop any auto-puppet flags that Lingo set
+				// implicitly (e.g. via `set the member of sprite`). Otherwise the
+				// sprite would stay frozen on screen and never be replaced by the
+				// score data again (e.g. TKKG2 rollover head/portrait sprites that
+				// are shown by puppeting and hidden with `puppetSprite n, FALSE`).
+				//
+				// The copy-back from the frame cache that used to sit here is gone:
+				// upstream removed it, and Score::updateSprites() reclaims the
+				// channel at the next sprite-span boundary instead.
+				target->_autoPuppet = kAPNone;
+			}
 		} else {
 			warning("b_puppetSprite: sprite index out of bounds");
 		}
