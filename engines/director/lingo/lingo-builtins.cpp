@@ -2006,7 +2006,11 @@ void LB::b_cancelIdleLoad(int nargs) {
 }
 
 void LB::b_continue(int nargs) {
-	g_director->_playbackPaused = false;
+	// pause/continue act on the current movie's playback head, which may be a
+	// MIAW selected via `tell window ...`. Pausing/continuing must not affect
+	// other movies (e.g. the stage), so the state lives on the Score.
+	if (g_director->getCurrentMovie())
+		g_director->getCurrentMovie()->getScore()->_playbackPaused = false;
 }
 
 void LB::b_dontPassEvent(int nargs) {
@@ -2139,7 +2143,9 @@ void LB::b_pass(int nargs) {
 }
 
 void LB::b_pause(int nargs) {
-	g_director->_playbackPaused = true;
+	// See b_continue(): pause only the current movie's playback head.
+	if (g_director->getCurrentMovie())
+		g_director->getCurrentMovie()->getScore()->_playbackPaused = true;
 }
 
 void LB::b_play(int nargs) {
