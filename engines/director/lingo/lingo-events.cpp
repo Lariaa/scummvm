@@ -685,8 +685,11 @@ bool Movie::processInputEvent(LEvent event, int targetId, Common::Point pos) {
 void Movie::processEvent(LEvent event, int targetId) {
 	Common::Queue<LingoEvent> queue;
 	queueEvent(queue, event, targetId);
+	Window *savedWindow = _vm->getCurrentWindow();
 	_vm->setCurrentWindow(this->getWindow());
 	_lingo->processEvents(queue, false);
+	if (savedWindow)
+		_vm->setCurrentWindow(savedWindow);
 }
 
 void Movie::broadcastEvent(LEvent event) {
@@ -704,8 +707,12 @@ void Movie::broadcastEvent(LEvent event) {
 	if (queue.empty())
 		queueEvent(queue, event, 0);
 
+	// restore the current window after dispatching
+	Window *savedWindow = _vm->getCurrentWindow();
 	_vm->setCurrentWindow(this->getWindow());
 	_lingo->processEvents(queue, false);
+	if (savedWindow)
+		_vm->setCurrentWindow(savedWindow);
 }
 
 void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
