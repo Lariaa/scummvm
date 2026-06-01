@@ -4243,7 +4243,11 @@ void LB::b_member(int nargs) {
 	}
 
 	if (res.member > g_lingo->getMembersNum(res.castLib)) {
-		// D6 and up does not error on non-existing cast members
+		// D6 and up does not error on non-existing cast members. Referencing a
+		// not-yet-existing member is legal: the reference is used to create it
+		// (e.g. pasteClipBoardInto() or "set the name of member ..."), so do not
+		// halt execution. ("Ein Fall fuer Muetze & Co" clones a template player
+		// into the next free slot to save a new profile.)
 		if (g_director->getVersion() < 600) {
 			debugC(5, kDebugLingoExec, "b_member: Cast member ID %s out of range! In real D5 this would cause Lingo errors for some use cases", res.asString().c_str());
 		}
