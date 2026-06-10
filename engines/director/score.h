@@ -210,7 +210,6 @@ public:
 	byte _currentFrameRate;
 	byte _puppetTempo;
 
-	bool _puppetPalette;
 	int _paletteTransitionIndex;
 	byte _paletteSnapshotBuffer[768];
 

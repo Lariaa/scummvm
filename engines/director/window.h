@@ -222,6 +222,11 @@ public:
 	Graphics::MacWindowManager *_wm;
 
 	TransParams *_puppetTransition;
+	// The palette channel puppet state persists across movie switches within
+	// a window: puppetSprites are cancelled when branching to another movie,
+	// but puppetPalette (like puppetTempo/puppetTransition) stays in effect
+	// until an explicit `puppetPalette 0`.
+	bool _puppetPalette;
 
 	MovieReference _nextMovie;
 	Common::List<MovieReference> _movieStack;
