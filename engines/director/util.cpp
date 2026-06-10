@@ -20,6 +20,8 @@
  */
 
 #include "common/file.h"
+#include "common/hash-str.h"
+#include "common/hashmap.h"
 #include "common/keyboard.h"
 #include "common/macresman.h"
 #include "common/memstream.h"
@@ -865,11 +867,75 @@ Common::Path findAbsolutePath(const Common::String &path, bool directory, const 
 	return result;
 }
 
+// Recursively index every file under a directory, keyed by case-insensitive
+// base name -> path relative to the index root. Bounded in depth to avoid
+// pathological trees.
+static void indexGameTree(const Common::FSNode &dir, const Common::String &relBase,
+		Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> &index,
+		int depth) {
+	if (depth > 8)
+		return;
+
+	Common::FSList children;
+	if (!dir.getChildren(children, Common::FSNode::kListAll))
+		return;
+
+	for (auto &child : children) {
+		Common::String name = child.getName();
+		Common::String rel = relBase.empty() ? name :
+			Common::String::format("%s%c%s", relBase.c_str(), g_director->_dirSeparator, name.c_str());
+		if (child.isDirectory()) {
+			indexGameTree(child, rel, index, depth + 1);
+		} else if (!index.contains(name)) {
+			// Keep the first (shallowest) occurrence of a given base name.
+			index[name] = rel;
+		}
+	}
+}
+
+// Director titles routinely reference a movie/video by bare name even though the
+// file lives in a subdirectory (e.g. `go to movie "Bauwagen"` where the file is
+// MEDIA/DATA/BAUWAGEN.DXR), or via a stale absolute path (C:\...). findPath()'s
+// normal search only looks in the current folder, the game root and the (often
+// unset) Lingo searchPath, so those references fail and the game stalls. As a
+// last resort we resolve the bare base name anywhere in the game tree, using a
+// one-time index that is rebuilt only if the game directory changes.
+static Common::Path resolveBasenameInGameTree(const Common::String &baseName, const char **exts) {
+	static Common::String s_indexedFor;
+	static Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> s_index;
+
+	if (baseName.empty())
+		return Common::Path();
+
+	Common::String gameDir = g_director->getGameDataDir()->getPath().toString();
+	if (s_indexedFor != gameDir) {
+		s_index.clear();
+		indexGameTree(*g_director->getGameDataDir(), Common::String(), s_index, 0);
+		s_indexedFor = gameDir;
+		debugC(1, kDebugPaths, "resolveBasenameInGameTree(): indexed %u files under '%s'",
+			(uint)s_index.size(), gameDir.c_str());
+	}
+
+	Common::Array<Common::String> candidates;
+	candidates.push_back(baseName);
+	// If the name carries no extension, also try the caller's media extensions.
+	if (exts && baseName.findLastOf('.') == Common::String::npos) {
+		for (const char **e = exts; *e; e++)
+			candidates.push_back(baseName + *e);
+	}
+
+	for (auto &cand : candidates) {
+		if (s_index.contains(cand))
+			return Common::Path(s_index[cand], g_director->_dirSeparator);
+	}
+	return Common::Path();
+}
+
 Common::Path findPath(const Common::Path &path, bool currentFolder, bool searchPaths, bool directory, const char **exts) {
 	return findPath(path.toString(g_director->_dirSeparator), currentFolder, searchPaths, directory, exts);
 }
 
-Common::Path findPath(const Common::String &path, bool currentFolder, bool searchPaths, bool directory, const char **exts, Common::String currentPath_) {
+Common::Path findPath(const Common::String &path, bool currentFolder, bool searchPaths, bool directory, const char **exts, Common::String currentPath_, bool treeFallback) {
 	Common::Path result, base;
 	debugCN(1, kDebugPaths, "%s", recIndent());
 	debugC(1, kDebugPaths, "findPath(): beginning search for \"%s\"", path.c_str());
@@ -943,6 +1009,25 @@ Common::Path findPath(const Common::String &path, bool currentFolder, bool searc
 		}
 	}
 
+	// Last resort (movie/video lookups only): resolve the bare base name anywhere
+	// in the game tree. This rescues bare-name references into subdirectories and
+	// stale absolute paths that the searches above can't reach. Gated by
+	// treeFallback so existence probes (e.g. FileIO) don't get false positives.
+	if (treeFallback) {
+		Common::String conv = convertPath(testPath);
+		Common::String baseName = conv;
+		size_t sep = baseName.findLastOf(g_director->_dirSeparator);
+		if (sep != Common::String::npos)
+			baseName = Common::String(baseName.c_str() + sep + 1);
+		result = resolveBasenameInGameTree(baseName, exts);
+		if (!result.empty()) {
+			debugCN(1, kDebugPaths, "%s", recIndent());
+			debugC(1, kDebugPaths, "findPath(): resolved \"%s\" via game-tree base-name search -> \"%s\"",
+				testPath.c_str(), result.toString().c_str());
+			return result;
+		}
+	}
+
 	// Return empty path
 	debugC(1, kDebugPaths, "findPath(): failed to resolve \"%s\"", path.c_str());
 	return Common::Path();
@@ -965,7 +1050,7 @@ Common::Path findMoviePath(const Common::String &path, bool currentFolder, bool 
 		exts = extsD6;
 	}
 
-	Common::Path result = findPath(path, currentFolder, searchPaths, false, exts, currentPath);
+	Common::Path result = findPath(path, currentFolder, searchPaths, false, exts, currentPath, true /* treeFallback */);
 	return result;
 }
 
