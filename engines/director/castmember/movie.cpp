@@ -50,13 +50,13 @@ MovieCastMember::MovieCastMember(Cast *cast, uint16 castId, MovieCastMember &sou
 	_enableScripts = source._enableScripts;
 }
 
-Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint frame) {
+Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint frame, int parentInk, uint32 parentForeColor, uint32 parentBackColor) {
 	if (_needsReload) {
 		_loaded = false;
 		load();
 	}
 
-	return FilmLoopCastMember::getSubChannels(bbox, frame);
+	return FilmLoopCastMember::getSubChannels(bbox, frame, parentInk, parentForeColor, parentBackColor);
 }
 
 void MovieCastMember::load() {
