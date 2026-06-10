@@ -160,6 +160,7 @@
 #include "director/lingo/xtras/d/datetime.h"
 #include "director/lingo/xtras/f/filextra.h"
 #include "director/lingo/xtras/g/getdir.h"
+#include "director/lingo/xtras/i/ineturl.h"
 #include "director/lingo/xtras/k/keypoll.h"
 #include "director/lingo/xtras/m/masterapp.h"
 #include "director/lingo/xtras/m/mui.h"
@@ -309,6 +310,7 @@ static const struct XLibProto {
 	XLIBDEF(GpidXObj,			kXObj,			400),	// D4
 	XLIBDEF(HenryXObj,			kXObj,			400),	// D4
 	XLIBDEF(HitMap,				kXObj,			400),	// D4
+	XLIBDEF(INetURLXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(IniXObj,			kXObj,			400),	// D4
 	XLIBDEF(InstObjXObj,		kXObj,			400),	// D4
 	XLIBDEF(IsCD,				kXObj,			300),	// D3
