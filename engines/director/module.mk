@@ -197,6 +197,7 @@ MODULE_OBJS = \
 	lingo/xtras/k/keypoll.o \
 	lingo/xtras/m/masterapp.o \
 	lingo/xtras/m/mui.o \
+	lingo/xtras/i/ineturl.o \
 	lingo/xtras/d/datetime.o \
 	lingo/xtras/n/netlingo.o \
 	lingo/xtras/f/filextra4.o \
