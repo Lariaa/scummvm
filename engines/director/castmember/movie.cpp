@@ -69,7 +69,7 @@ MovieCastMember::~MovieCastMember() {
 	_score = nullptr;	// Prevent use-after-free in Filmloop
 }
 
-Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint frame) {
+Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint frame, int parentInk, uint32 parentForeColor, uint32 parentBackColor) {
 	if (_needsReload) {
 		_loaded = false;
 		load();
