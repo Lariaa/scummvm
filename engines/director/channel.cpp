@@ -870,9 +870,9 @@ Common::Array<Channel> *Channel::getSubChannels() {
 	if (_sprite->_cast) {
 		Common::Rect bbox = getBbox();
 		if (_sprite->_cast->_type == kCastFilmLoop)
-			return ((FilmLoopCastMember *)_sprite->_cast)->getSubChannels(bbox, _filmLoopFrame);
+			return ((FilmLoopCastMember *)_sprite->_cast)->getSubChannels(bbox, _filmLoopFrame, _sprite->_ink, _sprite->getForeColor(), _sprite->getBackColor());
 		else if (_sprite->_cast->_type == kCastMovie)
-			return ((MovieCastMember *)_sprite->_cast)->getSubChannels(bbox, _filmLoopFrame);
+			return ((MovieCastMember *)_sprite->_cast)->getSubChannels(bbox, _filmLoopFrame, _sprite->_ink, _sprite->getForeColor(), _sprite->getBackColor());
 	}
 	warning("Channel doesn't have any sub-channels");
 	return nullptr;
