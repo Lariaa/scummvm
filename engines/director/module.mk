@@ -198,6 +198,7 @@ MODULE_OBJS = \
 	lingo/xtras/m/masterapp.o \
 	lingo/xtras/m/mui.o \
 	lingo/xtras/m/mix.o \
+	lingo/xtras/m/mixsound.o \
 	lingo/xtras/i/ineturl.o \
 	lingo/xtras/d/datetime.o \
 	lingo/xtras/o/openurl.o \
