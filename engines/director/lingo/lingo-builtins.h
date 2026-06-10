@@ -154,6 +154,7 @@ void b_pass(int nargs);
 void b_pause(int nargs);
 void b_play(int nargs);
 void b_playAccel(int nargs);
+void b_stop(int nargs);
 void b_preLoad(int nargs);
 void b_preLoadCast(int nargs);
 void b_preLoadMovie(int nargs);
