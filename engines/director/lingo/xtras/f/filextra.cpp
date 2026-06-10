@@ -33,6 +33,9 @@
  *
  * USED IN:
  * I Spy
+ * Loewenzahn 2 / 3 / 4 / 8 / Adventskalender
+ * TKKG 7 / 8 / 9 / 10
+ * Oscar the Balloonist Discovers the Sea
  *
  **************************************************/
 
@@ -183,7 +186,17 @@ void FileXtra::m_DirectoryToList(int nargs) {
 		return;
 	}
 
-	Common::FSNode dir(path);
+	// findPath() returns a path relative to the game directory. Build the
+	// absolute location (game dir + relative path) before constructing the
+	// FSNode; a bare relative path would be resolved against the process working
+	// directory and the listing would spuriously fail. This is what makes e.g.
+	// Loewenzahn 3's CD check work: it lists "<drive>:\setup\", which resolves to
+	// the game's top-level SETUP folder and must actually enumerate its files
+	// (so the LOEWE3.ICO marker is found and the CD path gets set).
+	Common::Path absPath = Common::Path(g_director->getGameDataDir()->getPath());
+	absPath.appendInPlace(Common::String(g_director->_dirSeparator), g_director->_dirSeparator);
+	absPath.appendInPlace(path);
+	Common::FSNode dir(absPath);
 	Common::FSList fslist;
 	if (!dir.isDirectory() || !dir.getChildren(fslist, Common::FSNode::kListAll)) {
 		g_lingo->push(result);
