@@ -199,6 +199,7 @@ MODULE_OBJS = \
 	lingo/xtras/f/filextra4.o \
 	lingo/xtras/g/getdir.o \
 	lingo/xtras/g/glu32.o \
+	lingo/xtras/i/ineturl.o \
 	lingo/xtras/k/keypoll.o \
 	lingo/xtras/m/masterapp.o \
 	lingo/xtras/m/mui.o \
