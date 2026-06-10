@@ -199,6 +199,7 @@ MODULE_OBJS = \
 	lingo/xtras/i/ineturl.o \
 	lingo/xtras/n/netfile.o \
 	lingo/xtras/d/datetime.o \
+	lingo/xtras/n/netlingo.o \
 	lingo/xtras/o/openurl.o \
 	lingo/xtras/o/oscheck.o \
 	lingo/xtras/q/qtvrxtra.o \
