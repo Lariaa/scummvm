@@ -44,7 +44,7 @@ public:
 	bool isModified() override;
 	//Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
 
-	virtual Common::Array<Channel> *getSubChannels(Common::Rect &bbox, uint frame);
+	virtual Common::Array<Channel> *getSubChannels(Common::Rect &bbox, uint frame, int parentInk = kInkTypeCopy, uint32 parentForeColor = 0, uint32 parentBackColor = 0xff);
 	virtual CastMemberID getSubChannelSound1(uint frame);
 	virtual CastMemberID getSubChannelSound2(uint frame);
 
