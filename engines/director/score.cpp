@@ -65,7 +65,6 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 	_soundManager = _window->getSoundManager();
 
 	_puppetTempo = 0;
-	_puppetPalette = false;
 	_paletteTransitionIndex = 0;
 	memset(_paletteSnapshotBuffer, 0, 768);
 
@@ -1013,7 +1012,7 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 }
 
 bool Score::renderPrePaletteCycle(RenderMode mode) {
-	if (_puppetPalette)
+	if (_window->_puppetPalette)
 		return false;
 
 	// Skip this if we don't have a palette instruction
@@ -1130,7 +1129,7 @@ bool Score::renderPrePaletteCycle(RenderMode mode) {
 }
 
 void Score::setLastPalette() {
-	if (_puppetPalette)
+	if (_window->_puppetPalette)
 		return;
 
 	bool isCachedPalette = false;
@@ -1199,7 +1198,7 @@ bool Score::isPaletteColorCycling() {
 }
 
 void Score::renderPaletteCycle(RenderMode mode) {
-	if (_puppetPalette)
+	if (_window->_puppetPalette)
 		return;
 
 	// If the palette is defined in the frame and doesn't match
