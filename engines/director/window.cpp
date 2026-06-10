@@ -55,6 +55,7 @@ Window::Window(int id, bool scrollable, bool resizable, bool editable, Graphics:
 	_isStage = isStage;
 	_stageColor = _wm->_colorBlack;
 	_puppetTransition = nullptr;
+	_puppetPalette = false;
 	_soundManager = new DirectorSound(this);
 	_lingoState = new LingoState;
 	_lingoPlayState = nullptr;
