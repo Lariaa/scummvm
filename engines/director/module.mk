@@ -222,6 +222,7 @@ MODULE_OBJS = \
 	lingo/xtras/s/staytoonedhigh.o \
 	lingo/xtras/s/staytoonedober.o \
 	lingo/xtras/s/staytoonedtoon.o \
+	lingo/xtras/s/swadcmpr.o \
 	lingo/xtras/t/timextra.o \
 	lingo/xtras/x/xsound.o
 
