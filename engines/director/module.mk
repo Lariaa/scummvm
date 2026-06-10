@@ -200,6 +200,7 @@ MODULE_OBJS = \
 	lingo/xtras/i/ineturl.o \
 	lingo/xtras/k/keypoll.o \
 	lingo/xtras/m/masterapp.o \
+	lingo/xtras/m/mix.o \
 	lingo/xtras/m/mui.o \
 	lingo/xtras/n/netlingo.o \
 	lingo/xtras/o/openurl.o \
