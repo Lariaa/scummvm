@@ -349,6 +349,20 @@ Symbol Lingo::getHandler(const Common::String &name) {
 	if (sym.type != VOIDSYM)
 		return sym;
 
+	// A movie playing in a window may call handlers defined in the movie
+	// scripts (and shared cast) of the main movie on the stage. Look there
+	// only as a last resort so the MIAW's own handlers keep shadowing the
+	// stage's. This is a pure lookup; the current window stays untouched.
+	Window *stage = g_director->getStage();
+	if (g_director->getCurrentWindow() != stage) {
+		Movie *stageMovie = stage->getCurrentMovie();
+		if (stageMovie) {
+			sym = stageMovie->getHandler(name, 0);
+			if (sym.type != VOIDSYM)
+				return sym;
+		}
+	}
+
 	sym.type = VOIDSYM;
 	sym.name = new Common::String(name);
 	return sym;
