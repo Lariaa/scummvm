@@ -30,7 +30,7 @@
 /**************************************************
  *
  * USED IN:
- * Loewenzahn 1 / 2 / 3 / 4 / 8 / Adventskalender
+ * Loewenzahn 1 / 2 / 3 / 4 / 5 / 7 / 8 / Adventskalender / Spielebox
  * TKKG 6 / 7 / 8 / 9 / 10 / 11 / 13 / 14
  * Oscar the Balloonist (Lake / Countryside / Sea / Mountains)
  *
