@@ -31,6 +31,9 @@
  *
  * USED IN:
  * I Spy Spooky Mansion
+ * Loewenzahn 8 / Adventskalender
+ * TKKG 6 / 7 / 8 / 9 / 11 / 13 / 14
+ * Oscar the Balloonist Flies into the Mountains
  *
  **************************************************/
 
@@ -187,6 +190,8 @@ namespace Director {
 const char *BudAPIXtra::xlibName = "BudAPI";
 const XlibFileDesc BudAPIXtra::fileNames[] = {
 	{ "budapi",   nullptr },
+	{ "Budapi16",   nullptr },	// Windows 16-bit build
+	{ "Budapi32",   nullptr },	// Windows 32-bit build
 	{ nullptr,        nullptr },
 };
 
