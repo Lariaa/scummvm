@@ -201,6 +201,7 @@ MODULE_OBJS = \
 	lingo/xtras/m/mixsound.o \
 	lingo/xtras/i/ineturl.o \
 	lingo/xtras/n/netfile.o \
+	lingo/xtras/s/swadcmpr.o \
 	lingo/xtras/d/datetime.o \
 	lingo/xtras/n/netlingo.o \
 	lingo/xtras/o/openurl.o \
