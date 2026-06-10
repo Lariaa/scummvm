@@ -65,6 +65,7 @@ namespace Director {
 const char *QTSupport::xlibName = "QuickTimeSupport";
 const XlibFileDesc QTSupport::fileNames[] = {
 	{ "QuickTime Asset",	nullptr },
+	{ "QTASSET",			nullptr },	// Windows (QTASSET.X32)
 	{ nullptr,		nullptr },
 };
 
