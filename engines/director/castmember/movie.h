@@ -33,7 +33,7 @@ public:
 
 	CastMember *duplicate(Cast *cast, uint16 castId) override { return (CastMember *)(new MovieCastMember(cast, castId, *this)); }
 
-	Common::Array<Channel> *getSubChannels(Common::Rect &bbox, uint frame) override;
+	Common::Array<Channel> *getSubChannels(Common::Rect &bbox, uint frame, int parentInk = kInkTypeCopy, uint32 parentForeColor = 0, uint32 parentBackColor = 0xff) override;
 	void load() override;
 
 	bool hasField(int field) override;
