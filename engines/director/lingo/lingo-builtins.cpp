@@ -138,6 +138,7 @@ static const BuiltinProto builtins[] = {
 	{ "pause",			LB::b_pause,		0, 0, 200, CBLTIN },	// D2 c
 	{ "play",			LB::b_play,			0, 2, 200, CBLTIN },	// D2 c
 	{ "playAccel",		LB::b_playAccel,	-1,0, 200, CBLTIN },	// D2
+	{ "stop",			LB::b_stop,			0, 1, 300, CBLTIN },	// D3 (SWA Xtra)
 		// play done												// D2
 	{ "preLoad",		LB::b_preLoad,		-1,0, 300, CBLTIN },	//		D3.1 c
 	{ "preLoadCast",	LB::b_preLoadCast,	-1,0, 300, CBLTIN },	//		D3.1 c
@@ -2174,6 +2175,15 @@ void LB::b_play(int nargs) {
 	}
 
 	g_lingo->func_play(frame, movie);
+}
+
+void LB::b_stop(int nargs) {
+	// Director's Shockwave Audio (SWA) Xtra exposes "stop member <swaMember>" to
+	// halt streamed ".swa" playback, mirroring the existing play/pause builtins.
+	// We don't play SWA media, so this is a no-op that simply discards the
+	// argument instead of raising an "undefined handler" Lingo error (which
+	// otherwise aborts e.g. Loewenzahn 3's login screen).
+	g_lingo->dropStack(nargs);
 }
 
 void LB::b_playAccel(int nargs) {
