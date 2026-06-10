@@ -231,7 +231,9 @@ bool DigitalVideoCastMember::loadVideo(Common::String path) {
 
 	_filename = path;
 
-	Common::Path location = findPath(path);
+	// treeFallback: a digital video is frequently referenced by bare name while
+	// the .MOV/.AVI file lives in a subdirectory (MEDIA/VIDEOS/, DATA/VIDEOS/...).
+	Common::Path location = findPath(path, true, true, false, nullptr, "", true /* treeFallback */);
 	if (location.empty()) {
 		warning("DigitalVideoCastMember::loadVideo(): unable to resolve path %s", path.c_str());
 		return false;
