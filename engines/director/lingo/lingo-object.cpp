@@ -183,6 +183,7 @@
 #include "director/lingo/xtras/s/staytoonedober.h"
 #include "director/lingo/xtras/s/staytoonedtoon.h"
 #include "director/lingo/xtras/s/setmouse.h"
+#include "director/lingo/xtras/s/swadcmpr.h"
 #include "director/lingo/xtras/t/timextra.h"
 #include "director/lingo/xtras/x/xsound.h"
 
@@ -391,6 +392,7 @@ static const struct XLibProto {
 	XLIBDEF(StayToonedHighXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(StayToonedOberXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(StayToonedToonXtra,			kXtraObj,					500),	// D5
+	XLIBDEF(SWADcmprXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(SysColorXObj,		kXObj,			400),	// D4
 	XLIBDEF(TemnotaXObj,			kXObj,					400),	// D4
 	XLIBDEF(TenguXObj,			kXObj,			400),	// D4
