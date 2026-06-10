@@ -164,6 +164,7 @@
 #include "director/lingo/xtras/k/keypoll.h"
 #include "director/lingo/xtras/m/masterapp.h"
 #include "director/lingo/xtras/m/mix.h"
+#include "director/lingo/xtras/m/mixsound.h"
 #include "director/lingo/xtras/m/mui.h"
 #include "director/lingo/xtras/o/openurl.h"
 #include "director/lingo/xtras/o/oscheck.h"
@@ -331,6 +332,7 @@ static const struct XLibProto {
 	XLIBDEF(Misc,				kXObj,			400),	// D4
 	XLIBDEF(MiscX,				kXObj,			400),	// D4
 	XLIBDEF(MixXtra,			kXtraObj,		500),	// D5
+	XLIBDEF(MixSoundXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(MMaskXObj,			kXObj,			400),	// D4
 	XLIBDEF(MoovXObj,			kXObj,			300),	// D3
 	XLIBDEF(MoveMouseJPXObj,	kXObj,			400),	// D4
