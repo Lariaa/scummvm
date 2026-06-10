@@ -194,8 +194,18 @@ MODULE_OBJS = \
 	lingo/xtras/k/keypoll.o \
 	lingo/xtras/m/masterapp.o \
 	lingo/xtras/m/mui.o \
+	lingo/xtras/m/mix.o \
+	lingo/xtras/m/mixsound.o \
+	lingo/xtras/i/ineturl.o \
+	lingo/xtras/n/netfile.o \
+	lingo/xtras/s/swadcmpr.o \
+	lingo/xtras/s/swastrm.o \
+	lingo/xtras/d/datetime.o \
+	lingo/xtras/n/netlingo.o \
 	lingo/xtras/o/openurl.o \
 	lingo/xtras/o/oscheck.o \
+	lingo/xtras/p/paintx.o \
+	lingo/xtras/s/setmouse.o \
 	lingo/xtras/q/qtvrxtra.o \
 	lingo/xtras/r/registryreader.o \
 	lingo/xtras/r/rtk.o \
