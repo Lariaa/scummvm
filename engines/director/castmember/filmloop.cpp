@@ -105,7 +105,7 @@ bool FilmLoopCastMember::isModified() {
 	return false;
 }
 
-Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, uint frame) {
+Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, uint frame, int parentInk, uint32 parentForeColor, uint32 parentBackColor) {
 
 	_subchannels.clear();
 
@@ -153,6 +153,24 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		Sprite src = *_score->_scoreCache[frame]->_sprites[iter];
 		if (src._castId.isNull())
 			continue;
+
+		// In Director, an ink effect applied to a film-loop sprite is applied to
+		// every cell inside the loop. The film loop's own cells are usually
+		// authored with Copy ink (they composite against each other), so when the
+		// score sprite uses a transparency ink (e.g. Background Transparent) we
+		// must propagate it down, otherwise each cell renders as an opaque box.
+		// Only override when the parent actually set a non-Copy ink, so loops
+		// placed with the default Copy ink keep their cells' own inks.
+		//
+		// The transparency key for Background Transparent ink is the sprite's
+		// background colour, so the parent's fore/back colours must travel with
+		// the ink; otherwise each cell would key its own (wrong) colour and the
+		// background pixels would stay opaque.
+		if (parentInk != kInkTypeCopy) {
+			src._ink = (InkType)parentInk;
+			src._foreColor = parentForeColor;
+			src._backColor = parentBackColor;
+		}
 
 		if (src._cast == nullptr && _cast != nullptr)
 			src.setCast(src._castId);
