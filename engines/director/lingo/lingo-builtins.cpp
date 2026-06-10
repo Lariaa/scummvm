@@ -138,6 +138,7 @@ static const BuiltinProto builtins[] = {
 	{ "pause",			LB::b_pause,		0, 0, 200, CBLTIN },	// D2 c
 	{ "play",			LB::b_play,			0, 2, 200, CBLTIN },	// D2 c
 	{ "playAccel",		LB::b_playAccel,	-1,0, 200, CBLTIN },	// D2
+	{ "stop",			LB::b_stop,			1, 1, 300, CBLTIN },	// SWA Xtra "stop member <swa>"
 		// play done												// D2
 	{ "preLoad",		LB::b_preLoad,		-1,0, 300, CBLTIN },	//		D3.1 c
 	{ "preLoadCast",	LB::b_preLoadCast,	-1,0, 300, CBLTIN },	//		D3.1 c
@@ -2184,6 +2185,18 @@ void LB::b_play(int nargs) {
 	}
 
 	g_lingo->func_play(frame, movie);
+}
+
+void LB::b_stop(int nargs) {
+	// Director's Shockwave Audio (SWA) Xtra exposes "stop member <swaMember>" to
+	// halt streamed ".swa" playback, mirroring the existing play/pause builtins.
+	// It always takes the SWA member as its single argument (registered 1,1) --
+	// Loewenzahn 3 e.g. calls stop(member "S2INTRO"); a bare "stop" is not a
+	// Director builtin at all (real Director 5/6/7 raise "handler not defined").
+	// We don't play SWA media, so this is a no-op that discards the member
+	// argument instead of raising an "undefined handler" error that would abort
+	// Loewenzahn 3's login screen.
+	g_lingo->dropStack(nargs);
 }
 
 void LB::b_playAccel(int nargs) {
