@@ -123,6 +123,44 @@ struct CachedFile {
 		"PATH.INI",
 		(const byte *)"[cd-path]\r\npath=d:\\\r\n", -1
 	},
+	{"tkkg5", Common::kPlatformWindows,
+		// TKKG5 reads <WindowsDir>\TKKG_5.ini, same "[CD]" + bare-letter "item 2"
+		// scheme as TKKG6 (see below).
+		"TKKG_5.ini",
+		(const byte *)"[CD]\r\npath=d\r\n", -1
+	},
+	{"tkkg6", Common::kPlatformWindows,
+		// TKKG6 reads <WindowsDir>\TKKG_6.ini to find the CD drive: it scans for
+		// a "[CD]" line and takes "item 2" (after '=') of the following line as
+		// the bare drive letter, then forms "<letter>:". So the value must be the
+		// letter only ("d"), not "d:\" (which would yield a bogus "d:\:").
+		"TKKG_6.ini",
+		(const byte *)"[CD]\r\npath=d\r\n", -1
+	},
+	{"tkkg7", Common::kPlatformWindows,
+		// TKKG7 reads <WindowsDir>\TKKG_7.ini and takes "char 1 of item 2" of the
+		// line after "[CDpath]" as the drive letter, then forms "<letter>:".
+		"TKKG_7.ini",
+		(const byte *)"[CDpath]\r\npath=d:\\\r\n", -1
+	},
+	{"tkkg8", Common::kPlatformWindows,
+		// TKKG8 reads <WindowsDir>\TKKG_8.ini, same "[CDpath]" scheme as TKKG7.
+		"TKKG_8.ini",
+		(const byte *)"[CDpath]\r\npath=d:\\\r\n", -1
+	},
+	{"tkkg9", Common::kPlatformWindows,
+		// TKKG9 reads <WindowsDir>\TKKG_9.ini, same "[CDpath]" scheme as TKKG7.
+		"TKKG_9.ini",
+		(const byte *)"[CDpath]\r\npath=d:\\\r\n", -1
+	},
+	{"oscar5", Common::kPlatformWindows,
+		// Oscar the Balloonist Flies into the Mountains reads
+		// <WindowsDir>\Oscar_Be.ini and takes "item 2" (after '=') of the line
+		// after "[CDpath]" as the drive root, using it *directly* (mediaPath =
+		// <value> & "Datas\"). So the value must be the full "d:\".
+		"Oscar_Be.ini",
+		(const byte *)"[CDpath]\r\npath=d:\\\r\n", -1
+	},
 
 	// Professor Finkle's Times Table Factory has an installer that copies a bunch of empty files,
 	// which the game gets upset about if they don't exist.
