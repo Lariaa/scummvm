@@ -157,14 +157,21 @@
 #include "director/lingo/xtras/b/budapi.h"
 #include "director/lingo/xtras/d/directsound.h"
 #include "director/lingo/xtras/d/displayres.h"
+#include "director/lingo/xtras/d/datetime.h"
 #include "director/lingo/xtras/f/filextra.h"
+#include "director/lingo/xtras/f/filextra4.h"
 #include "director/lingo/xtras/g/getdir.h"
+#include "director/lingo/xtras/i/ineturl.h"
 #include "director/lingo/xtras/k/keypoll.h"
 #include "director/lingo/xtras/m/masterapp.h"
+#include "director/lingo/xtras/m/mix.h"
+#include "director/lingo/xtras/m/mixsound.h"
 #include "director/lingo/xtras/m/mui.h"
-#include "director/lingo/xtras/m/mui.h"
+#include "director/lingo/xtras/n/netfile.h"
+#include "director/lingo/xtras/n/netlingo.h"
 #include "director/lingo/xtras/o/openurl.h"
 #include "director/lingo/xtras/o/oscheck.h"
+#include "director/lingo/xtras/p/paintx.h"
 #include "director/lingo/xtras/q/qtvrxtra.h"
 #include "director/lingo/xtras/r/registryreader.h"
 #include "director/lingo/xtras/r/rtk.h"
@@ -176,6 +183,9 @@
 #include "director/lingo/xtras/s/staytoonedhigh.h"
 #include "director/lingo/xtras/s/staytoonedober.h"
 #include "director/lingo/xtras/s/staytoonedtoon.h"
+#include "director/lingo/xtras/s/setmouse.h"
+#include "director/lingo/xtras/s/swadcmpr.h"
+#include "director/lingo/xtras/s/swastrm.h"
 #include "director/lingo/xtras/t/timextra.h"
 #include "director/lingo/xtras/x/xsound.h"
 
@@ -273,6 +283,7 @@ static const struct XLibProto {
 	XLIBDEF(DPWAVIXObj,			kXObj,			300),	// D3
 	XLIBDEF(DPWQTWXObj,			kXObj,			300),	// D3
 	XLIBDEF(DarkenScreen,		kXObj,			300),	// D3
+	XLIBDEF(DateTimeXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(DateUtilXObj,		kXObj,			400),	// D4
 	XLIBDEF(DeveloperStack,		kXObj,			300),	// D3
 	XLIBDEF(DialogsXObj,		kXObj,			400),	// D4
@@ -293,6 +304,7 @@ static const struct XLibProto {
 	XLIBDEF(FileExists,			kXObj,			300),	// D3
 	XLIBDEF(FileIO,				kXObj | kXtraObj,200),	// D2
 	XLIBDEF(FileXtra,			kXtraObj,		500),	// D5
+	XLIBDEF(FileXtra4Xtra,			kXtraObj,					500),	// D5
 	XLIBDEF(FindFolder,			kXObj,			300),	// D3
 	XLIBDEF(FindSys,			kXObj,			400),	// D4
 	XLIBDEF(FindWin,			kXObj,			400),	// D4
@@ -308,6 +320,7 @@ static const struct XLibProto {
 	XLIBDEF(GpidXObj,			kXObj,			400),	// D4
 	XLIBDEF(HenryXObj,			kXObj,			400),	// D4
 	XLIBDEF(HitMap,				kXObj,			400),	// D4
+	XLIBDEF(INetURLXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(IniXObj,			kXObj,			400),	// D4
 	XLIBDEF(InstObjXObj,		kXObj,			400),	// D4
 	XLIBDEF(IsCD,				kXObj,			300),	// D3
@@ -326,6 +339,8 @@ static const struct XLibProto {
 	XLIBDEF(MemoryXObj,			kXObj,			300),	// D3
 	XLIBDEF(Misc,				kXObj,			400),	// D4
 	XLIBDEF(MiscX,				kXObj,			400),	// D4
+	XLIBDEF(MixXtra,			kXtraObj,		500),	// D5
+	XLIBDEF(MixSoundXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(MMaskXObj,			kXObj,			400),	// D4
 	XLIBDEF(MoovXObj,			kXObj,			300),	// D3
 	XLIBDEF(MoveMouseJPXObj,	kXObj,			400),	// D4
@@ -336,11 +351,14 @@ static const struct XLibProto {
 	XLIBDEF(MuiXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(MyFolderXObj,			kXObj,					400),	// D4
 	XLIBDEF(MystIsleXObj,		kXObj,			400),	// D4
+	XLIBDEF(NetFileXtra,		kXtraObj,		500),	// D5
+	XLIBDEF(NetLingoXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(OSCheckXtra,		kXtraObj,		400),	// D4
 	XLIBDEF(OpenBleedWindowXCMD,kXObj,			300),	// D3
 	XLIBDEF(OpenURLXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(OrthoPlayXObj,		kXObj,			400),	// D4
 	XLIBDEF(PACoXObj,			kXObj,			300),	// D3
+	XLIBDEF(PaintXXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(PalXObj,			kXObj,			400),	// D4
 	XLIBDEF(PanelXObj,			kXObj,			200),	// D2
 	XLIBDEF(PharaohsXObj,		kXObj,			400),	// D4
@@ -365,6 +383,7 @@ static const struct XLibProto {
 	XLIBDEF(SaveNRestoreXObj,			kXObj,					400),	// D4
 	XLIBDEF(ScrnUtilXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(SerialPortXObj,		kXObj,			200),	// D2
+	XLIBDEF(SetMouseXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(SmackerXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(SmallUtilXObj,		kXObj,			400),	// D4
 	XLIBDEF(SoundJam,			kXObj,			400),	// D4
@@ -376,6 +395,8 @@ static const struct XLibProto {
 	XLIBDEF(StayToonedHighXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(StayToonedOberXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(StayToonedToonXtra,			kXtraObj,					500),	// D5
+	XLIBDEF(SWADcmprXtra,		kXtraObj,		500),	// D5
+	XLIBDEF(SWAStrmXtra,		kXtraObj,		500),	// D5
 	XLIBDEF(SysColorXObj,		kXObj,			400),	// D4
 	XLIBDEF(TemnotaXObj,			kXObj,					400),	// D4
 	XLIBDEF(TenguXObj,			kXObj,			400),	// D4
