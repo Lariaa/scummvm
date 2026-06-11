@@ -509,6 +509,13 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 		break;
 	// 8bpp - if using a different palette, and we're not doing a color cycling operation, convert using nearest colour matching
 	case 8:
+		if (_bitsPerPixel == 8) {  // TEMP GREENDBG: diagnose jewels1 green tint
+			bool palOk = g_director->getLoadedPalettes().contains(castPaletteId);
+			warning("GREENDBG cast %d: clut=%s castPal=%s curPal=%s palLoaded=%d puppet=%d targetBpp=%d cycling=%d",
+				_castId, _clut.asString().c_str(), castPaletteId.asString().c_str(),
+				currentPaletteId.asString().c_str(), palOk, movie->getWindow()->_puppetPalette,
+				targetBpp, isColorCycling);
+		}
 		// "break" means falling back to the default of rendering the image with
 		// the current 8-bit palette. The below is only about -redithering colours-;
 		// i.e. redrawing the picture to use the current palette.
