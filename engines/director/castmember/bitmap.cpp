@@ -515,8 +515,16 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 		// Only redither 8-bit images in 8-bit mode if we have the remap palette flag set, or it is external
 		if (targetBpp == 1 && !movie->_remapPalettesWhenNeeded && !_external)
 			break;
-		// If we're in 32-bit mode, and not in puppet palette mode, then "redither" as well.
-		if (targetBpp == 4 && movie->getWindow()->_puppetPalette && !_external)
+		// In 32-bit mode, when a palette is puppeted, skip redithering only for
+		// images that actually follow the current palette (clutId 0, or the same
+		// palette as the current one). Those are the color-cycling/animated images
+		// the puppet is for, and must be rendered live against the current palette.
+		// Images with their own distinct palette still get dithered to it; otherwise
+		// a puppetPalette set for one image would corrupt every other image on stage
+		// (e.g. the jewels1 cave background, whose bitmaps carry their own clut while
+		// the loader puppets a different palette before branching to that scene).
+		if (targetBpp == 4 && movie->getWindow()->_puppetPalette && !_external
+				&& castPaletteId == currentPaletteId)
 			break;
 		if (_external || (targetBpp == 4) || (castPaletteId != currentPaletteId && !isColorCycling)) {
 			const auto pals = g_director->getLoadedPalettes();
