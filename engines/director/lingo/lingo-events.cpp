@@ -277,12 +277,29 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			}
 
 			if (_vm->getVersion() >= 600) {
-				event.scriptType = kScoreScript;
-				event.scriptId = scriptId;
+				AbstractObject *inst = nullptr;
 				if (event.behaviorIndex >= 0 && event.behaviorIndex < (int)_score->_channels[event.channelId]->_scriptInstanceList.size())
-					event.scriptInstance = _score->_channels[event.channelId]->_scriptInstanceList[event.behaviorIndex].u.obj;
+					inst = _score->_channels[event.channelId]->_scriptInstanceList[event.behaviorIndex].u.obj;
 				else
 					warning("resolveScriptEvent: behaviorIndex %d out of range", event.behaviorIndex);
+
+				const char *evName = _lingo->_eventHandlerTypes[event.event];
+				bool hasHandler = evName && inst && inst->getMethod(evName).type != VOIDSYM;
+
+				// Only resolve this behavior if it actually defines a handler for the
+				// event. Otherwise leave the event as kNoneScript so processEvents()
+				// skips it without touching _passEvent. A handler-less behavior run
+				// as a no-op would still consume the pass-through (passByDefault),
+				// swallowing the subsequent movie/cast handlers and editable-text
+				// widget input (e.g. a CurH cursor behavior on an editable name field
+				// has no keyDown handler but, being the last behavior, swallowed every
+				// keystroke). Mirrors the kCastHandler and kFrameHandler branches,
+				// which both gate on handler existence.
+				if (hasHandler) {
+					event.scriptType = kScoreScript;
+					event.scriptId = scriptId;
+					event.scriptInstance = inst;
+				}
 				return;
 			}
 
