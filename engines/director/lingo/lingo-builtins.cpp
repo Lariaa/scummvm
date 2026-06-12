@@ -2016,6 +2016,7 @@ void LB::b_continue(int nargs) {
 
 void LB::b_dontPassEvent(int nargs) {
 	g_lingo->_passEvent = false;
+	g_lingo->_passEventExplicitlyBlocked = true;
 }
 
 void LB::b_nothing(int nargs) {
@@ -2141,6 +2142,7 @@ void LB::b_idleLoadDone(int nargs) {
 
 void LB::b_pass(int nargs) {
 	g_lingo->_passEvent = true;
+	g_lingo->_passEventExplicitlyBlocked = false;
 }
 
 void LB::b_pause(int nargs) {
@@ -2447,6 +2449,7 @@ void LB::b_stopEvent(int nargs) {
 	// current event message from being passed to subsequent locations in the
 	// message hierarchy.
 	g_lingo->_passEvent = false;
+	g_lingo->_passEventExplicitlyBlocked = true;
 }
 
 ///////////////////
