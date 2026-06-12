@@ -371,12 +371,20 @@ bool Movie::processSysEvent(Common::Event &event) {
 		if (_timeOutKeyDown)
 			_lastTimeOut = _lastEventTime;
 
-		result = processInputEvent(kEventKeyDown, sc->getSpriteIDOfActiveWidget());
+		processInputEvent(kEventKeyDown, sc->getSpriteIDOfActiveWidget());
+		// The active editable text widget should still receive the keystroke
+		// unless a script explicitly stopped the event (dontPassEvent/stopEvent).
+		// processInputEvent() returns _passEvent, which is also false after a
+		// plain do-nothing handler ran without passing -- using it here would let
+		// e.g. a cursor (CurH) behavior or a movie keyDown handler swallow every
+		// keystroke. macwindow.cpp gates widget delivery on this return value.
+		result = !_lingo->_passEventExplicitlyBlocked;
 		g_director->loadSlowdownCooloff();
 		return result;
 
 	case Common::EVENT_KEYUP:
-		result = processInputEvent(kEventKeyUp, sc->getSpriteIDOfActiveWidget());
+		processInputEvent(kEventKeyUp, sc->getSpriteIDOfActiveWidget());
+		result = !_lingo->_passEventExplicitlyBlocked;
 		_keyFlags = event.kbd.flags;
 		return result;
 
