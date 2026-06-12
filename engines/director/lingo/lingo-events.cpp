@@ -676,6 +676,10 @@ void Movie::queueInputEvent(LEvent event, int targetId, Common::Point pos) {
 
 
 bool Movie::processInputEvent(LEvent event, int targetId, Common::Point pos) {
+	// Track whether a script explicitly stops the event (dontPassEvent/stopEvent)
+	// during this input event, so editable text widgets can still receive a key
+	// that a plain do-nothing handler merely failed to pass on.
+	_lingo->_passEventExplicitlyBlocked = false;
 	if (!_lingo->_state->callstack.empty()) {
 		// We're in the middle of executing something else, queue input event for later
 		queueInputEvent(event, targetId, pos);
