@@ -678,6 +678,8 @@ void Movie::queueInputEvent(LEvent event, int targetId, Common::Point pos) {
 
 
 bool Movie::processInputEvent(LEvent event, int targetId, Common::Point pos) {
+	_lingo->_passEventExplicitlyBlocked = false;
+
 	// Route a mouse event on a movie cast member into its linked movie so that
 	// movie's own scripts (mouseUp, the clickOn) handle it.
 	if (event >= kEventMouseUp && event <= kEventMouseWithin) {

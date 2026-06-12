@@ -373,12 +373,14 @@ bool Movie::processSysEvent(Common::Event &event) {
 		if (_timeOutKeyDown)
 			_lastTimeOut = _lastEventTime;
 
-		result = processInputEvent(kEventKeyDown, sc->getSpriteIDOfActiveWidget());
+		processInputEvent(kEventKeyDown, sc->getSpriteIDOfActiveWidget());
+		result = !_lingo->_passEventExplicitlyBlocked;
 		g_director->loadSlowdownCooloff();
 		return result;
 
 	case Common::EVENT_KEYUP:
-		result = processInputEvent(kEventKeyUp, sc->getSpriteIDOfActiveWidget());
+		processInputEvent(kEventKeyUp, sc->getSpriteIDOfActiveWidget());
+		result = !_lingo->_passEventExplicitlyBlocked;
 		_vm->_keyFlags = event.kbd.flags;
 		return result;
 

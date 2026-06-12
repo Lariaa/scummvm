@@ -580,6 +580,7 @@ public:
 
 	// events
 	bool _passEvent;
+	bool _passEventExplicitlyBlocked;
 	Datum _perFrameHook;
 
 	Datum _windowList;
