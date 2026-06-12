@@ -207,6 +207,7 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 
 	// events
 	_passEvent = false;
+	_passEventExplicitlyBlocked = false;
 	_perFrameHook = Datum();
 
 	_windowList.type = ARRAY;

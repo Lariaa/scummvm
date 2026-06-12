@@ -571,6 +571,11 @@ public:
 
 	// events
 	bool _passEvent;
+	// Set only when a script explicitly calls `dontPassEvent`, distinct from
+	// _passEvent (which is also false when a plain handler ran without passing).
+	// Used to decide whether an editable text widget should still receive a
+	// keystroke: it should, unless a script explicitly stopped the event.
+	bool _passEventExplicitlyBlocked;
 	Datum _perFrameHook;
 
 	Datum _windowList;
