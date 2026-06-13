@@ -283,7 +283,12 @@ public:
 	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
 
 private:
-	typedef Common::HashMap<Common::String, Common::String> FileMap;
+	// Director (Win/Mac) treats filenames case-insensitively. The game requests the
+	// SCORE movie as e.g. "score.DIR" while saveMovie() may have written the shadow
+	// save under "SCORE.DIR" (the on-disk casing). A case-sensitive map misses that
+	// and the engine silently falls back to the (empty) original movie, so saved
+	// progress never loads back. Match case-insensitively, like RIFXArchive's FileMap.
+	typedef Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> FileMap;
 	FileMap _files;
 };
 
