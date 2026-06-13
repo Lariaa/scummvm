@@ -641,6 +641,10 @@ bool Window::loadNextMovie() {
 	_currentMovie = new Movie(this);
 	_currentMovie->setArchive(mov);
 
+	// TEMP green-tint test: revert puppetPalette persistence (pre-6fa82 behaviour,
+	// where the flag lived on the per-movie Score and reset on every movie switch).
+	_puppetPalette = false;
+
 	debug(0, "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 	debug(0, "@@@@   Switching to movie '%s' in '%s'", utf8ToPrintable(_currentMovie->getMacName()).c_str(), _currentPath.c_str());
 	debug(0, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
