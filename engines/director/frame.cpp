@@ -250,10 +250,14 @@ void Frame::readMainChannelsD2(Common::MemoryReadStreamEndian &stream, uint16 of
 				} else {
 					_mainChannels.palette.paletteId = CastMemberID(paletteId, DEFAULT_CAST_LIB);
 				}
+				bool hadPal = !g_director->hasPalette(_mainChannels.palette.paletteId) ? false : true;
 				if (!g_director->hasPalette(_mainChannels.palette.paletteId))
 					_mainChannels.palette.paletteId = CastMemberID();
 				if (!_mainChannels.palette.paletteId.isNull())
 					_mainChannels.scoreCachedPaletteId = _mainChannels.palette.paletteId;
+				if (paletteId != 0)  // TEMP PALCHDBG: scene palette parse
+					warning("PALCHDBG: frame palette channel raw=%d -> hasPalette(DEFAULT_CAST_LIB)=%d resolved=(%d,%d)",
+						paletteId, hadPal, _mainChannels.palette.paletteId.member, _mainChannels.palette.paletteId.castLib);
 			}
 			break;
 		case 18:
