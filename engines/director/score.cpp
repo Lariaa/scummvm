@@ -1144,12 +1144,15 @@ void Score::setLastPalette() {
 		currentPalette = _currentFrame->_mainChannels.scoreCachedPaletteId;
 		if (!_vm->hasPalette(currentPalette))
 			currentPalette = CastMemberID();
-		// The cached ID is created before the cast gets loaded; if it's zero,
-		// this corresponds to the movie default palette.
-		if (currentPalette.isNull()) {
-			currentPalette = _vm->getCurrentMovie()->_defaultPalette;
-		}
-		// If for whatever reason this doesn't resolve, abort.
+		// Neither the frame nor the cached score palette specify anything for
+		// this frame. In Director the palette in effect simply carries over
+		// until a palette-channel change, so keep the last applied palette
+		// instead of reverting to the movie default. Reverting would reset
+		// every static frame to the (often bogus -1/system) default and drop
+		// the scene palette that was set on the prior palette-change frame --
+		// which is what turned the jewels1 scenes green: the scene palette
+		// only appears on the change frame, and Frame::reset() clears
+		// scoreCachedPaletteId on every loop/rewind.
 		if (currentPalette.isNull())
 			return;
 	}
