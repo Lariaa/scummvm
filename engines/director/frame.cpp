@@ -518,6 +518,10 @@ void Frame::readMainChannelsD4(Common::MemoryReadStreamEndian &stream, uint16 of
 				}
 				if (!_mainChannels.palette.paletteId.isNull())
 					_mainChannels.scoreCachedPaletteId = _mainChannels.palette.paletteId;
+				if (paletteId != 0)  // TEMP PALCHDBG D4: scene palette parse
+					warning("PALCHDBG-D4: frame palette channel raw=%d hasPalette=%d resolved=(%d,%d)",
+						paletteId, g_director->hasPalette(_mainChannels.palette.paletteId),
+						_mainChannels.palette.paletteId.member, _mainChannels.palette.paletteId.castLib);
 			}
 			break;
 		case 22:
