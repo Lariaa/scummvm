@@ -511,10 +511,16 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 	case 8:
 		if (_bitsPerPixel == 8) {  // TEMP GREENDBG: diagnose jewels1 green tint
 			bool palOk = g_director->getLoadedPalettes().contains(castPaletteId);
-			warning("GREENDBG cast %d: clut=%s castPal=%s curPal=%s palLoaded=%d puppet=%d targetBpp=%d cycling=%d",
+			bool break8 = (targetBpp == 1 && !movie->_remapPalettesWhenNeeded && !_external);
+			bool breakPup = (targetBpp == 4 && movie->getWindow()->_puppetPalette && !_external
+				&& castPaletteId == currentPaletteId);
+			bool redither = !break8 && !breakPup
+				&& (_external || (targetBpp == 4) || (castPaletteId != currentPaletteId && !isColorCycling));
+			warning("GREENDBG cast %d: clut=%s castPal=%s curPal=%s palLoaded=%d puppet=%d targetBpp=%d cycling=%d remap=%d path=%s",
 				_castId, _clut.asString().c_str(), castPaletteId.asString().c_str(),
 				currentPaletteId.asString().c_str(), palOk, movie->getWindow()->_puppetPalette,
-				targetBpp, isColorCycling);
+				targetBpp, isColorCycling, movie->_remapPalettesWhenNeeded,
+				break8 ? "BREAK8(raw-vs-physical)" : breakPup ? "BREAKpuppet" : redither ? "REDITHER->castPal" : "none");
 		}
 		// "break" means falling back to the default of rendering the image with
 		// the current 8-bit palette. The below is only about -redithering colours-;
