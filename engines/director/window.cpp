@@ -641,8 +641,8 @@ bool Window::loadNextMovie() {
 	_currentMovie = new Movie(this);
 	_currentMovie->setArchive(mov);
 
-	// TEMP green-tint test: revert puppetPalette persistence (pre-6fa82 behaviour,
-	// where the flag lived on the per-movie Score and reset on every movie switch).
+	// A palette puppet does not survive a movie switch: the new movie starts
+	// with the palette channel back under score control until it puppets again.
 	_puppetPalette = false;
 
 	debug(0, "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");

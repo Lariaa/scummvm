@@ -3232,8 +3232,6 @@ void LB::b_puppetPalette(int nargs) {
 	}
 
 	Window *window = movie->getWindow();
-	warning("PUPPETDBG: puppetPalette(%s) in movie '%s'", palette.asString().c_str(),
-		movie->getMacName().c_str());  // TEMP green-tint diag
 	if (!palette.isNull()) {
 		g_director->setPalette(palette);
 		window->_puppetPalette = true;
