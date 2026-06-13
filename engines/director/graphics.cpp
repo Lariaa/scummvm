@@ -181,7 +181,7 @@ bool DirectorEngine::setPalette(const CastMemberID &id) {
 	PaletteV4 *pal = getPalette(id);
 	if (!pal)
 		return false;
-	warning("SETPALDBG: physical setPalette -> %s", id.asString().c_str());  // TEMP green-tint diag
+	warning("SETPALDBG: physical setPalette -> member %d castLib %d", id.member, id.castLib);  // TEMP green-tint diag (asString() derefs getCurrentMovie -> null at startup)
 	debugC(5, kDebugImages, "DirectorEngine::setPalettes(): setting palette %d, %d", id.member, id.castLib);
 	setPalette(pal->palette, pal->length);
 	return true;
