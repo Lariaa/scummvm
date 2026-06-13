@@ -1671,10 +1671,24 @@ uint16 Score::getSpriteIDFromPos(Common::Point pos) {
 	return 0;
 }
 
+// In D6+ a sprite's behaviors are stored per frame: Score::loadFrameSpriteDetails()
+// only fills Sprite::_behaviors on frames that carry a sprite-list index (the span
+// keyframe), and Sprite::replaceFrom() copies that empty list into the persistent
+// channel sprite on every continuation frame. The instantiated behaviors, however,
+// live on Channel::_scriptInstanceList for the whole span (created at the span start,
+// destroyed by killScriptInstances() at the span end). So on a continuation frame the
+// channel still has live, mouse-handling behaviors even though _sprite->_behaviors is
+// empty -- and Sprite::respondsToMouse()/isActive() (which consult _behaviors) wrongly
+// report the sprite as inert, making a click there fall through.
+//
+// The event dispatch (queueEvent()/resolveScriptEvent()) already treats
+// _scriptInstanceList as the source of truth, so the two helpers below align the hit
+// test with it: a channel that carries live behavior instances is clickable anywhere
+// within the behavior sprite's span, not just on the keyframe.
 uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
-		if (test == kCollisionYes && _channels[i]->_sprite->respondsToMouse())
+		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToMouse() || !_channels[i]->_scriptInstanceList.empty()))
 			return i;
 		else if (test == kCollisionHole)
 			break;
@@ -1686,7 +1700,7 @@ uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 uint16 Score::getActiveSpriteIDFromPos(Common::Point pos) {
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
-		if (test == kCollisionYes && _channels[i]->_sprite->isActive())
+		if (test == kCollisionYes && (_channels[i]->_sprite->isActive() || !_channels[i]->_scriptInstanceList.empty()))
 			return i;
 		else if (test == kCollisionHole)
 			break;
