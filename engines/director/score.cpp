@@ -1129,6 +1129,13 @@ bool Score::renderPrePaletteCycle(RenderMode mode) {
 }
 
 void Score::setLastPalette() {
+	// TEMP SLPDBG: show whether the frame carries a real scene palette and
+	// whether the puppet early-return suppresses applying it.
+	warning("SLPDBG setLastPalette: puppet=%d framePal=(%d,%d) cached=(%d,%d) last=(%d,%d)",
+		_window->_puppetPalette,
+		_currentFrame->_mainChannels.palette.paletteId.member, _currentFrame->_mainChannels.palette.paletteId.castLib,
+		_currentFrame->_mainChannels.scoreCachedPaletteId.member, _currentFrame->_mainChannels.scoreCachedPaletteId.castLib,
+		_vm->_lastPalette.member, _vm->_lastPalette.castLib);
 	if (_window->_puppetPalette)
 		return;
 
