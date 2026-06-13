@@ -1578,6 +1578,9 @@ void LC::c_tell() {
 			return;
 		}
 	}
+	warning("CTXDBG c_tell: '%s' -> '%s'",
+		currentWindow->getCurrentMovie() ? currentWindow->getCurrentMovie()->getMacName().c_str() : "<none>",
+		w->getCurrentMovie() ? w->getCurrentMovie()->getMacName().c_str() : "<none>");
 	currentWindow->moveLingoState(w);
 	g_director->setCurrentWindow(w);
 
@@ -1591,6 +1594,9 @@ void LC::c_telldone() {
 		return;
 	}
 	Window *w = static_cast<Window *>(returnWindow.u.obj);
+	warning("CTXDBG c_telldone: '%s' -> '%s'",
+		currentWindow->getCurrentMovie() ? currentWindow->getCurrentMovie()->getMacName().c_str() : "<none>",
+		w->getCurrentMovie() ? w->getCurrentMovie()->getMacName().c_str() : "<none>");
 	currentWindow->moveLingoState(w);
 	g_director->setCurrentWindow(w);
 }

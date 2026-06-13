@@ -359,8 +359,12 @@ Symbol Lingo::getHandler(const Common::String &name) {
 		Movie *stageMovie = stage->getCurrentMovie();
 		if (stageMovie) {
 			sym = stageMovie->getHandler(name, 0);
-			if (sym.type != VOIDSYM)
+			if (sym.type != VOIDSYM) {
+				warning("CTXDBG handler '%s' NOT in current window movie '%s' (path %s) -- resolved via stage movie '%s'",
+					name.c_str(), g_director->getCurrentMovie()->getMacName().c_str(),
+					g_director->getCurrentPath().c_str(), stageMovie->getMacName().c_str());
 				return sym;
+			}
 		}
 	}
 
