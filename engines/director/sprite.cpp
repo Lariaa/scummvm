@@ -350,12 +350,20 @@ bool Sprite::respondsToMouse() {
 	ScriptContext *spriteScript = _movie->getScriptContext(kScoreScript, _scriptId);
 	if (spriteScript && (spriteScript->_eventHandlers.contains(kEventGeneric)
 					  || spriteScript->_eventHandlers.contains(kEventMouseDown)
-					  || spriteScript->_eventHandlers.contains(kEventMouseUp)))
+					  || spriteScript->_eventHandlers.contains(kEventMouseUp)
+					  || spriteScript->_eventHandlers.contains(kEventMouseWithin)
+					  || spriteScript->_eventHandlers.contains(kEventMouseEnter)
+					  || spriteScript->_eventHandlers.contains(kEventMouseLeave)
+					  || spriteScript->_eventHandlers.contains(kEventMouseUpOutSide)))
 		return true;
 
 	ScriptContext *castScript = _movie->getScriptContext(kCastScript, _castId);
 	if (castScript && (castScript->_eventHandlers.contains(kEventMouseDown)
-					|| castScript->_eventHandlers.contains(kEventMouseUp)))
+					|| castScript->_eventHandlers.contains(kEventMouseUp)
+					|| castScript->_eventHandlers.contains(kEventMouseWithin)
+					|| castScript->_eventHandlers.contains(kEventMouseEnter)
+					|| castScript->_eventHandlers.contains(kEventMouseLeave)
+					|| castScript->_eventHandlers.contains(kEventMouseUpOutSide)))
 		return true;
 
 	return false;
