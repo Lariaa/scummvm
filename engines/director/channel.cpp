@@ -120,6 +120,8 @@ Channel::~Channel() {
 
 DirectorPlotData Channel::getPlotData() {
 	int blend = (_sprite->_thickness & kTHasBlend) || _sprite->_ink == kInkTypeBlend ? _sprite->_blendAmount : 0;
+	debugC(6, kDebugImages, "Channel::getPlotData(): castId: %s ink: %d blend: %d backColor: %d foreColor: %d",
+		_sprite->_castId.asString().c_str(), _sprite->_ink, blend, _sprite->getBackColor(), _sprite->getForeColor());
 	DirectorPlotData pd(g_director, _sprite->_spriteType, _sprite->_ink, blend, _sprite->getBackColor(), _sprite->getForeColor());
 	pd.colorWhite = g_director->getColorWhite();
 	pd.colorBlack = g_director->getColorBlack();
