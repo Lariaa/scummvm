@@ -578,9 +578,16 @@ bool Window::step() {
 				debug(0, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 
 				bool goodMovie = _currentMovie->loadArchive();
-				// If we've just started, switch to the default palette
-				if (g_director->_firstMovie)
-					g_director->setPalette(_currentMovie->getCast()->_defaultPalette);
+				// Apply the new movie's default palette on entry. In Director the
+				// palette is a movie-level property: switching movies resets to the
+				// new movie's default until a palette-channel change. This used to be
+				// seeded for non-first movies via the _defaultPalette fallback in
+				// setLastPalette(), which the D4 scene-palette fix removed -- leaving
+				// movies with a real custom default palette (e.g. TKKG ausweis.dir,
+				// member 42) rendering against the previous movie's physical palette.
+				CastMemberID defPal = _currentMovie->getCast()->_defaultPalette;
+				g_director->setPalette(defPal);
+				g_director->_lastPalette = defPal;
 
 				// If we came in a loop, then skip as requested
 				if (!_nextMovie.frameS.empty()) {
