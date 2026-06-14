@@ -46,6 +46,7 @@
 #include "director/channel.h"
 #include "director/sprite.h"
 #include "director/window.h"
+#include "director/lingo/lingo-object.h"
 #include "director/castmember/castmember.h"
 #include "director/castmember/filmloop.h"
 #include "director/castmember/transition.h"
@@ -1700,13 +1701,34 @@ uint16 Score::getSpriteIDFromPos(Common::Point pos) {
 // report the sprite as inert, making a click there fall through.
 //
 // The event dispatch (queueEvent()/resolveScriptEvent()) already treats
-// _scriptInstanceList as the source of truth, so the two helpers below align the hit
+// _scriptInstanceList as the source of truth, so the helper below aligns the hit
 // test with it: a channel that carries live behavior instances is clickable anywhere
 // within the behavior sprite's span, not just on the keyframe.
+//
+// As with Sprite::respondsToMouse(), only instances that actually define a mouse
+// handler count. A behavior with e.g. only an on beginSprite handler must not capture
+// clicks, or the dispatcher would drop the resolved event and the click would never
+// reach a lower click-catcher sprite (e.g. TKKG5 Sz140's box-pushing playfield).
+static bool instancesHandleMouse(Channel *channel) {
+	static const LEvent mouseEvents[] = { kEventMouseDown, kEventMouseUp, kEventMouseWithin,
+										  kEventMouseEnter, kEventMouseLeave, kEventMouseUpOutSide };
+	for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
+		const Datum &scriptInstance = channel->_scriptInstanceList[i];
+		if (scriptInstance.type != OBJECT || !scriptInstance.u.obj)
+			continue;
+		for (int j = 0; j < ARRAYSIZE(mouseEvents); j++) {
+			const char *name = g_lingo->_eventHandlerTypes[mouseEvents[j]];
+			if (name && scriptInstance.u.obj->getMethod(name).type != VOIDSYM)
+				return true;
+		}
+	}
+	return false;
+}
+
 uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
-		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToMouse() || !_channels[i]->_scriptInstanceList.empty()))
+		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToMouse() || instancesHandleMouse(_channels[i])))
 			return i;
 		else if (test == kCollisionHole)
 			break;
