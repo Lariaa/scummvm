@@ -892,11 +892,13 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 			if (currentSprite) {
 				Common::Rect bbox = channel->getBbox();
 				debugC(5, kDebugImages,
-					"Score::updateSprites(): CH: %-3d castId: %s invalid: %d [ink: %d, puppet: %d, moveable: %d, trails: %d, visible: %d] [bbox: %d,%d,%d,%d] [type: %d fg: %d bg: %d] [script: %s]",
+					"Score::updateSprites(): CH: %-3d castId: %s invalid: %d [ink: %d, puppet: %d, moveable: %d, trails: %d, visible: %d] [bbox: %d,%d,%d,%d] [type: %d fg: %d bg: %d] [inkData: 0x%02x blend: %d thickness: 0x%02x effBlend: %d] [script: %s]",
 					i, currentSprite->_castId.asString().c_str(), invalidCastMember,
 					currentSprite->_ink, currentSprite->_puppet, currentSprite->_moveable,
 					currentSprite->_trails, channel->_visible,
 					PRINT_RECT(bbox), currentSprite->_spriteType, currentSprite->_foreColor, currentSprite->_backColor,
+					currentSprite->_inkData, currentSprite->_blendAmount, currentSprite->_thickness,
+					(((currentSprite->_thickness & kTHasBlend) || currentSprite->_ink == kInkTypeBlend) ? currentSprite->_blendAmount : 0),
 					currentSprite->_scriptId.asString().c_str());
 			} else {
 				debugC(5, kDebugImages, "Score::updateSprites(): CH: %-3d: No sprite", i);
