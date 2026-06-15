@@ -1835,6 +1835,16 @@ void LC::call(const Symbol &funcSym, int nargs, bool allowRetVal) {
 			(*funcSym.u.bltin)(nargs);
 			g_lingo->_state->me = retMe;
 		} else {
+			// sendSprite/sendAllSprites/call/send can be used both as a command and
+			// as a function (returning the handler's result). They are registered as
+			// HBLTIN, so the same builtin is invoked in either context; tell it whether
+			// a return value is expected (same mechanism as m_perform above).
+			if (funcSym.name && (funcSym.name->equalsIgnoreCase("sendSprite") ||
+					funcSym.name->equalsIgnoreCase("sendAllSprites") ||
+					funcSym.name->equalsIgnoreCase("call") ||
+					funcSym.name->equalsIgnoreCase("send")))
+				g_lingo->push(Datum(allowRetVal));
+
 			(*funcSym.u.bltin)(nargs);
 		}
 

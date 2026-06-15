@@ -123,7 +123,7 @@ static const BuiltinProto builtins[] = {
 	// Control
 	{ "abort",			LB::b_abort,		0, 0, 400, CBLTIN },	//			D4 c
 	{ "cancelIdleLoad",	LB::b_cancelIdleLoad,1,1, 500, CBLTIN },	//				D5 c
-	{ "call",			LB::b_call,			-1,0, 600, CBLTIN },	// 					D6 c
+	{ "call",			LB::b_call,			-1,0, 600, HBLTIN },	// 					D6 c (also usable as function)
 	{ "callAncestor",	LB::b_callAncestor,	-1,0, 600, CBLTIN },	// 					D6 c
 	{ "continue",		LB::b_continue,		0, 0, 200, CBLTIN },	// D2 c
 	{ "dontPassEvent",	LB::b_dontPassEvent,0, 0, 200, CBLTIN },	// D2 c
@@ -147,7 +147,7 @@ static const BuiltinProto builtins[] = {
 	{ "quit",			LB::b_quit,			0, 0, 200, CBLTIN },	// D2 c
 	{ "restart",		LB::b_restart,		0, 0, 200, CBLTIN },	// D2 c
 	{ "return",			LB::b_return,		0, 1, 200, CBLTIN },	// D2 f
-	{ "send",			LB::b_call,			-1,0, 400, CBLTIN },	//			D4 c, undocumented
+	{ "send",			LB::b_call,			-1,0, 400, HBLTIN },	//			D4 c, undocumented (also usable as function)
 	{ "sendAncestor",	LB::b_callAncestor,	-1,0, 400, CBLTIN },	//			D4 c, undocumented
 	{ "shutDown",		LB::b_shutDown,		0, 0, 200, CBLTIN },	// D2 c
 	{ "startTimer",		LB::b_startTimer,	0, 0, 200, CBLTIN },	// D2 c
@@ -203,8 +203,8 @@ static const BuiltinProto builtins[] = {
 	{ "puppetTransition",LB::b_puppetTransition,-1,0,200, CBLTIN },	// D2 c
 	{ "ramNeeded",		LB::b_ramNeeded,	2, 2, 300, FBLTIN },	//		D3.1 f
 	{ "rollOver",		LB::b_rollOver,		0, 1, 200, FBLTIN },	// D2 f
-	{ "sendAllSprites",	LB::b_sendAllSprites,-1,0,600, CBLTIN },	// 					D6 c
-	{ "sendSprite",		LB::b_sendSprite,	-1,0, 600, CBLTIN },	// 					D6 c
+	{ "sendAllSprites",	LB::b_sendAllSprites,-1,0,600, HBLTIN },	// 					D6 c (also usable as function)
+	{ "sendSprite",		LB::b_sendSprite,	-1,0, 600, HBLTIN },	// 					D6 c (also usable as function)
 	{ "spriteBox",		LB::b_spriteBox,	5, 5, 200, CBLTIN },	// D2 c
 	{ "unLoad",			LB::b_unLoad,		0, 2, 300, CBLTIN },	//		D3.1 c
 	{ "unLoadCast",		LB::b_unLoadCast,	0, 2, 300, CBLTIN },	//		D3.1 c
@@ -1951,25 +1951,31 @@ void LB::b_abort(int nargs) {
 
 // Helper: call a named handler on a single behavior instance with extra args.
 // extraArgs is stored in reverse order (as popped from stack).
-static void callBehaviorHandler(Datum &instance, const Common::String &msgName, const Common::Array<Datum> &extraArgs) {
+// Returns the handler's result (VOID if the instance has no such handler), so
+// sendSprite/call can be used as functions.
+static Datum callBehaviorHandler(Datum &instance, const Common::String &msgName, const Common::Array<Datum> &extraArgs) {
 	Symbol sym = instance.u.obj->getMethod(msgName);
 	if (sym.type == VOIDSYM)
-		return;
+		return Datum();
 
 	g_lingo->push(instance);
 	for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
 		g_lingo->push(extraArgs[j]);
 
 	int frame = g_lingo->_state->callstack.size();
-	LC::call(sym, 1 + (int)extraArgs.size(), false);
+	LC::call(sym, 1 + (int)extraArgs.size(), true);
 	g_lingo->execute(frame);
+	return g_lingo->pop();
 }
 
 void LB::b_call(int nargs) {
+	bool allowRetVal = g_lingo->pop().asInt() != 0; // flag pushed by LC::call for HBLTIN
 	// call(#message, scriptInstance [, args...])
 	if (nargs < 2) {
 		warning("b_call: expected at least 2 args, got %d", nargs);
 		g_lingo->dropStack(nargs);
+		if (allowRetVal)
+			g_lingo->pushVoid();
 		return;
 	}
 
@@ -1982,18 +1988,22 @@ void LB::b_call(int nargs) {
 	Datum message = g_lingo->pop();
 	Common::String msgName = message.asString();
 
+	Datum result;
 	if (script.type == OBJECT) {
-		callBehaviorHandler(script, msgName, extraArgs);
+		result = callBehaviorHandler(script, msgName, extraArgs);
 	} else if (script.type == ARRAY) {
-		// call() accepts a list of instances
+		// call() accepts a list of instances; the result is that of the last one.
 		for (uint i = 0; i < script.u.farr->arr.size(); i++) {
 			Datum instance = script.u.farr->arr[i];
 			if (instance.type == OBJECT)
-				callBehaviorHandler(instance, msgName, extraArgs);
+				result = callBehaviorHandler(instance, msgName, extraArgs);
 		}
 	} else {
 		warning("b_call: expected OBJECT or list for script argument");
 	}
+
+	if (allowRetVal)
+		g_lingo->push(result);
 }
 
 void LB::b_callAncestor(int nargs) {
@@ -3516,9 +3526,12 @@ void LB::b_rollOver(int nargs) {
 }
 
 void LB::b_sendAllSprites(int nargs) {
+	bool allowRetVal = g_lingo->pop().asInt() != 0; // flag pushed by LC::call for HBLTIN
 	// sendAllSprites(#message [, args...])
 	if (nargs < 1) {
 		warning("b_sendAllSprites: expected at least 1 arg, got %d", nargs);
+		if (allowRetVal)
+			g_lingo->pushVoid();
 		return;
 	}
 
@@ -3530,53 +3543,65 @@ void LB::b_sendAllSprites(int nargs) {
 	Datum message = g_lingo->pop();
 	Common::String msgName = message.asString();
 
+	Datum result;
 	Movie *movie = g_director->getCurrentMovie();
-	if (!movie)
-		return;
-	Score *score = movie->getScore();
-	if (!score)
-		return;
+	Score *score = movie ? movie->getScore() : nullptr;
+	if (score) {
+		// Ensure the current frame's sprite behaviors are instantiated before
+		// resolving the message (see b_sendSprite for the rationale). Otherwise a
+		// message sent during startMovie/initHotspots falls through to a me-less
+		// handler call, leaving `me` VOID.
+		score->createScriptInstances(score->getCurrentFrameNum());
 
-	// Ensure the current frame's sprite behaviors are instantiated before
-	// resolving the message (see b_sendSprite for the rationale). Otherwise a
-	// message sent during startMovie/initHotspots falls through to a me-less
-	// handler call, leaving `me` VOID.
-	score->createScriptInstances(score->getCurrentFrameNum());
+		bool anyHandled = false;
+		uint savedSpriteNum = movie->_currentSpriteNum;
+		for (uint ch = 1; ch < score->_channels.size(); ch++) {
+			Channel *channel = score->_channels[ch];
+			if (!channel)
+				continue;
+			for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
+				Datum instance = channel->_scriptInstanceList[i];
+				if (instance.type != OBJECT)
+					continue;
+				Symbol sym = instance.u.obj->getMethod(msgName);
+				if (sym.type == VOIDSYM)
+					continue;
+				// `the spriteNum of me` must resolve to the sprite whose behavior is
+				// running (see b_sendSprite), so set it per channel around the call.
+				movie->_currentSpriteNum = ch;
+				result = callBehaviorHandler(instance, msgName, extraArgs);
+				movie->_currentSpriteNum = savedSpriteNum;
+				anyHandled = true;
+			}
+		}
 
-	bool anyHandled = false;
-	uint savedSpriteNum = movie->_currentSpriteNum;
-	for (uint ch = 1; ch < score->_channels.size(); ch++) {
-		Channel *channel = score->_channels[ch];
-		if (!channel)
-			continue;
-		for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
-			Datum instance = channel->_scriptInstanceList[i];
-			if (instance.type != OBJECT)
-				continue;
-			Symbol sym = instance.u.obj->getMethod(msgName);
-			if (sym.type == VOIDSYM)
-				continue;
-			// `the spriteNum of me` must resolve to the sprite whose behavior is
-			// running (see b_sendSprite), so set it per channel around the call.
-			movie->_currentSpriteNum = ch;
-			callBehaviorHandler(instance, msgName, extraArgs);
-			movie->_currentSpriteNum = savedSpriteNum;
-			anyHandled = true;
+		if (!anyHandled) {
+			// No behavior handled it; fall down to a frame/movie handler if one
+			// exists, otherwise no-op (do not invoke an undefined handler).
+			Symbol h = g_lingo->getHandler(msgName);
+			if (h.type != VOIDSYM) {
+				for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
+					g_lingo->push(extraArgs[j]);
+				int frame = g_lingo->_state->callstack.size();
+				LC::call(h, numExtraArgs, true);
+				g_lingo->execute(frame);
+				result = g_lingo->pop();
+			}
 		}
 	}
 
-	if (!anyHandled) {
-		for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
-			g_lingo->push(extraArgs[j]);
-		g_lingo->executeHandler(msgName, numExtraArgs);
-	}
+	if (allowRetVal)
+		g_lingo->push(result);
 }
 
 void LB::b_sendSprite(int nargs) {
+	bool allowRetVal = g_lingo->pop().asInt() != 0; // flag pushed by LC::call for HBLTIN
 	// sendSprite(whichSprite, #message [, args...])
 	if (nargs < 2) {
 		warning("b_sendSprite: expected at least 2 args, got %d", nargs);
 		g_lingo->dropStack(nargs);
+		if (allowRetVal)
+			g_lingo->pushVoid();
 		return;
 	}
 
@@ -3589,52 +3614,58 @@ void LB::b_sendSprite(int nargs) {
 	int spriteNum = g_lingo->pop().asInt();
 	Common::String msgName = message.asString();
 
+	Datum result;
 	Movie *movie = g_director->getCurrentMovie();
-	if (!movie)
-		return;
-	Score *score = movie->getScore();
-	if (!score)
-		return;
+	Score *score = movie ? movie->getScore() : nullptr;
+	Channel *channel = score ? score->getChannelById((uint16)spriteNum) : nullptr;
+	if (channel) {
+		// The sprite's behaviors may not have been instantiated yet, e.g. when
+		// sendSprite is called from startMovie/initHotspots before the score has
+		// rendered the frame. Without an instance, the message would fall through
+		// to a plain (me-less) handler below, leaving `me` VOID and crashing on the
+		// first property access. Instantiate the current frame's behaviors first so
+		// the message reaches the real behavior instance with a valid `me`.
+		if (channel->_scriptInstanceList.empty() && channel->_sprite && !channel->_sprite->_behaviors.empty())
+			score->createScriptInstances(score->getCurrentFrameNum());
 
-	Channel *channel = score->getChannelById((uint16)spriteNum);
-	if (!channel)
-		return;
+		bool handled = false;
+		uint savedSpriteNum = movie->_currentSpriteNum;
+		for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
+			Datum instance = channel->_scriptInstanceList[i];
+			if (instance.type != OBJECT)
+				continue;
+			Symbol sym = instance.u.obj->getMethod(msgName);
+			if (sym.type == VOIDSYM)
+				continue;
+			// Within the handler, `the spriteNum of me` must resolve to the target
+			// sprite, matching how processEvent sets _currentSpriteNum for real
+			// sprite events. Otherwise the behavior reads spriteNum 0 and operates
+			// on the wrong sprite (e.g. `set the cursor of sprite (the spriteNum of
+			// me)` ends up setting the stage cursor, sprite 0).
+			movie->_currentSpriteNum = (uint)spriteNum;
+			result = callBehaviorHandler(instance, msgName, extraArgs);
+			movie->_currentSpriteNum = savedSpriteNum;
+			handled = true;
+		}
 
-	// The sprite's behaviors may not have been instantiated yet, e.g. when
-	// sendSprite is called from startMovie/initHotspots before the score has
-	// rendered the frame. Without an instance, the message would fall through
-	// to a plain (me-less) handler below, leaving `me` VOID and crashing on the
-	// first property access. Instantiate the current frame's behaviors first so
-	// the message reaches the real behavior instance with a valid `me`.
-	if (channel->_scriptInstanceList.empty() && channel->_sprite && !channel->_sprite->_behaviors.empty())
-		score->createScriptInstances(score->getCurrentFrameNum());
-
-	bool handled = false;
-	uint savedSpriteNum = movie->_currentSpriteNum;
-	for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
-		Datum instance = channel->_scriptInstanceList[i];
-		if (instance.type != OBJECT)
-			continue;
-		Symbol sym = instance.u.obj->getMethod(msgName);
-		if (sym.type == VOIDSYM)
-			continue;
-		// Within the handler, `the spriteNum of me` must resolve to the target
-		// sprite, matching how processEvent sets _currentSpriteNum for real
-		// sprite events. Otherwise the behavior reads spriteNum 0 and operates
-		// on the wrong sprite (e.g. `set the cursor of sprite (the spriteNum of
-		// me)` ends up setting the stage cursor, sprite 0).
-		movie->_currentSpriteNum = (uint)spriteNum;
-		callBehaviorHandler(instance, msgName, extraArgs);
-		movie->_currentSpriteNum = savedSpriteNum;
-		handled = true;
+		if (!handled) {
+			// Pass down the hierarchy: frame script, movie scripts. If no handler
+			// exists anywhere, sendSprite is a no-op (Director returns VOID) -- do
+			// NOT invoke an undefined handler, which would raise a fatal error.
+			Symbol h = g_lingo->getHandler(msgName);
+			if (h.type != VOIDSYM) {
+				for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
+					g_lingo->push(extraArgs[j]);
+				int frame = g_lingo->_state->callstack.size();
+				LC::call(h, numExtraArgs, true);
+				g_lingo->execute(frame);
+				result = g_lingo->pop();
+			}
+		}
 	}
 
-	if (!handled) {
-		// Pass down the hierarchy: frame script, movie scripts
-		for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
-			g_lingo->push(extraArgs[j]);
-		g_lingo->executeHandler(msgName, numExtraArgs);
-	}
+	if (allowRetVal)
+		g_lingo->push(result);
 }
 
 void LB::b_spriteBox(int nargs) {
