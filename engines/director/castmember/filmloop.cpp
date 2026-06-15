@@ -161,7 +161,28 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		// the ink; otherwise each cell would key its own (wrong) colour and the
 		// background pixels would stay opaque.
 		if (parentInk != kInkTypeCopy) {
-			src._ink = (InkType)parentInk;
+			// Only transparency-class inks make sense to apply per cell: they decide
+			// which pixels of each cell are drawn, so propagating them keys every
+			// cell's background and the figure assembles cleanly.
+			//
+			// Blend- and colour-effect inks (Blend/Add/AddPin/Sub/SubPin/Light/Dark/
+			// Reverse/...) are meant for the film loop's *composite* against the stage,
+			// not for each cell. Forcing them onto every cell makes each cell blend
+			// with the background individually, so the whole figure turns translucent
+			// (the TKKG5 shop-scene figures whose loop sprite uses Light/Dark/AddPin).
+			// We cannot composite-then-blend here, so cut the cells out cleanly with
+			// Background Transparent instead -- an opaque figure beats a see-through one.
+			switch (parentInk) {
+			case kInkTypeBackgndTrans:
+			case kInkTypeMatte:
+			case kInkTypeMask:
+			case kInkTypeTransparent:
+				src._ink = (InkType)parentInk;
+				break;
+			default:
+				src._ink = kInkTypeBackgndTrans;
+				break;
+			}
 			src._foreColor = parentForeColor;
 			src._backColor = parentBackColor;
 		}
