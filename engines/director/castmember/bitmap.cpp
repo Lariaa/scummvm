@@ -531,10 +531,6 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 			CastMemberID palIndex = pals.contains(castPaletteId) ? castPaletteId : CastMemberID(kClutSystemMac, -1);
 			const PaletteV4 &srcPal = pals.getVal(palIndex);
 
-			debugC(5, kDebugImages, "getDitherImg REMAP cast %d: castClut=%s currentPal=%s contains=%d -> srcPalIdx=%s external=%d remapFlag=%d targetBpp=%d",
-				_castId, castPaletteId.asString().c_str(), currentPaletteId.asString().c_str(),
-				(int)pals.contains(castPaletteId), palIndex.asString().c_str(), (int)_external, (int)movie->_remapPalettesWhenNeeded, targetBpp);
-
 			// If it is an external image, use the included palette.
 			// For BMP images especially, they'll often have the right colors
 			// but in the wrong palette order.
@@ -563,23 +559,6 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 					}
 				}
 			}
-		}
-
-		if (_bitsPerPixel == 8 && targetBpp == 1) {
-			const Graphics::Surface *src = &_picture->_surface;
-			int body = 0, collapsed = 0;
-			for (int y = 0; y < src->h; y++) {
-				for (int x = 0; x < src->w; x++) {
-					int s = *(const byte *)src->getBasePtr(x, y);
-					if (s == 0)
-						continue;
-					body++;
-					if (*(byte *)dither->getBasePtr(x, y) == 0)
-						collapsed++;
-				}
-			}
-			debugC(5, kDebugImages, "getDitherImg cast %d: body(nonzero)=%d collapsed-to-0=%d (%d%%)",
-				_castId, body, collapsed, body ? collapsed * 100 / body : 0);
 		}
 	}
 	return dither;
