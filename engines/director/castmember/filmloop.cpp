@@ -144,8 +144,19 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		if (src._castId.isNull())
 			continue;
 
-		if (src._cast == nullptr && _cast != nullptr)
-			src.setCast(src._castId);
+		if (src._cast == nullptr) {
+			// castLib -1 is the loop's own cast (Mission to Planet X walk cycle)
+			if (src._castId.castLib == -1 && _cast != nullptr) {
+				src._cast = _cast->getCastMember(src._castId.member, true);
+				// Matches the bookkeeping Sprite::setCast() does; the old pointer
+				// is null here, so there is nothing to release first
+				if (src._cast)
+					src._cast->incRefCount();
+			} else {
+				// castLib 0 is an empty channel that Director leaves blank (TKKG 5 Sz40)
+				continue;
+			}
+		}
 
 		debugCN(5, kDebugImages, "FilmLoopCastMember::getSubChannels(): sprite: %d - cast: %s, orig: %d,%d %dx%d",
 				iter, src._castId.asString().c_str(),
