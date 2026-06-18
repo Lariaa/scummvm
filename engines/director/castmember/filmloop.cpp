@@ -187,8 +187,21 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			src._backColor = parentBackColor;
 		}
 
-		if (src._cast == nullptr && _cast != nullptr)
-			src._cast = _cast->getCastMember(src._castId.member, true);
+		if (src._cast == nullptr) {
+			// castLib -1 means "the enclosing movie's cast", i.e. the film loop's
+			// own cast -- resolve the cell there (this is what makes e.g. the
+			// Mission to Planet X walk cycle work).
+			if (src._castId.castLib == -1 && _cast != nullptr) {
+				src._cast = _cast->getCastMember(src._castId.member, true);
+			} else {
+				// castLib 0 = "no cast": an empty/disabled film-loop channel that
+				// Director leaves blank. Forcing it onto the loop's own cast draws a
+				// spurious bitmap -- e.g. the TKKG5 Sz40 "FB blinzelt" loop carries a
+				// stale man's-arm/cane cell (HB_ar06, castLib 0) that must not render
+				// while the man himself is absent. Skip it.
+				continue;
+			}
+		}
 
 		debugCN(5, kDebugImages, "FilmLoopCastMember::getSubChannels(): sprite: %d - cast: %s, orig: %d,%d %dx%d",
 				iter, src._castId.asString().c_str(),
