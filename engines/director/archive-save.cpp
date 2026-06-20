@@ -175,7 +175,18 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 			break;
 
 		case MKTAG('V', 'W', 'S', 'C'):
-			movie->getScore()->writeVWSCResource(saveFile, it->offset);
+			// TEMP (Option A): copy the original VWSC bytes verbatim instead of
+			// re-serializing the score. The D6 score re-serializer
+			// (writeVWSCResource) is not byte-faithful for D6 -- it omits the
+			// leading sprite-detail offset table and emits fixed-size channels,
+			// producing a much larger score that the game cannot load back
+			// (TKKG5 savegame: 11669 -> 56568 bytes). Savegames never modify the
+			// score, so a verbatim copy is correct here. Paired with the matching
+			// VWSC case in rebuildResources() (keeps the original size).
+			saveFile->seek(it->offset, SEEK_SET);
+			saveFile->writeUint32LE(it->tag);
+			saveFile->writeUint32LE(it->size);
+			saveFile->writeStream(getResource(it->tag, it->index));
 			break;
 
 		default:
@@ -583,8 +594,9 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 			break;
 
 		case MKTAG('V', 'W', 'S', 'C'):
-			resSize = movie->getScore()->getVWSCResourceSize();
-			it->size = resSize;
+			// TEMP (Option A): keep the original VWSC size; the score is copied
+			// verbatim in writeToFile rather than re-serialized (see there).
+			resSize = it->size;
 			it->offset = currentSize;
 			currentSize += resSize + 8;		// The size doesn't include the header and the size entry
 			break;
