@@ -504,7 +504,9 @@ void Score::updateCurrentFrame() {
 
 		// Finally, update the channels and buffer any dirty rectangles.
 		// This will ignore any channel data that is overridden with the puppet flag.
-		updateSprites(kRenderModeNormal, true);
+		// frameChanged=true: the delta was just re-read, so a kSCBCastId here is a real
+		// score sprite-span change that may reclaim a channel from a stale auto-puppet.
+		updateSprites(kRenderModeNormal, true, true);
 	} else if (!_window->_playbackPaused) {
 		// Loading the same frame; e.g. "go to frame".
 		// This is mostly a no-op, however any sprite changes for
@@ -936,7 +938,7 @@ void Score::incrementFilmLoops() {
 	}
 }
 
-void Score::updateSprites(RenderMode mode, bool withClean) {
+void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 	if (_window->_newMovieStarted)
 		mode = kRenderForceUpdate;
 
@@ -948,6 +950,24 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 		Channel *channel = _channels[i];
 		Sprite *currentSprite = channel->_sprite;
 		Sprite *nextSprite = _currentFrame->_sprites[i];
+
+		// The score advancing to a frame that asserts a new cast member on a channel
+		// (kSCBCastId set in this frame's freshly-loaded delta = a score sprite-span
+		// boundary) must reclaim it from a stale auto-puppet. A Lingo `set the member
+		// of sprite` (e.g. an unreleased hotspot/rollover "dummy" graphic) auto-puppets
+		// the cast; isDirty(), setClean() and replaceSprite() all then skip the cast for
+		// an auto-puppeted sprite, so the score's own sprite would be blocked forever
+		// (TKKG5: the grandmother's gesture channel stuck on a global dummy after a
+		// hotspot interaction). Dropping the auto-puppet here lets the score's sprite
+		// take over. Gated on frameChanged: only a real frame advance/jump re-reads the
+		// delta, so kSCBCastId is current; a same-frame reload ("go to frame" loop)
+		// carries a stale mask and must NOT clobber a live Lingo puppet (e.g. the
+		// TKKG5 member-card buttons). Explicit puppetSprite is always left untouched.
+		if (frameChanged && currentSprite && nextSprite && !currentSprite->_puppet &&
+				currentSprite->_autoPuppet && (nextSprite->_copyBackMask & kSCBCastId) &&
+				currentSprite->_castId != nextSprite->_castId) {
+			currentSprite->_autoPuppet = 0;
+		}
 
 		// widget content has changed and needs a redraw.
 		// this doesn't include changes in dimension or position!

@@ -130,7 +130,7 @@ public:
 	bool renderTransition(uint16 frameId, RenderMode mode);
 	void renderFrame(uint16 frameId, RenderMode mode = kRenderModeNormal, bool sound1Changed = true, bool sound2Changed = true);
 	void incrementFilmLoops();
-	void updateSprites(RenderMode mode = kRenderModeNormal, bool withClean = false);
+	void updateSprites(RenderMode mode = kRenderModeNormal, bool withClean = false, bool frameChanged = false);
 	bool renderPrePaletteCycle(RenderMode mode = kRenderModeNormal);
 	void setLastPalette();
 	bool isPaletteColorCycling();
