@@ -176,7 +176,19 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 			break;
 
 		case MKTAG('V', 'W', 'S', 'C'):
-			movie->getScore()->writeVWSCResource(saveFile, it->offset);
+			if (movie->getScore()->_version >= kFileVer600) {
+				// writeVWSCResource() is not byte-faithful for D6+ (it omits
+				// the sprite-detail offset table and emits fixed-size
+				// channels), and nothing can modify a loaded score yet.
+				// TODO: implement a byte-faithful D6+ score writer
+				warning("STUB: RIFXArchive::writeToFile(): D6+ score re-serialization not implemented; keeping the original VWSC bytes");
+				saveFile->seek(it->offset, SEEK_SET);
+				saveFile->writeUint32LE(it->tag);
+				saveFile->writeUint32LE(it->size);
+				saveFile->writeStream(getResource(it->tag, it->index));
+			} else {
+				movie->getScore()->writeVWSCResource(saveFile, it->offset);
+			}
 			break;
 
 		default:
@@ -601,7 +613,12 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 			break;
 
 		case MKTAG('V', 'W', 'S', 'C'):
-			resSize = movie->getScore()->getVWSCResourceSize();
+			if (movie->getScore()->_version >= kFileVer600) {
+				// Kept verbatim; see the matching case in writeToFile().
+				resSize = it->size;
+			} else {
+				resSize = movie->getScore()->getVWSCResourceSize();
+			}
 			it->size = resSize;
 			it->offset = currentSize;
 			currentSize += resSize + 8;		// The size doesn't include the header and the size entry
