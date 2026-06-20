@@ -1450,6 +1450,16 @@ void Frame::readSpriteD6(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		stream.hexdump(size);
 	}
 
+	// A corrupt/misaligned channel offset can resolve to a sprite index past the end
+	// of the channel array; guard the access so we warn and skip the bytes instead of
+	// asserting (idx < _size) and aborting.
+	if ((uint)(spritePosition + 1) >= _sprites.size()) {
+		warning("Frame::readSpriteD6(): sprite %d beyond %d channels (offset %d, size %d) -- skipping",
+			spritePosition + 1, (int)_sprites.size(), offset, size);
+		stream.skip(MIN((uint32)size, (uint32)(stream.size() - stream.pos())));
+		return;
+	}
+
 	Sprite &sprite = *_sprites[spritePosition + 1];
 
 	uint32 initPos = stream.pos();
