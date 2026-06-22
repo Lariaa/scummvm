@@ -983,7 +983,22 @@ void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 			_movie->_videoPlayback = true;
 		}
 
-		if (channel->isDirty(nextSprite) || widgetRedrawn || mode == kRenderForceUpdate) {
+		// A new score sprite span can begin on a channel without changing the cast
+		// member or any visual field (e.g. TKKG5 Sz206's valve wheel: the decorative
+		// span [50-50] is followed by span [51-59] carrying the #rad hotspot behaviors,
+		// both member 51 at the same position). isDirty() only compares visual fields,
+		// so it misses such a same-member span boundary; the partial setClean() path
+		// then keeps the channel on the stale span with empty _behaviors and the hotspot
+		// never instantiates. Detect it directly: the channel's current span start no
+		// longer matches the span the freshly-read frame asserts for this channel.
+		bool dirty = channel->isDirty(nextSprite);
+		bool spanMismatch = g_director->getVersion() >= 600 && frameChanged && nextSprite && currentSprite &&
+			channel->_startFrame != nextSprite->_spriteInfo.startFrame;
+		// Don't force a puppeted sprite from the score (replaceSprite() would be a no-op
+		// for it anyway, and the unmatched span would re-trigger every frame).
+		bool spanStart = spanMismatch && !currentSprite->_puppet && !currentSprite->_autoPuppet;
+
+		if (dirty || widgetRedrawn || mode == kRenderForceUpdate || spanStart) {
 
 			if (currentSprite && currentSprite->_cast && currentSprite->_cast->_erase) {
 				currentSprite->_cast->_erase = false;
