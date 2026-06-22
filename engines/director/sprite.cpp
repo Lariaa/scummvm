@@ -334,6 +334,15 @@ bool Sprite::getEditable() {
 	return _editable || _cast->isEditable();
 }
 
+static bool scriptHandlesMouse(ScriptContext *script) {
+	return script && (script->_eventHandlers.contains(kEventMouseDown)
+				   || script->_eventHandlers.contains(kEventMouseUp)
+				   || script->_eventHandlers.contains(kEventMouseWithin)
+				   || script->_eventHandlers.contains(kEventMouseEnter)
+				   || script->_eventHandlers.contains(kEventMouseLeave)
+				   || script->_eventHandlers.contains(kEventMouseUpOutSide));
+}
+
 bool Sprite::respondsToMouse() {
 	if (_moveable)
 		return true;
@@ -341,29 +350,28 @@ bool Sprite::respondsToMouse() {
 	if (_cast && _cast->_type == kCastButton)
 		return true;
 
-	// TODO: Check if we need to check against individual events like below
+	// D6+ stores sprite scripts as behaviors. A sprite only responds to the mouse
+	// if at least one of its behaviors actually defines a mouse handler. A behavior
+	// with e.g. only an on beginSprite handler must NOT capture clicks: the hit test
+	// would pick it, the event dispatcher (resolveScriptEvent) would then drop it for
+	// lack of a handler, and the click would never fall through to a lower click-catcher
+	// sprite (e.g. the playfield catcher in TKKG5's Sz140 box-pushing puzzle, whose
+	// behavior holds the on mouseDown that drives movement). This mirrors the per-handler
+	// gate the dispatcher already applies.
 	if (g_director->getVersion() >= 600) {
-		if (_behaviors.size() > 0)
-			return true;
+		for (uint i = 0; i < _behaviors.size(); i++) {
+			if (scriptHandlesMouse(_movie->getScriptContext(kScoreScript, _behaviors[i].memberID)))
+				return true;
+		}
 	}
 
 	ScriptContext *spriteScript = _movie->getScriptContext(kScoreScript, _scriptId);
 	if (spriteScript && (spriteScript->_eventHandlers.contains(kEventGeneric)
-					  || spriteScript->_eventHandlers.contains(kEventMouseDown)
-					  || spriteScript->_eventHandlers.contains(kEventMouseUp)
-					  || spriteScript->_eventHandlers.contains(kEventMouseWithin)
-					  || spriteScript->_eventHandlers.contains(kEventMouseEnter)
-					  || spriteScript->_eventHandlers.contains(kEventMouseLeave)
-					  || spriteScript->_eventHandlers.contains(kEventMouseUpOutSide)))
+					  || scriptHandlesMouse(spriteScript)))
 		return true;
 
 	ScriptContext *castScript = _movie->getScriptContext(kCastScript, _castId);
-	if (castScript && (castScript->_eventHandlers.contains(kEventMouseDown)
-					|| castScript->_eventHandlers.contains(kEventMouseUp)
-					|| castScript->_eventHandlers.contains(kEventMouseWithin)
-					|| castScript->_eventHandlers.contains(kEventMouseEnter)
-					|| castScript->_eventHandlers.contains(kEventMouseLeave)
-					|| castScript->_eventHandlers.contains(kEventMouseUpOutSide)))
+	if (scriptHandlesMouse(castScript))
 		return true;
 
 	return false;
