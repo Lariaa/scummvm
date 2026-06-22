@@ -320,9 +320,10 @@ scummvmAssertEqual(getOne(testList, "urgh"), 2)
 set testlist to [5, "URGH", 3, 1, "urgh"]
 scummvmAssertEqual(getOne(testList, "urgh"), 5)
 
--- for finding ARRAY/PARRAY, check the pointer, not the contents
+-- for finding ARRAY/PARRAY, match by contents (value), not object identity
 set testList to [#a, #b, [1, 2, 3]]
-scummvmAssertEqual(getOne(testList, [1, 2, 3]), 0)
+scummvmAssertEqual(getOne(testList, [1, 2, 3]), 3)
+scummvmAssertEqual(getOne(testList, [1, 2, 4]), 0)
 set subItem to [1, 2, 3]
 set testList to [#a, #b, subItem]
 scummvmAssertEqual(getOne(testList, subItem), 3)
