@@ -289,28 +289,39 @@ def read_uint32_be(data: bytes) -> int:
 def inject_makefile(slug: str, xcode_type: XCodeType) -> None:
     make_contents = open(MAKEFILE_PATH, "r").readlines()
     slug_alpha = slug[:1]
-    storage_path = f"lingo/xtras" if xcode_type == "Xtra" else f"lingo/xlibs"
-    expr = re.compile(f"^\t{storage_path}/([a-zA-Z0-9\\-]+).o( \\\\|)")
+    storage_path = "lingo/xtras" if xcode_type == "Xtra" else "lingo/xlibs"
     obj = f"{slug_alpha}/{slug}"
-    for i in range(len(make_contents)):
-        m = expr.match(make_contents[i])
+    # Match the subdir-organized object lines, e.g. "\tlingo/xtras/b/budapi.o \".
+    # The previous regex did not account for the "<letter>/" subdirectory and would
+    # either fail to match or spuriously match unrelated lines (e.g. "o/oscheck.o"),
+    # mangling the makefile. Track the last entry of the relevant section and append
+    # there, keeping the line-continuation backslashes consistent.
+    line_re = re.compile(
+        rf"^\t{re.escape(storage_path)}/([a-zA-Z0-9]/[a-zA-Z0-9_\-]+)\.o( \\)?\s*$"
+    )
+    last = None
+    for i, line in enumerate(make_contents):
+        m = line_re.match(line)
         if m:
-            if slug == m.group(1):
-                # file already in makefile
+            if m.group(1) == obj:
                 print(f"{obj}.o already in {MAKEFILE_PATH}, skipping")
                 return
-            elif slug < m.group(1):
-                make_contents.insert(i, f"\t{storage_path}/{obj}.o \\\n")
-                with open(MAKEFILE_PATH, "w") as f:
-                    f.writelines(make_contents)
-                return
-            elif m.group(2) == "":
-                # final entry in the list
-                make_contents[i] += " \\"
-                make_contents.insert(i + 1, f"\t{storage_path}/{obj}.o\n")
-                with open(MAKEFILE_PATH, "w") as f:
-                    f.writelines(make_contents)
-                return
+            last = i
+    if last is None:
+        print(f"WARNING: no '{storage_path}' object lines found in {MAKEFILE_PATH}")
+        return
+    last_has_backslash = make_contents[last].rstrip("\n").endswith("\\")
+    if last_has_backslash:
+        # More object lines follow this section; a plain continuation line is correct.
+        make_contents.insert(last + 1, f"\t{storage_path}/{obj}.o \\\n")
+    else:
+        # This was the final entry of MODULE_OBJS: give it a trailing backslash and
+        # let the newly inserted line become the new (backslash-less) final entry.
+        make_contents[last] = make_contents[last].rstrip("\n").rstrip() + " \\\n"
+        make_contents.insert(last + 1, f"\t{storage_path}/{obj}.o\n")
+    with open(MAKEFILE_PATH, "w") as f:
+        f.writelines(make_contents)
+    return
 
 
 def inject_lingo_object(slug: str, xobj_class: str, director_version: int, xcode_type: XCodeType) -> None:
@@ -637,7 +648,15 @@ def extract_xcode_win32(file: BinaryIO, pe_offset: int) -> XCode:
                 methtable = data[start:end].decode('iso-8859-1').split('\n')
 
     if not methtable_found:
-        raise ValueError("Could not find msgTable! You may have to copy the Xtra into real Director, run \"put mMessageList(xtra(\"xtraName\"))\" in the message window, then copy the output to a text file.")
+        # Fallback: many Xtras build the msgTable at runtime, so the static
+        # push pattern above is never emitted. However, the human-readable
+        # message table is almost always still present verbatim in a data
+        # section as a NUL-terminated, newline-joined blob starting with
+        # "xtra <Name>". Carve that out and reuse the text-file code path.
+        print("Static msgTable not found, scanning data sections for a literal msgTable blob...")
+        methtable = extract_msgtable_blob(file, sections)
+        if methtable is None:
+            raise ValueError("Could not find msgTable! You may have to copy the Xtra into real Director, run \"put mMessageList(xtra(\"xtraName\"))\" in the message window, then copy the output to a text file.")
 
     for entry in methtable:
         print(entry)
@@ -652,6 +671,64 @@ def extract_xcode_win32(file: BinaryIO, pe_offset: int) -> XCode:
         "filename": library_name.lower(),
         "method_table": methtable
     }
+
+
+def extract_msgtable_blob(file: BinaryIO, sections: dict[str, PESection]) -> list[str] | None:
+    """Carve a literal, human-readable msgTable out of the PE data sections.
+
+    Used as a fallback when the Xtra assembles its msgTable at runtime, so the
+    table never appears as a single static C string referenced by the canonical
+    push sequence. The descriptive table (as produced by mMessageList) is still
+    embedded verbatim, NUL-terminated and beginning with a "xtra <Name>" header.
+
+    Returns the table split into lines (header first), or None if not found.
+    Property declarations ("the <prop> of member/sprite") are dropped: they are
+    not methods and would otherwise be parsed into bogus stubs.
+
+    NB: a few Xtras (e.g. DirectMedia) store a mangled table where comment text
+    is glued to the next method name without a separator; those cannot be parsed
+    automatically and need a hand-authored text file fed to the text-file path.
+    """
+    candidates: list[str] = []
+    for s in sections.values():
+        file.seek(s["raw_ptr"])
+        data = file.read(s["raw_size"])
+        for m in re.finditer(rb"xtra [\x20-\x7e]", data):
+            start = m.start()
+            end = data.find(b"\x00", start)
+            if end < 0:
+                end = len(data)
+            blob = data[start:end]
+            if b"\n" not in blob:
+                continue
+            text = blob.decode("iso-8859-1")
+            # Must look like an actual message table, not a stray "xtra ..." string:
+            # a "xtra <Name>" header followed by several newline-separated entries.
+            # (Method lines may be plain globals like "* Foo int x" with no comment,
+            # so we key off the header + line count rather than method markers.)
+            header = text.split("\n", 1)[0].split()
+            if (
+                len(header) >= 2
+                and re.match(r"[A-Za-z][\w]*$", header[1].rstrip(","))
+                and text.count("\n") >= 2
+            ):
+                candidates.append(text)
+    if not candidates:
+        return None
+
+    text = max(candidates, key=len)
+    raw_lines = text.split("\n")
+
+    lines: list[str] = [raw_lines[0]]  # the "xtra <Name>" header
+    for ln in raw_lines[1:]:
+        stripped = ln.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("the "):
+            # Property declaration, not a method; skip it.
+            continue
+        lines.append(ln)
+    return lines
 
 
 def extract_xcode_textfile(file: BinaryIO) -> XCode:
@@ -903,6 +980,9 @@ def generate_xtra_stubs(
         elem = e.split("--", 1)[0].strip()
         if not elem:
             continue
+        # Skip commented-out / disabled msgTable entries, e.g. "/* _privateRoutine * *".
+        if elem.startswith("/*") or elem.startswith("//"):
+            continue
         functype = "method"
         if elem.startswith("+"):
             elem = elem[1:].strip()
@@ -915,6 +995,10 @@ def generate_xtra_stubs(
         else:
             methname, args = elem.split(" ", 1)
             argv = args.split(",")
+        # Skip anything that is not a valid Lingo/C++ identifier (junk lines).
+        if not re.match(r"[A-Za-z_]\w*$", methname):
+            print(f"  skipping non-identifier msgTable entry: {elem!r}")
+            continue
         min_args = len(argv)
         max_args = len(argv)
         if argv and argv[-1].strip() == "*":
@@ -934,6 +1018,12 @@ def generate_xtra_stubs(
                 default="0",
             )
         )
+    # Every Xtra instance supports new(); the cpp template always defines m_new.
+    # If the msgTable had no explicit "new" (e.g. global-only Xtras), add it here
+    # so it is declared in the header and registered in xlibMethods.
+    if not any(m["methname"] == "new" for m in meths):
+        meths.insert(0, dict(functype="method", methname="new",
+                             args=[], min_args=0, max_args=0, default="0"))
     xobject_class = f"{name}XtraObject"
     xobj_class = f"{name}Xtra"
 
