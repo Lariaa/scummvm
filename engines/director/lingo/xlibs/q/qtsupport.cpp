@@ -68,6 +68,8 @@ const char *QTSupport::xlibName = "QuickTimeSupport";
 const XlibFileDesc QTSupport::fileNames[] = {
 	{ "QuickTime Asset",	nullptr },
 	{ "QTASSET",			nullptr },
+	{ "QT3Asset",			nullptr },	// Löwenzahn 4/5 (QT3ASSET.X32)
+	{ "QT6Asset",			nullptr },	// Löwenzahn 1/2/3/4/6 (QT6Asset.x32)
 	{ nullptr,		nullptr },
 };
 
