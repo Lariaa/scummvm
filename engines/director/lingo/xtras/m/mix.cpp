@@ -52,6 +52,8 @@ const char *MixXtra::xlibName = "Mix";
 const XlibFileDesc MixXtra::fileNames[] = {
 	{ "MIX32",	nullptr },
 	{ "MIX16",	nullptr },
+	{ "Mix Services",	nullptr },	// D8+ on-disk name (Mix Services.x32)
+	{ "MIXSERVI",	nullptr },	// D7 8.3 on-disk name (MIXSERVI.X32)
 	{ nullptr,	nullptr },
 };
 
