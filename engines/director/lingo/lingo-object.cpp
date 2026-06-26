@@ -202,6 +202,7 @@
 #include "director/lingo/xtras/s/sharpexport.h"
 #include "director/lingo/xtras/s/soundchannel.h"
 #include "director/lingo/xtras/t/timextra.h"
+#include "director/lingo/xtras/u/uihelper.h"
 #include "director/lingo/xtras/x/xsound.h"
 
 namespace Director {
@@ -430,6 +431,7 @@ static const struct XLibProto {
 	XLIBDEF(TemnotaXObj,			kXObj,					400),	// D4
 	XLIBDEF(TenguXObj,			kXObj,			400),	// D4
 	XLIBDEF(TimextraXtra,		kXtraObj,		500),	// D5
+	XLIBDEF(UiHelperXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(UnitTestXObj,		kXObj,			400),	// D4
 	XLIBDEF(VMPresentXObj,		kXObj,			400),	// D4
 	XLIBDEF(VMisOnXFCN,			kXObj,			400),	// D4
