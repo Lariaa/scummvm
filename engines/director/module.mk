@@ -224,7 +224,8 @@ MODULE_OBJS = \
 	lingo/xtras/s/swastrm.o \
 	lingo/xtras/t/timextra.o \
 	lingo/xtras/x/xsound.o \
-	lingo/xtras/a/amplitude.o
+	lingo/xtras/a/amplitude.o \
+	lingo/xtras/b/border.o
 
 
 ifdef USE_IMGUI
