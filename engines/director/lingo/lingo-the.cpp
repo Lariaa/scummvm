@@ -534,7 +534,13 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		warning("STUB: the alertHook");
 		break;
 	case kTheApplicationPath:
-		warning("STUB: the applicationPath");
+		// The folder the projector/application was launched from. Under ScummVM
+		// everything lives in the game directory, so this matches the movie path.
+		// Several titles (e.g. TKKG 7's cdPathClass) fall back to `the
+		// applicationPath` when no CD-ROM drive is detected, so returning an
+		// empty string here used to break their data lookups.
+		d.type = STRING;
+		d.u.s = new Common::String(_vm->getCurrentAbsolutePath());
 		break;
 	case kTheBeepOn:
 		d = (int)movie->_isBeepOn;
