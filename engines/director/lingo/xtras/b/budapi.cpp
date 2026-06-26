@@ -25,6 +25,7 @@
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-utils.h"
+#include "director/util.h"
 #include "director/lingo/xtras/b/budapi.h"
 
 /**************************************************
@@ -371,10 +372,49 @@ void BudAPIXtra::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
+void BudAPIXtra::m_baFindDrive(int nargs) {
+	// baFindDrive(startDrive, fileName): locate the drive holding fileName and
+	// return its drive letter. Used by CD-detection code (e.g. TKKG 7's
+	// cdPathClass: `baFindDrive("c", uniqueName)`), which then builds the CD
+	// path as `Drive & ":\"`. Under ScummVM all data lives in the game
+	// directory, so we report a synthetic CD letter whenever the marker file
+	// actually resolves. convertPath() later strips the drive prefix, so the
+	// constructed path resolves against the game tree as usual.
+	Common::String fileName = (nargs >= 1) ? g_lingo->pop().asString() : Common::String();
+	if (nargs >= 2)
+		g_lingo->pop(); // startDrive, unused
+
+	bool found = !fileName.empty() && !findPath(fileName, true, true, false, nullptr, "", true).empty();
+	Common::String result = found ? Common::String("d") : Common::String("");
+	debugC(3, kDebugXObj, "BudAPIXtra::m_baFindDrive: file '%s' -> '%s'",
+		fileName.c_str(), found ? "d" : "<not found>");
+	g_lingo->push(Datum(result));
+}
+
+void BudAPIXtra::m_baDiskInfo(int nargs) {
+	// baDiskInfo(disk, infoType): report drive properties. CD-detection code
+	// checks `baDiskInfo(Drive, "type") = "CD-ROM"`, so for the synthetic drive
+	// we hand back from baFindDrive we claim a CD-ROM. "free" returns available
+	// space in bytes; we report a large value so install-space checks pass.
+	Common::String infoType = (nargs >= 1) ? g_lingo->pop().asString() : Common::String();
+	Common::String disk = (nargs >= 2) ? g_lingo->pop().asString() : Common::String();
+
+	Datum result;
+	if (infoType.equalsIgnoreCase("type")) {
+		result = Datum(Common::String("CD-ROM"));
+	} else if (infoType.equalsIgnoreCase("free") || infoType.equalsIgnoreCase("size")) {
+		result = Datum((int)0x40000000); // 1 GiB, plenty for any disk-space check
+	} else {
+		result = Datum(Common::String(""));
+	}
+	debugC(3, kDebugXObj, "BudAPIXtra::m_baDiskInfo: disk '%s' info '%s' -> '%s'",
+		disk.c_str(), infoType.c_str(), result.asString().c_str());
+	g_lingo->push(result);
+}
+
 XOBJSTUB(BudAPIXtra::m_baVersion, 0)
 XOBJSTUB(BudAPIXtra::m_baSysFolder, 0)
 XOBJSTUB(BudAPIXtra::m_baCpuInfo, 0)
-XOBJSTUB(BudAPIXtra::m_baDiskInfo, 0)
 XOBJSTUB(BudAPIXtra::m_baMemoryInfo, 0)
 XOBJSTUB(BudAPIXtra::m_baFindApp, 0)
 XOBJSTUB(BudAPIXtra::m_baReadIni, 0)
@@ -461,7 +501,6 @@ XOBJSTUB(BudAPIXtra::m_baGetFilename, 0)
 XOBJSTUB(BudAPIXtra::m_baGetFolder, 0)
 XOBJSTUB(BudAPIXtra::m_baFileVersion, 0)
 XOBJSTUB(BudAPIXtra::m_baEncryptFile, 0)
-XOBJSTUB(BudAPIXtra::m_baFindDrive, 0)
 XOBJSTUB(BudAPIXtra::m_baOpenFile, 0)
 XOBJSTUB(BudAPIXtra::m_baOpenURL, 0)
 XOBJSTUB(BudAPIXtra::m_baPrintFile, 0)
