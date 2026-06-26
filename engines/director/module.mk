@@ -225,7 +225,8 @@ MODULE_OBJS = \
 	lingo/xtras/t/timextra.o \
 	lingo/xtras/x/xsound.o \
 	lingo/xtras/a/amplitude.o \
-	lingo/xtras/b/border.o
+	lingo/xtras/b/border.o \
+	lingo/xtras/d/directemail.o
 
 
 ifdef USE_IMGUI
