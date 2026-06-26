@@ -206,6 +206,7 @@
 #include "director/lingo/xtras/v/vlist.h"
 #include "director/lingo/xtras/w/wingroup.h"
 #include "director/lingo/xtras/x/xsound.h"
+#include "director/lingo/xtras/x/xmlparser.h"
 
 namespace Director {
 
@@ -448,6 +449,7 @@ static const struct XLibProto {
 	XLIBDEF(WinInfoXObj,		kXObj,			400),	// D4
 	XLIBDEF(WindowXObj,			kXObj,			200),	// D2
 	XLIBDEF(XCMDGlueXObj,		kXObj,			200),	// D2
+	XLIBDEF(XMLParserXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(XPlayPACoXFCN,		kXObj,			300),	// D3
 	XLIBDEF(XSoundXFCN,			kXObj,			400),	// D4
 	XLIBDEF(XWINXObj,			kXObj,			300),	// D3
