@@ -27,6 +27,7 @@
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-utils.h"
+#include "director/util.h"
 #include "director/lingo/xtras/b/budapi.h"
 
 /**************************************************
@@ -377,6 +378,28 @@ void BudAPIXtra::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
+void BudAPIXtra::m_baFindDrive(int nargs) {
+	// baFindDrive(startDrive, fileName): locate the drive holding fileName and
+	// return its drive letter. Used by CD-detection code (e.g. TKKG 7's
+	// cdPathClass: `baFindDrive("c", uniqueName)`), which then builds the CD
+	// path as `Drive & ":\"`. The marker file is the title's own projector in
+	// the CD root (TKKG 7: "TKKG 7.exe", TKKG 8: "Tkkg 8.exe"), so a plain
+	// lookup in the game directory is enough. Under ScummVM all data lives
+	// there, so we report a synthetic CD letter whenever the marker resolves.
+	// convertPath() later strips the drive prefix, so the constructed path
+	// resolves against the game tree as usual.
+	Common::String fileName = (nargs >= 1) ? g_lingo->pop().asString() : Common::String();
+	if (nargs >= 2)
+		g_lingo->pop(); // startDrive, unused
+
+	bool found = !fileName.empty() && !findPath(fileName).empty();
+	// Report the same synthetic CD letter that baDiskInfo() reports as a CD-Rom.
+	Common::String result = found ? Common::String("e") : Common::String("");
+	debugC(3, kDebugXObj, "BudAPIXtra::m_baFindDrive: file '%s' -> '%s'",
+		fileName.c_str(), found ? "e" : "<not found>");
+	g_lingo->push(Datum(result));
+}
+
 XOBJSTUB(BudAPIXtra::m_baVersion, 0)
 XOBJSTUB(BudAPIXtra::m_baSysFolder, 0)
 XOBJSTUB(BudAPIXtra::m_baCpuInfo, 0)
@@ -384,21 +407,24 @@ void BudAPIXtra::m_baDiskInfo(int nargs) {
 	Common::String infoType = g_lingo->pop().asString();
 	Common::String disk = g_lingo->pop().asString();
 
-	if (!infoType.equalsIgnoreCase("type")) {
-		warning("STUB: BudAPIXtra::m_baDiskInfo: unsupported InfoType '%s'", infoType.c_str());
-		g_lingo->push(Datum());
-		return;
-	}
-
 	if (disk.hasSuffix(":"))
 		disk.deleteLastChar();
 
-	if (disk.equalsIgnoreCase("e"))
-		g_lingo->push(Datum(Common::String("CD-Rom")));
-	else if (disk.equalsIgnoreCase("c"))
-		g_lingo->push(Datum(Common::String("Hard")));
-	else
-		g_lingo->push(Datum(Common::String("")));
+	if (infoType.equalsIgnoreCase("type")) {
+		// TKKG 7's CD detection checks `baDiskInfo(Drive, "type") = "CD-ROM"`;
+		// report drive E as the (synthetic) CD-Rom that baFindDrive hands back.
+		if (disk.equalsIgnoreCase("e"))
+			g_lingo->push(Datum(Common::String("CD-Rom")));
+		else if (disk.equalsIgnoreCase("c"))
+			g_lingo->push(Datum(Common::String("Hard")));
+		else
+			g_lingo->push(Datum(Common::String("")));
+	} else if (infoType.equalsIgnoreCase("free") || infoType.equalsIgnoreCase("size")) {
+		g_lingo->push(Datum((int)0x40000000)); // 1 GiB, plenty for any disk-space check
+	} else {
+		warning("STUB: BudAPIXtra::m_baDiskInfo: unsupported InfoType '%s'", infoType.c_str());
+		g_lingo->push(Datum());
+	}
 }
 XOBJSTUB(BudAPIXtra::m_baMemoryInfo, 0)
 XOBJSTUB(BudAPIXtra::m_baFindApp, 0)
@@ -535,7 +561,6 @@ XOBJSTUB(BudAPIXtra::m_baGetFilename, 0)
 XOBJSTUB(BudAPIXtra::m_baGetFolder, 0)
 XOBJSTUB(BudAPIXtra::m_baFileVersion, 0)
 XOBJSTUB(BudAPIXtra::m_baEncryptFile, 0)
-XOBJSTUB(BudAPIXtra::m_baFindDrive, 0)
 XOBJSTUB(BudAPIXtra::m_baOpenFile, 0)
 XOBJSTUB(BudAPIXtra::m_baOpenURL, 0)
 XOBJSTUB(BudAPIXtra::m_baPrintFile, 0)
