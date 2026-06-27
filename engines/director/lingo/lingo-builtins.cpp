@@ -3923,7 +3923,6 @@ void LB::b_rect(int nargs) {
 
 
 void LB::b_intersect(int nargs) {
-	Datum d;
 	Datum r2 = g_lingo->pop();
 	Datum r1 = g_lingo->pop();
 	TYPECHECK(r1, RECT);
@@ -3931,9 +3930,23 @@ void LB::b_intersect(int nargs) {
 	Common::Rect rect1(r1.u.farr->arr[0].asInt(), r1.u.farr->arr[1].asInt(), r1.u.farr->arr[2].asInt(), r1.u.farr->arr[3].asInt());
 	Common::Rect rect2(r2.u.farr->arr[0].asInt(), r2.u.farr->arr[1].asInt(), r2.u.farr->arr[2].asInt(), r2.u.farr->arr[3].asInt());
 
-	d = rect1.intersects(rect2);
+	// Director's intersect() returns the intersection *rect*, or rect(0,0,0,0)
+	// when the two rects do not overlap (NOT a boolean). Callers routinely read
+	// "the width of intersect(...)" to test for collisions.
+	Datum res;
+	res.type = RECT;
+	res.u.farr = new FArray();
+	if (rect1.intersects(rect2)) {
+		res.u.farr->arr.push_back(Datum(MAX(rect1.left, rect2.left)));
+		res.u.farr->arr.push_back(Datum(MAX(rect1.top, rect2.top)));
+		res.u.farr->arr.push_back(Datum(MIN(rect1.right, rect2.right)));
+		res.u.farr->arr.push_back(Datum(MIN(rect1.bottom, rect2.bottom)));
+	} else {
+		for (int i = 0; i < 4; i++)
+			res.u.farr->arr.push_back(Datum(0));
+	}
 
-	g_lingo->push(d);
+	g_lingo->push(res);
 }
 
 void LB::b_inflate(int nargs) {
