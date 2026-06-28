@@ -30,6 +30,11 @@ public:
 
 	bool hasProp(const Common::String &propName) override;
 	Datum getProp(const Common::String &propName) override;
+
+	// The DLL/function bound by the most recent GLUNew on this object, used by
+	// GLUCall to recognise known copy-protection probes (see glu32.cpp).
+	Common::String _dll;
+	Common::String _func;
 };
 
 namespace GLU32Xtra {

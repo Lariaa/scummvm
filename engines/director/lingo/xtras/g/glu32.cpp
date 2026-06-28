@@ -114,8 +114,70 @@ void GLU32Xtra::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-XOBJSTUB(GLU32Xtra::m_GLUNew, 0)
-XOBJSTUB(GLU32Xtra::m_GLUCall, 0)
+void GLU32Xtra::m_GLUNew(int nargs) {
+	// GLUNew(me, dllName, funcName, returnType, params, vendor, callConv):
+	// binds a Win32 DLL function for a later GLUCall. We cannot call real DLLs,
+	// but we remember which function was bound so GLUCall can recognise known
+	// copy-protection probes. Args are popped in reverse push order, so the
+	// first-pushed dllName/funcName are the last two popped.
+	g_lingo->printArgs("GLU32Xtra::m_GLUNew", nargs);
+	GLU32XtraObject *me = (GLU32XtraObject *)g_lingo->_state->me.u.obj;
+
+	Common::String dll, func;
+	for (int i = nargs - 1; i >= 0; i--) {
+		Datum d = g_lingo->pop();
+		if (i == 0)
+			dll = d.asString();
+		else if (i == 1)
+			func = d.asString();
+	}
+	me->_dll = dll;
+	me->_func = func;
+
+	g_lingo->push(Datum(0)); // 0 == no error
+}
+
+void GLU32Xtra::m_GLUCall(int nargs) {
+	// GLUCall(me, ...): would invoke the bound DLL function. We cannot run real
+	// DLLs, so all genuinely-uncallable bindings return 0 as before -- except
+	// the Tivola/Terzio copy-protection probe optgraph.dll!initdisplay. The real
+	// DLL returns a per-title magic that the movie compares against a hard-coded
+	// constant, halting (or jumping to a "CopyProtect" frame) on mismatch. The
+	// magic is baked into each movie's script, so it cannot be derived here; we
+	// return the expected value per game. Games pass the DLL either bare or with
+	// a full path, so match on the base filename.
+	g_lingo->printArgs("GLU32Xtra::m_GLUCall", nargs);
+	GLU32XtraObject *me = (GLU32XtraObject *)g_lingo->_state->me.u.obj;
+	g_lingo->dropStack(nargs);
+
+	Common::String dll = me->_dll;
+	for (int i = (int)dll.size() - 1; i >= 0; i--) {
+		if (dll[i] == '\\' || dll[i] == '/') {
+			dll = dll.substr(i + 1);
+			break;
+		}
+	}
+
+	if (dll.equalsIgnoreCase("optgraph.dll") && me->_func.equalsIgnoreCase("initdisplay")) {
+		Common::String gameId = g_director->getGameId();
+		if (gameId == "tkkg7") {
+			g_lingo->push(Datum((int)43123212));
+			return;
+		}
+		if (gameId == "loewe4") {
+			g_lingo->push(Datum(Common::String("13665984")));
+			return;
+		}
+		if (gameId == "tkkg8") {
+			g_lingo->push(Datum((int)16325536));
+			return;
+		}
+		warning("GLU32Xtra::m_GLUCall: unhandled optgraph.dll copy protection for game '%s'", gameId.c_str());
+	}
+
+	g_lingo->push(Datum(0));
+}
+
 XOBJSTUB(GLU32Xtra::m_GLUGetResults, 0)
 XOBJSTUB(GLU32Xtra::m_GLUDispose, 0)
 XOBJSTUB(GLU32Xtra::m_GLUGetErrorString, 0)
