@@ -22,6 +22,8 @@
 #ifndef DIRECTOR_UTIL_H
 #define DIRECTOR_UTIL_H
 
+#include "common/keyboard.h"
+
 namespace Common {
 class String;
 class FSNode;
@@ -106,6 +108,11 @@ Common::CodePage detectFontEncoding(Common::Platform platform, uint16 fontId);
 
 int charToNum(Common::u32char_type_t ch);
 Common::u32char_type_t numToChar(int num);
+
+// Map a ScummVM key code to the Mac / Windows virtual key code that Lingo
+// (e.g. the KeyPoll Xtra) expects. Returns -1 if there is no mapping.
+int scummVMKeyCodeToMac(Common::KeyCode code);
+int scummVMKeyCodeToWin(Common::KeyCode code);
 int compareStringOrder(const Common::String &s1, const Common::String &s2);
 bool compareStringEquality(const Common::String &s1, const Common::String &s2);
 
