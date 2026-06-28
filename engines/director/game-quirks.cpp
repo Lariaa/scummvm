@@ -341,6 +341,9 @@ const struct Quirk {
 	{ "flipper", Common::kPlatformWindows, &quirkPretend16Bit },
 	{ "incarnatia", Common::kPlatformMacintosh, &quirkPretend16Bit },
 	{ "incarnatia", Common::kPlatformWindows, &quirkPretend16Bit },
+	// Löwenzahn 4's checkW.DIR does `if the colorDepth < 16 then go "8bit"` and
+	// gets stuck on the 8-bit warning frame otherwise.
+	{ "loewe4", Common::kPlatformWindows, &quirkPretend16Bit },
 
 	// The standard FileIO xlib exists as both an XObject and Xtra version, with similar functionality
 	// but incompatible APIs.
