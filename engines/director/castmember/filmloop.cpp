@@ -336,7 +336,10 @@ void FilmLoopCastMember::load() {
 		filmLoopId = _castId + _cast->_castIDoffset;
 		tag = MKTAG('S', 'C', 'V', 'W');
 		loop = _cast->getResource(tag, filmLoopId);
-	} else if (_cast->_version >= kFileVer400 && _cast->_version < kFileVer700) {
+	} else {
+		// D4 and later (including D7+) store the film loop's frames in an SCVW
+		// child chunk; the frame/sprite delta format is the same one the main
+		// score uses, so loadFrames() handles it across versions.
 		for (auto &it : _children) {
 			if (it.tag == MKTAG('S', 'C', 'V', 'W')) {
 				filmLoopId = it.index;
@@ -347,8 +350,6 @@ void FilmLoopCastMember::load() {
 				debugC(5, kDebugLoading, "FilmLoopCastMember::load(): Ignoring child with tag '%s' id: %d", tag2str(it.tag), it.index);
 			}
 		}
-	} else {
-		warning("STUB: FilmLoopCastMember::load(): Film loops not yet supported for version v%d (%d)", humanVersion(_cast->_version), _cast->_version);
 	}
 
 	if (_score) {
