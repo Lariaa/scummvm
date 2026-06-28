@@ -1773,7 +1773,11 @@ void LingoArchive::addNamesV4(Common::SeekableReadStreamEndian &stream) {
 			warning("addNamesV4: ran out of data after %d of %d names", i, count);
 			break;
 		}
-		Common::String name = stream.readPascalString();
+		// Names/symbols are stored in the same screwed-Mac-Roman scheme as
+		// string constants (see the STRING constant case above) and cast
+		// member names (Cast::loadCastInfo). Decode them here so that all
+		// three end up UTF-8-encoded and comparable via Cast::foldCastName.
+		Common::String name = cast->decodeString(stream.readPascalString()).encode(Common::kUtf8);
 
 		names.push_back(name);
 		debugC(5, kDebugLoading, "%d: \"%s\"", i, name.c_str());
