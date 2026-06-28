@@ -19,9 +19,15 @@
  *
  */
 
+#include "graphics/macgui/macfontmanager.h"
+#include "graphics/macgui/mactext.h"
+#include "graphics/macgui/macwindow.h"
+#include "graphics/macgui/macwindowmanager.h"
+
 #include "director/director.h"
 #include "director/cast.h"
 #include "director/movie.h"
+#include "director/window.h"
 #include "director/castmember/xtra.h"
 #include "director/lingo/lingo-the.h"
 
@@ -83,7 +89,7 @@ bool XtraCastMember::hasProp(const Common::String &propName) {
 	// commonly poll these in an `on exitFrame` wait-loop before advancing, so we
 	// answer them to avoid an "unknown property" Lingo error.
 	if (propName.equalsIgnoreCase("percentPlayed") || propName.equalsIgnoreCase("percentStreamed")
-			|| propName.equalsIgnoreCase("volume"))
+			|| propName.equalsIgnoreCase("volume") || propName.equalsIgnoreCase("text"))
 		return true;
 	return CastMember::hasProp(propName);
 }
@@ -97,6 +103,9 @@ Datum XtraCastMember::getProp(const Common::String &propName) {
 		return Datum(100);
 	if (propName.equalsIgnoreCase("volume"))
 		return Datum(_volume);
+	// D7 "Text Asset" Xtra members are used as text fields by scripts.
+	if (propName.equalsIgnoreCase("text"))
+		return Datum(_text);
 	return CastMember::getProp(propName);
 }
 
@@ -108,7 +117,39 @@ void XtraCastMember::setProp(const Common::String &propName, const Datum &value,
 		_volume = value.asInt();
 		return;
 	}
+	// Store text written to D7 "Text Asset" Xtra members and flag the member as
+	// changed so the channel rebuilds its widget and the new text is drawn.
+	if (propName.equalsIgnoreCase("text")) {
+		_text = value.asString();
+		_modified = true;
+		return;
+	}
 	CastMember::setProp(propName, value, force);
+}
+
+Graphics::MacWidget *XtraCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
+	// Only Xtra members that carry text (D7 "Text Asset", e.g. TKKG 7's notebook
+	// fields) should draw anything; everything else (Shockwave Audio, etc.) has
+	// no visual and returns nullptr so no stray box is rendered.
+	if (_text.empty())
+		return nullptr;
+
+	// Minimal rendering: the Xtra's authored font/size/colour/box are not parsed
+	// yet, so use the system font and Director's default text colours (black on
+	// white, matching TextCastMember's defaults) sized to the sprite's bbox.
+	Graphics::MacFont *macFont = new Graphics::MacFont();
+	Common::Rect dims(bbox);
+
+	Graphics::MacText *widget = new Graphics::MacText(
+		g_director->getCurrentWindow()->getMacWindow(),
+		bbox.left, bbox.top, dims.width(), dims.height(),
+		g_director->_wm, Common::U32String(_text), macFont,
+		/* fgcolor */ 0xff, /* bgcolor */ 0, dims.width(),
+		Graphics::kTextAlignLeft);
+	widget->draw();
+
+	delete macFont;
+	return widget;
 }
 
 Common::String XtraCastMember::formatInfo() {
