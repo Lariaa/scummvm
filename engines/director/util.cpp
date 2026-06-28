@@ -282,6 +282,20 @@ static const struct WinKeyCodeMapping {
 	{ Common::KEYCODE_INVALID,		0 }
 };
 
+int scummVMKeyCodeToMac(Common::KeyCode code) {
+	for (const MacKeyCodeMapping *k = MackeyCodeMappings; k->scummvm != Common::KEYCODE_INVALID; k++)
+		if (k->scummvm == code)
+			return k->mac;
+	return -1;
+}
+
+int scummVMKeyCodeToWin(Common::KeyCode code) {
+	for (const WinKeyCodeMapping *k = WinkeyCodeMappings; k->scummvm != Common::KEYCODE_INVALID; k++)
+		if (k->scummvm == code)
+			return k->win;
+	return -1;
+}
+
 void DirectorEngine::loadKeyCodes() {
 	if ((g_director->getPlatform() == Common::kPlatformWindows) && (g_director->getVersion() < 400)) {
 		// Allegedly this keykode list applies for the Windows version of D3.
