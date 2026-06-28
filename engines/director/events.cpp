@@ -364,6 +364,11 @@ bool Movie::processSysEvent(Common::Event &event) {
 			return true;
 		}
 
+		// Track which (non-modifier) keys are currently held so the KeyPoll
+		// Xtra (bgOneKey / bgAllKeys) can report key state. Modifiers are
+		// queried via _keyFlags instead.
+		_keysDown[event.kbd.keycode] = true;
+
 		debugC(1, kDebugEvents, "Movie::processEvent(): movie '%s', keycode: %d", _macName.c_str(), _keyCode);
 
 		_lastEventTime = g_director->getMacTicks();
@@ -383,6 +388,7 @@ bool Movie::processSysEvent(Common::Event &event) {
 		return result;
 
 	case Common::EVENT_KEYUP:
+		_keysDown.erase(event.kbd.keycode);
 		processInputEvent(kEventKeyUp, sc->getSpriteIDOfActiveWidget());
 		result = !_lingo->_passEventExplicitlyBlocked;
 		_keyFlags = event.kbd.flags;
