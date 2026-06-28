@@ -1954,6 +1954,14 @@ static int getCharEquality(Common::u32char_type_t ch) {
 	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 800)
 		return equalityTableD6win[num];
 
+	// D7+ keeps the same Windows-1252 case folding as D6, so reuse that table.
+	// Verified byte-for-byte identical to an equality dump from a real Director 7
+	// (Windows) movie. Without this, string equality for D7 movies fell back to
+	// raw bytes (no case folding), e.g. "Tkkg7.ico" != "TKKG7.ico", which breaks
+	// case-insensitive filename/marker comparisons such as TKKG 7's CD detection.
+	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN)
+		return equalityTableD6win[num];
+
 	warning("BUILDBOT: No equality table for Director version: %d-%s", version, Common::getLanguageCode(lang));
 	return num;
 }
