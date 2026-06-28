@@ -1172,26 +1172,31 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 }
 
 uint32 BitmapCastMember::getCastDataSize() {
-	// _pitch : 2 bytes
-	// _initialRect : 8 bytes
-	// _boundingRect : 8 bytes
-	// _regY : 2 bytes
-	// _regX : 2 bytes
-	// Total: 22 bytes
-	// For Director 4 : 2 byte extra for casttype and flags (See Cast::loadCastData())
-	uint32 dataSize = 22 + 2;
+	// Must mirror writeCastData() exactly so the 'CASt' resource size is correct.
+	// Base fields: _pitch (2) + _initialRect (8) + _boundingRect (8)
+	//            + _regY (2) + _regX (2) = 22 bytes.
+	uint32 dataSize = 22;
 
 	if (_bitsPerPixel != 0) {
+		// skipped byte (1) + _bitsPerPixel (1) + _clut.member (2)
 		dataSize += 4;
-		// if (_cast->_version >= kFileVer500) {
-		// 	dataSize += 2;		// Added two bytes for _clut.member
-		// 	dataSize -= 2;		// Removed two bytes for _castType and _flags (See Cast::loadCastData())
-		// }
-
-		if (_flags2 != 0) {
+		// _clut.castLib is only written from D5 on.
+		if (_cast->_version >= kFileVer500)
+			dataSize += 2;
+		if (_flags2 != 0)
 			dataSize += 16;
-		}
 	}
+
+	// In D4 the cast type byte, and (unless 0xFF) the flags byte, are counted in
+	// the cast-data size in the header; writeCAStResource() emits them and trims
+	// them off before calling writeCastData(). From D5 on they are separate
+	// header fields and not part of the cast data (see CastMember::writeCAStResource).
+	if (_cast->_version >= kFileVer400 && _cast->_version < kFileVer500) {
+		dataSize += 1;					// cast type byte
+		if (_flags1 != 0xFF)
+			dataSize += 1;				// flags byte
+	}
+
 	return dataSize;
 }
 
