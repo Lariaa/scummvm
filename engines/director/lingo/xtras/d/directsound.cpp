@@ -104,6 +104,8 @@ const char *const DirectsoundXtra::xlibName = "Directsound";
 const XlibFileDesc DirectsoundXtra::fileNames[] = {
 	{ "directsound",	nullptr },
 	{ "Dsound_r", 		nullptr },
+	{ "DSOUND",			nullptr },	// Löwenzahn 2 (DSOUND.X32 / DSOUND.X16)
+	{ "Directso",		nullptr },	// Löwenzahn 4 8.3 on-disk name (DIRECTSO.X32)
 	{ nullptr,			nullptr },
 };
 
@@ -250,8 +252,10 @@ void DirectsoundXtra::m_dsDelSound(int nargs) {
 	DirectsoundXtraObject *me = (DirectsoundXtraObject *)g_lingo->_globalvars[xlibName].u.obj;
 	int id = parseId(g_lingo->pop().asString());
 
-	if (id == -1)
+	if (id == -1) {
+		g_lingo->push(0);
 		return;
+	}
 
 	DirectorSound *sound = g_director->getCurrentWindow()->getSoundManager();
 
@@ -259,6 +263,8 @@ void DirectsoundXtra::m_dsDelSound(int nargs) {
 		sound->stopSound(me->_sounds[id].channel);
 
 	me->_sounds[id].free = true;
+
+	g_lingo->push(0);
 }
 
 XOBJSTUB(DirectsoundXtra::m_dsDupSound, 0)
@@ -269,16 +275,37 @@ void DirectsoundXtra::m_dsPlay(int nargs) {
 	DirectsoundXtraObject *me = (DirectsoundXtraObject *)g_lingo->_globalvars[xlibName].u.obj;
 	int id = parseId(g_lingo->pop().asString());
 
-	if (id == -1)
+	if (id == -1) {
+		g_lingo->push(0);
 		return;
+	}
 
 	DirectorSound *sound = g_director->getCurrentWindow()->getSoundManager();
 
 	if (me->_sounds[id].channel != -1)
 		sound->playFile(me->_sounds[id].fname, me->_sounds[id].channel);
+
+	g_lingo->push(0);
 }
 
-XOBJSTUB(DirectsoundXtra::m_dsStop, 0)
+void DirectsoundXtra::m_dsStop(int nargs) {
+	ARGNUMCHECK(1);
+
+	DirectsoundXtraObject *me = (DirectsoundXtraObject *)g_lingo->_globalvars[xlibName].u.obj;
+	int id = parseId(g_lingo->pop().asString());
+
+	if (id == -1) {
+		g_lingo->push(0);
+		return;
+	}
+
+	DirectorSound *sound = g_director->getCurrentWindow()->getSoundManager();
+
+	if (me->_sounds[id].channel != -1)
+		sound->stopSound(me->_sounds[id].channel);
+
+	g_lingo->push(0);
+}
 XOBJSTUB(DirectsoundXtra::m_dsGetSize, 0)
 XOBJSTUB(DirectsoundXtra::m_dsGetFreq, 0)
 XOBJSTUB(DirectsoundXtra::m_dsSetFreq, 0)
@@ -291,8 +318,10 @@ void DirectsoundXtra::m_dsSetVolume(int nargs) {
 	int vol = g_lingo->pop().asInt();
 	int id = parseId(g_lingo->pop().asString());
 
-	if (id == -1)
+	if (id == -1) {
+		g_lingo->push(0);
 		return;
+	}
 
 	// original range is 0..-10000
 	vol = (10000 + vol) * 256 / 10000;
@@ -301,6 +330,8 @@ void DirectsoundXtra::m_dsSetVolume(int nargs) {
 
 	if (me->_sounds[id].channel != -1)
 		sound->setChannelVolume(me->_sounds[id].channel, vol);
+
+	g_lingo->push(0);
 }
 
 XOBJSTUB(DirectsoundXtra::m_dsGetPan, 0)
@@ -315,11 +346,15 @@ void DirectsoundXtra::m_dsSetLoop(int nargs) {
 	int loops = g_lingo->pop().asInt();
 	int id = parseId(g_lingo->pop().asString());
 
-	if (id == -1)
+	if (id == -1) {
+		g_lingo->push(0);
 		return;
+	}
 
 	if (loops > 1)
 		warning("STUB: DirectsoundXtra::m_dsSetLoop(\"DSoundXtra:%d\", %d)", id, loops);
+
+	g_lingo->push(0);
 }
 
 void DirectsoundXtra::m_dsIsPlaying(int nargs) {
@@ -380,6 +415,8 @@ void DirectsoundXtra::m_dsClose(int nargs) {
 
 		me->_sounds[i].free = true;
 	}
+
+	g_lingo->push(0);
 }
 
 }
