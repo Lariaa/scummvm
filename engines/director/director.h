@@ -313,6 +313,8 @@ public:
 	uint16 _key;
 	int _keyCode;
 	byte _keyFlags;
+	// Keys (ScummVM keycodes) currently held down, for the KeyPoll Xtra.
+	Common::HashMap<int, bool> _keysDown;
 
 private:
 	byte _currentPalette[768];
