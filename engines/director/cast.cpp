@@ -1769,7 +1769,7 @@ void Cast::loadLingoContext(Common::SeekableReadStreamEndian &stream) {
 
 		Common::SeekableReadStreamEndian *r;
 		debugC(2, kDebugLoading, "****** Loading Lnam resource (%d)", nameTableId);
-		_lingoArchive->addNamesV4(*(r = _castArchive->getResource(MKTAG('L','n','a','m'), nameTableId)));
+		_lingoArchive->addNamesV4(*(r = _castArchive->getResource(MKTAG('L','n','a','m'), nameTableId)), _version);
 		delete r;
 
 		Common::Array<LingoContextEntry> entries;

@@ -1033,7 +1033,9 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	// offset 8
 	/* uint32 length = */ stream.readUint32();
 	/* uint32 length2 = */ stream.readUint32();
-	uint16 codeStoreOffset = stream.readUint16();
+	// Widened to 32-bit because in D7 we recompute this as an absolute payload
+	// offset that can exceed 16 bits (see the codeStore setup below).
+	uint32 codeStoreOffset = stream.readUint16();
 
 	/* uint16 scriptId = */ stream.readUint16() /* + 1 */;
 	// This field *should* match the script's index in Lctx, but this
@@ -1307,7 +1309,23 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		return nullptr;
 	}
 
-	uint32 codeStoreSize = functionsOffset - codeStoreOffset;
+	uint32 codeStoreSize;
+	if (version >= kFileVer700) {
+		// D7 reordered the Lscr sections: the property/global/function tables
+		// now precede the bytecode (in D6 the code came first). The header's
+		// codeStoreOffset no longer marks the code, which begins right after the
+		// function table (0x2a bytes per entry). Function/arg/var offsets are
+		// absolute, so the store runs from there to the end of the chunk.
+		codeStoreOffset = functionsOffset + functionsCount * 0x2a;
+		if (codeStoreOffset > (uint32)stream.size()) {
+			warning("Lscr code store offset out of bounds (offset %u, stream %u)",
+				codeStoreOffset, (uint32)stream.size());
+			return nullptr;
+		}
+		codeStoreSize = (uint32)stream.size() - codeStoreOffset;
+	} else {
+		codeStoreSize = functionsOffset - codeStoreOffset;
+	}
 	stream.seek(codeStoreOffset);
 	byte *codeStore = (byte *)malloc(codeStoreSize);
 	stream.read(codeStore, codeStoreSize);
@@ -1358,10 +1376,12 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		stream.readUint16();
 
 		if (startOffset < codeStoreOffset) {
-			warning("Function %d start offset is out of bounds!", i);
+			warning("Function %d start offset is out of bounds! (start %u, codeStore %u, size %u)",
+				i, startOffset, codeStoreOffset, codeStoreSize);
 			continue;
 		} else if (startOffset + length >= codeStoreOffset + codeStoreSize) {
-			warning("Function %d end offset is out of bounds", i);
+			warning("Function %d end offset is out of bounds (start %u, len %u, codeStore %u, size %u)",
+				i, startOffset, length, codeStoreOffset, codeStoreSize);
 			continue;
 		}
 
@@ -1722,7 +1742,7 @@ void LingoArchive::addCodeV4(Common::SeekableReadStreamEndian &stream, uint16 lc
 	}
 }
 
-void LingoArchive::addNamesV4(Common::SeekableReadStreamEndian &stream) {
+void LingoArchive::addNamesV4(Common::SeekableReadStreamEndian &stream, uint16 version) {
 	debugC(1, kDebugCompile, "Add V4 script name index");
 
 	if (stream.size() < 0x14) {
@@ -1746,8 +1766,17 @@ void LingoArchive::addNamesV4(Common::SeekableReadStreamEndian &stream) {
 	uint16 offset = stream.readUint16();
 	uint16 count = stream.readUint16();
 
-	if ((uint32)stream.size() != size) {
-		warning("Lnam content missing");
+	// The meaning of the "size" field changed in Director 7: up to D6 it holds
+	// the full size of the Lnam chunk (so size == stream.size()), but from D7 it
+	// holds only the size of the names data, i.e. the chunk size minus this
+	// header (so size + offset == stream.size()). Rejecting the latter left the
+	// names table empty, which cascades into "unknown name id" warnings for
+	// every global/property/function and breaks all of the movie's scripts.
+	uint32 streamSize = (uint32)stream.size();
+	uint32 expectedSize = (version >= kFileVer700) ? size + offset : size;
+	if (streamSize != expectedSize) {
+		warning("Lnam content missing (v%d: size %u, offset %u, expected %u, got %u)",
+			version, size, offset, expectedSize, streamSize);
 		return;
 	}
 
