@@ -148,6 +148,7 @@ public:
 
 	Common::CodePage getFileEncoding();
 	Common::U32String decodeString(const Common::String &str);
+	Common::String foldCastName(const Common::String &name);
 
 	// Script contexts keep a back-pointer to their owning cast.
 	void registerScriptContext(ScriptContext *ctx) { _liveScriptContexts.setVal(ctx, true); }

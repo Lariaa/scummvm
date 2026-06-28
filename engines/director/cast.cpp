@@ -171,13 +171,41 @@ void Cast::releaseCastMemberWidget() {
 			it._value->releaseWidget();
 }
 
+// Director resolves cast-member names case-insensitively, including accented
+// letters: e.g. `script "Schildkröte"` must resolve the member "SCHILDKRÖTE".
+// The IgnoreCase comparator used by _castsNames only folds ASCII, so we pre-fold
+// names with this helper before they are stored in / looked up from the cache.
+// Callers (CastMemberInfo::name via InfoEntry::readString(), Lingo STRING
+// constants, and Lingo names/symbols via LingoArchive::addNamesV4) all already
+// run their raw bytes through Cast::decodeString() once at load time, so `name`
+// here is always UTF-8. Decoding it again with decodeString() would treat the
+// UTF-8 bytes as raw screwed-Mac-Roman/Windows-1252 and corrupt them, so we
+// just parse the UTF-8 directly before case-folding ASCII and Latin-1
+// supplement letters. As long as insertion and lookup fold identically,
+// umlaut names match case-insensitively.
+Common::String Cast::foldCastName(const Common::String &name) {
+	Common::U32String u = name.decode(Common::kUtf8);
+	Common::U32String folded;
+	for (uint i = 0; i < u.size(); i++) {
+		uint32 c = u[i];
+		if (c >= 'A' && c <= 'Z')
+			c += 0x20;
+		else if (c >= 0x00C0 && c <= 0x00DE && c != 0x00D7)
+			// Latin-1 supplement uppercase letters (À-Þ, excluding ×)
+			c += 0x20;
+		folded += (Common::u32char_type_t)c;
+	}
+	return folded.encode(Common::kUtf8);
+}
+
 CastMember *Cast::getCastMemberByNameAndType(const Common::String &name, CastType type) {
 	if (type == kCastTypeAny) {
-		if (_castsNames.contains(name)) {
-			return getCastMember(_castsNames[name]);
+		Common::String key = foldCastName(name);
+		if (_castsNames.contains(key)) {
+			return getCastMember(_castsNames[key]);
 		}
 	} else {
-		Common::String cname = Common::String::format("%s:%d", name.c_str(), type);
+		Common::String cname = Common::String::format("%s:%d", foldCastName(name).c_str(), type);
 
 		if (_castsNames.contains(cname))
 			return getCastMember(_castsNames[cname]);
@@ -2271,6 +2299,27 @@ Common::CodePage Cast::getFileEncoding() {
 	return getEncoding(_platform, _vm->getLanguage());
 }
 
+// Fallback for high bytes that a Cast's own FXmp resource doesn't cover
+// (e.g. cast libraries with no text members never get a character-mapping
+// section, even though their compiled Lingo string literals are still
+// stored in the screwed-Mac-Roman scheme). Reinterprets the byte as its
+// standard Mac Roman character and re-encodes it as Windows-1252.
+static char macRomanHighByteToWindows1252(byte b) {
+	static char table[128];
+	static bool initialized = false;
+
+	if (!initialized) {
+		for (int i = 0; i < 128; i++) {
+			Common::U32String uch = Common::String(1, (char)(0x80 + i)).decode(Common::kMacRoman);
+			Common::String win = uch.encode(Common::kWindows1252);
+			table[i] = (win.size() == 1) ? win[0] : (char)(0x80 + i);
+		}
+		initialized = true;
+	}
+
+	return table[b - 0x80];
+}
+
 Common::U32String Cast::decodeString(const Common::String &str) {
 	Common::CodePage encoding = getFileEncoding();
 
@@ -2290,6 +2339,8 @@ Common::U32String Cast::decodeString(const Common::String &str) {
 		for (uint i = 0; i < str.size(); i++) {
 			if (_macCharsToWin.contains(str[i]))
 				fixedStr += _macCharsToWin[str[i]];
+			else if ((byte)str[i] >= 0x80)
+				fixedStr += macRomanHighByteToWindows1252((byte)str[i]);
 			else
 				fixedStr += str[i];
 		}
@@ -2460,18 +2511,21 @@ void Cast::rebuildCastNameCache() {
 	_castsNames.clear();
 	for (auto &it : _castsInfo) {
 		if (!it._value->name.empty()) {
+			// Names are folded (encoding-aware, case-insensitive) so that umlaut
+			// names resolve regardless of case, matching Director's lookup.
+			Common::String foldedName = foldCastName(it._value->name);
 			// Multiple casts can have the same name. In director only the earliest one is used for lookups.
-			if (!_castsNames.contains(it._value->name) || (_castsNames.getVal(it._value->name) > it._key)) {
-				_castsNames[it._value->name] = it._key;
+			if (!_castsNames.contains(foldedName) || (_castsNames.getVal(foldedName) > it._key)) {
+				_castsNames[foldedName] = it._key;
 			}
 
 			// Store name with type
 			CastMember *member = _loadedCast->getVal(it._key);
-			Common::String cname = Common::String::format("%s:%d", it._value->name.c_str(), member->_type);
+			Common::String cname = Common::String::format("%s:%d", foldedName.c_str(), member->_type);
 			if (!_castsNames.contains(cname) || (_castsNames.getVal(cname) > it._key)) {
 				_castsNames[cname] = it._key;
 			} else {
-				debugC(4, kDebugLoading, "Cast::rebuildCastNameCache(): duplicate cast name: %s for castIDs: %d %d ", cname.c_str(), it._key, _castsNames[it._value->name]);
+				debugC(4, kDebugLoading, "Cast::rebuildCastNameCache(): duplicate cast name: %s for castIDs: %d %d ", cname.c_str(), it._key, _castsNames.getVal(foldedName));
 			}
 		}
 	}
