@@ -144,6 +144,7 @@ public:
 
 	Common::CodePage getFileEncoding();
 	Common::U32String decodeString(const Common::String &str);
+	Common::String foldCastName(const Common::String &name);
 
 	Common::String formatCastSummary(int castId);
 	PaletteV4 loadPalette(Common::SeekableReadStreamEndian &stream, int id);

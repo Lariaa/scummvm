@@ -166,13 +166,37 @@ void Cast::releaseCastMemberWidget() {
 			it._value->releaseWidget();
 }
 
+// Director resolves cast-member names case-insensitively, including accented
+// letters: e.g. `script "Schildkröte"` must resolve the member "SCHILDKRÖTE".
+// The IgnoreCase comparator used by _castsNames only folds ASCII, so we pre-fold
+// names with this helper before they are stored in / looked up from the cache.
+// decodeString() yields proper Unicode (handling the Windows screwed-up Mac Roman
+// remap), after which ASCII and Latin-1 supplement letters can be case-folded.
+// The lossless UTF-8 result is used as the cache key; as long as insertion and
+// lookup fold identically, umlaut names match case-insensitively.
+Common::String Cast::foldCastName(const Common::String &name) {
+	Common::U32String u = decodeString(name);
+	Common::U32String folded;
+	for (uint i = 0; i < u.size(); i++) {
+		uint32 c = u[i];
+		if (c >= 'A' && c <= 'Z')
+			c += 0x20;
+		else if (c >= 0x00C0 && c <= 0x00DE && c != 0x00D7)
+			// Latin-1 supplement uppercase letters (À-Þ, excluding ×)
+			c += 0x20;
+		folded += (Common::u32char_type_t)c;
+	}
+	return folded.encode(Common::kUtf8);
+}
+
 CastMember *Cast::getCastMemberByNameAndType(const Common::String &name, CastType type) {
 	if (type == kCastTypeAny) {
-		if (_castsNames.contains(name)) {
-			return getCastMember(_castsNames[name]);
+		Common::String key = foldCastName(name);
+		if (_castsNames.contains(key)) {
+			return getCastMember(_castsNames[key]);
 		}
 	} else {
-		Common::String cname = Common::String::format("%s:%d", name.c_str(), type);
+		Common::String cname = Common::String::format("%s:%d", foldCastName(name).c_str(), type);
 
 		if (_castsNames.contains(cname))
 			return getCastMember(_castsNames[cname]);
@@ -2369,18 +2393,21 @@ void Cast::rebuildCastNameCache() {
 	_castsNames.clear();
 	for (auto &it : _castsInfo) {
 		if (!it._value->name.empty()) {
+			// Names are folded (encoding-aware, case-insensitive) so that umlaut
+			// names resolve regardless of case, matching Director's lookup.
+			Common::String foldedName = foldCastName(it._value->name);
 			// Multiple casts can have the same name. In director only the earliest one is used for lookups.
-			if (!_castsNames.contains(it._value->name) || (_castsNames.getVal(it._value->name) > it._key)) {
-				_castsNames[it._value->name] = it._key;
+			if (!_castsNames.contains(foldedName) || (_castsNames.getVal(foldedName) > it._key)) {
+				_castsNames[foldedName] = it._key;
 			}
 
 			// Store name with type
 			CastMember *member = _loadedCast->getVal(it._key);
-			Common::String cname = Common::String::format("%s:%d", it._value->name.c_str(), member->_type);
+			Common::String cname = Common::String::format("%s:%d", foldedName.c_str(), member->_type);
 			if (!_castsNames.contains(cname) || (_castsNames.getVal(cname) > it._key)) {
 				_castsNames[cname] = it._key;
 			} else {
-				debugC(4, kDebugLoading, "Cast::rebuildCastNameCache(): duplicate cast name: %s for castIDs: %d %d ", cname.c_str(), it._key, _castsNames[it._value->name]);
+				debugC(4, kDebugLoading, "Cast::rebuildCastNameCache(): duplicate cast name: %s for castIDs: %d %d ", cname.c_str(), it._key, _castsNames.getVal(foldedName));
 			}
 		}
 	}
