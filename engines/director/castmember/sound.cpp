@@ -88,7 +88,9 @@ void SoundCastMember::load() {
 			tag = MKTAG('S', 'N', 'D', ' ');
 			sndId = (uint16)(_castId + _cast->_castIDoffset);
 		}
-	} else if (_cast->_version >= kFileVer600 && _cast->_version < kFileVer700) {
+	} else if (_cast->_version >= kFileVer600) {
+		// D7 (v700) keeps the same MoA sound chunk layout as D6
+		// (snd /sndH/sndS/ediM/cupt), so reuse the same loader.
 		for (auto &it : _children) {
 			if (it.tag == MKTAG('s', 'n', 'd', ' ')) {
 				sndId = it.index;

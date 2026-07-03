@@ -2181,10 +2181,9 @@ void Cast::loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id) {
 	}
 
 	// For SoundCastMember, read the flags in the CastInfo
-	if (_version >= kFileVer400 && _version < kFileVer700 && member->_type == kCastSound) {
+	// (D7/v700 uses the same looping flag bit as D4-D6).
+	if (_version >= kFileVer400 && member->_type == kCastSound) {
 		((SoundCastMember *)member)->_looping = castInfo.flags & 16 ? 0 : 1;
-	} else if (_version >= kFileVer700 && member->_type == kCastSound) {
-		warning("STUB: Cast::loadCastInfo(): Sound cast member info not yet supported for version v%d (%d)", humanVersion(_version), _version);
 	}
 
 	// For PaletteCastMember, run load() as we need it right now
