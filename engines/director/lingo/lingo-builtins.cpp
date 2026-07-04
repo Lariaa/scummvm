@@ -3564,6 +3564,10 @@ void LB::b_sendSprite(int nargs) {
 
 		if (!handled) {
 			Symbol h = g_lingo->getHandler(msgName);
+			// getHandler() also returns behavior handlers, which need an instance for
+			// `me`. Director ignores sendSprite to a sprite that doesn't respond.
+			if (h.type != VOIDSYM && h.ctx && h.ctx->_scriptType == kScoreScript)
+				h.type = VOIDSYM;
 			if (h.type != VOIDSYM) {
 				for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
 					g_lingo->push(extraArgs[j]);
