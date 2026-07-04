@@ -1439,20 +1439,30 @@ Datum LC::eqDataStrict(Datum d1, Datum d2) {
 	if (d1.type == STRING && d2.type == STRING) {
 		return Datum(*d1.u.s == *d2.u.s ? 1 : 0);
 	}
-	// ARRAYs and PARRAYs are compared by contents (element-wise), not by object
-	// identity. getOne/getPos must find a value-equal sublist even when it is a
-	// freshly built object: e.g. TKKG5's Sokoban does getOne([[13,14],...], [x,y])
-	// with a newly computed [x,y] to detect a box reaching a target entrance.
-	// Recurse with eqDataStrict so nested string elements stay case-sensitive.
-	if (d1.isArray() && d2.isArray()) {
-		if (d1.u.farr->arr.size() != d2.u.farr->arr.size())
-			return Datum(0);
-		return LC::compareArrays(LC::eqDataStrict, d1, d2, false, true);
-	}
-	if (d1.type == PARRAY && d2.type == PARRAY) {
-		if (d1.u.parr->arr.size() != d2.u.parr->arr.size())
-			return Datum(0);
-		return LC::compareArrays(LC::eqDataStrict, d1, d2, false, true);
+	// From Director 6 on, getOne/getPos compare ARRAYs and PARRAYs by contents
+	// (element-wise), so a value-equal sublist matches even when it is a freshly
+	// built object: e.g. TKKG5's Sokoban does getOne([[13,14],...], [x,y]) with a
+	// newly computed [x,y] to detect a box reaching a target entrance. Director 5
+	// and earlier compare lists by object identity instead (verified against real
+	// Director 5/6/7), so a freshly built list never matches there.
+	if (g_director->getVersion() >= 600) {
+		// Recurse with eqDataStrict so nested string elements stay case-sensitive.
+		if (d1.isArray() && d2.isArray()) {
+			if (d1.u.farr->arr.size() != d2.u.farr->arr.size())
+				return Datum(0);
+			return LC::compareArrays(LC::eqDataStrict, d1, d2, false, true);
+		}
+		if (d1.type == PARRAY && d2.type == PARRAY) {
+			if (d1.u.parr->arr.size() != d2.u.parr->arr.size())
+				return Datum(0);
+			return LC::compareArrays(LC::eqDataStrict, d1, d2, false, true);
+		}
+	} else {
+		// D5 and earlier: object-identity comparison for ARRAY/PARRAY.
+		if (d1.isArray() && d2.isArray())
+			return Datum(d1.u.farr == d2.u.farr ? 1 : 0);
+		if (d1.type == PARRAY && d2.type == PARRAY)
+			return Datum(d1.u.parr == d2.u.parr ? 1 : 0);
 	}
 	return LC::eqData(d1, d2);
 }
