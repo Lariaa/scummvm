@@ -170,12 +170,16 @@ void Cast::releaseCastMemberWidget() {
 // letters: e.g. `script "Schildkröte"` must resolve the member "SCHILDKRÖTE".
 // The IgnoreCase comparator used by _castsNames only folds ASCII, so we pre-fold
 // names with this helper before they are stored in / looked up from the cache.
-// decodeString() yields proper Unicode (handling the Windows screwed-up Mac Roman
-// remap), after which ASCII and Latin-1 supplement letters can be case-folded.
-// The lossless UTF-8 result is used as the cache key; as long as insertion and
-// lookup fold identically, umlaut names match case-insensitively.
+// Callers (CastMemberInfo::name via InfoEntry::readString(), Lingo STRING
+// constants, and Lingo names/symbols via LingoArchive::addNamesV4) all already
+// run their raw bytes through Cast::decodeString() once at load time, so `name`
+// here is always UTF-8. Decoding it again with decodeString() would treat the
+// UTF-8 bytes as raw screwed-Mac-Roman/Windows-1252 and corrupt them, so we
+// just parse the UTF-8 directly before case-folding ASCII and Latin-1
+// supplement letters. As long as insertion and lookup fold identically,
+// umlaut names match case-insensitively.
 Common::String Cast::foldCastName(const Common::String &name) {
-	Common::U32String u = decodeString(name);
+	Common::U32String u = name.decode(Common::kUtf8);
 	Common::U32String folded;
 	for (uint i = 0; i < u.size(); i++) {
 		uint32 c = u[i];
@@ -2203,6 +2207,27 @@ Common::CodePage Cast::getFileEncoding() {
 	return getEncoding(_platform, _vm->getLanguage());
 }
 
+// Fallback for high bytes that a Cast's own FXmp resource doesn't cover
+// (e.g. cast libraries with no text members never get a character-mapping
+// section, even though their compiled Lingo string literals are still
+// stored in the screwed-Mac-Roman scheme). Reinterprets the byte as its
+// standard Mac Roman character and re-encodes it as Windows-1252.
+static char macRomanHighByteToWindows1252(byte b) {
+	static char table[128];
+	static bool initialized = false;
+
+	if (!initialized) {
+		for (int i = 0; i < 128; i++) {
+			Common::U32String uch = Common::String(1, (char)(0x80 + i)).decode(Common::kMacRoman);
+			Common::String win = uch.encode(Common::kWindows1252);
+			table[i] = (win.size() == 1) ? win[0] : (char)(0x80 + i);
+		}
+		initialized = true;
+	}
+
+	return table[b - 0x80];
+}
+
 Common::U32String Cast::decodeString(const Common::String &str) {
 	Common::CodePage encoding = getFileEncoding();
 
@@ -2222,6 +2247,8 @@ Common::U32String Cast::decodeString(const Common::String &str) {
 		for (uint i = 0; i < str.size(); i++) {
 			if (_macCharsToWin.contains(str[i]))
 				fixedStr += _macCharsToWin[str[i]];
+			else if ((byte)str[i] >= 0x80)
+				fixedStr += macRomanHighByteToWindows1252((byte)str[i]);
 			else
 				fixedStr += str[i];
 		}
