@@ -655,9 +655,40 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 			queue.push(LingoEvent(event, eventId, kCastHandler, false, pos, channelId));
 			// fall through
 
-		case kEventIdle:
 		case kEventEnterFrame:
 		case kEventExitFrame:
+			// In D6+, the enterFrame and exitFrame messages are sent to the
+			// behaviors of every sprite in the frame (in channel order) before
+			// reaching the frame and movie scripts. ScummVM previously only
+			// dispatched these to the frame script, so sprite behaviors that
+			// implement on enterFrame / on exitFrame never ran (e.g. the car
+			// steering in Loewenzahn 2's SERennen.DIR, which polls the keyboard
+			// from Car1Script's exitFrame, and TKKG6's "Gehe zu Szene" behavior,
+			// whose on exitFrame navigates to its whichSzene initializer param).
+			//
+			// Guard on the event type: the mouse cases above fall through into
+			// this case, so without checking `event` a mouseUp/mouseDown would be
+			// broadcast to EVERY sprite behavior on the stage. (TKKG6: clicking a
+			// character on the main map then also fired the location hotspot
+			// underneath it -- e.g. #ort30 -- jumping to the wrong scene, and gave
+			// every hotspot a spurious rollover that corrupted the tooltips.)
+			if ((event == kEventEnterFrame || event == kEventExitFrame) && _vm->getVersion() >= 600) {
+				for (uint ch = 1; ch < _score->_channels.size(); ch++) {
+					Channel *channel = _score->_channels[ch];
+					if (!channel || !channel->_sprite || channel->_sprite->_behaviors.empty())
+						continue;
+
+					// Generate an event for each behavior. Pass through by
+					// default so the message continues to the remaining
+					// behaviors and ultimately the frame and movie scripts,
+					// unless a behavior explicitly calls dontPassEvent.
+					for (uint i = 0; i < channel->_scriptInstanceList.size(); i++)
+						queue.push(LingoEvent(event, eventId, kSpriteHandler, true, pos, ch, i));
+				}
+			}
+			// fall through
+
+		case kEventIdle:
 		case kEventTimeout:
 			queue.push(LingoEvent(event, eventId, kFrameHandler, false, pos, channelId));
 			// fall through
