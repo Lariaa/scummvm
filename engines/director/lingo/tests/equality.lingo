@@ -257,4 +257,10 @@ scummvmAssert(not(v1 = "what"))
 scummvmAssert(v1 < "what")
 scummvmAssert(not(v1 > "what"))
 
+-- NOTE: Property access on a VOID object (the foo of <void>) is NOT silently
+-- lenient in real Director 7 -- it raises "property not found". ScummVM's
+-- getObjectProp returns VOID instead (commit e03c227), which is MORE lenient
+-- than Director and likely masks a deeper cause (the object should not be VOID).
+-- Deliberately NOT asserted here until that divergence is resolved.
+
 
