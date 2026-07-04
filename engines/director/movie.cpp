@@ -293,27 +293,34 @@ bool Movie::loadArchive() {
 		g_director->_lastPalette = CastMemberID();
 
 	bool recenter = false;
-	// For the stage, always resize to the movie rect.
-	// For MIAWs, only resize if the window hasn't been explicitly sized by Lingo
-	// (i.e. still at the 1x1 default from createWindow).
-	// An embedded movie borrows the host's window and must never resize it.
-	bool windowSizeIsDefault = (_window->getSurface()->w <= 1 && _window->getSurface()->h <= 1);
-	if (!_isEmbedded && (_window == _vm->getStage() || windowSizeIsDefault)) {
-		if (_window->getSurface()->w != _movieRect.width() || _window->getSurface()->h != _movieRect.height()) {
-			_window->resizeInner(_movieRect.width(), _movieRect.height());
-			recenter = true;
+	// A movie may carry an empty (0x0) stage rect in its config -- e.g. TKKG 7's
+	// scene movies (Sz*.dir), which are loaded via `go to movie` and inherit the
+	// main movie's stage. Resizing the stage to 0x0 makes initGraphics(0, 0)
+	// divide by zero in the graphics backend, so only apply the movie rect when
+	// it actually has a size; otherwise keep the current stage dimensions.
+	if (!_movieRect.isEmpty()) {
+		// For the stage, always resize to the movie rect.
+		// For MIAWs, only resize if the window hasn't been explicitly sized by Lingo
+		// (i.e. still at the 1x1 default from createWindow).
+		// An embedded movie borrows the host's window and must never resize it.
+		bool windowSizeIsDefault = (_window->getSurface()->w <= 1 && _window->getSurface()->h <= 1);
+		if (!_isEmbedded && (_window == _vm->getStage() || windowSizeIsDefault)) {
+			if (_window->getSurface()->w != _movieRect.width() || _window->getSurface()->h != _movieRect.height()) {
+				_window->resizeInner(_movieRect.width(), _movieRect.height());
+				recenter = true;
+			}
 		}
-	}
 
-	// TODO: Add more options for desktop dimensions
-	if (!_isEmbedded && _window == _vm->getStage()) {
-		uint16 windowWidth = g_director->desktopEnabled() ? g_director->_wmWidth : _movieRect.width();
-		uint16 windowHeight = g_director->desktopEnabled() ? g_director->_wmHeight : _movieRect.height();
-		if (_vm->_wm->_screenDims.width() != windowWidth || _vm->_wm->_screenDims.height() != windowHeight) {
-			_vm->_wm->resizeScreen(windowWidth, windowHeight);
-			recenter = true;
+		// TODO: Add more options for desktop dimensions
+		if (!_isEmbedded && _window == _vm->getStage()) {
+			uint16 windowWidth = g_director->desktopEnabled() ? g_director->_wmWidth : _movieRect.width();
+			uint16 windowHeight = g_director->desktopEnabled() ? g_director->_wmHeight : _movieRect.height();
+			if (_vm->_wm->_screenDims.width() != windowWidth || _vm->_wm->_screenDims.height() != windowHeight) {
+				_vm->_wm->resizeScreen(windowWidth, windowHeight);
+				recenter = true;
 
-			initGraphics(windowWidth, windowHeight, &_vm->_pixelformat);
+				initGraphics(windowWidth, windowHeight, &_vm->_pixelformat);
+			}
 		}
 	}
 
@@ -331,7 +338,7 @@ bool Movie::loadArchive() {
 		} else if (_version < kFileVer600) {
 			r = new Common::MemoryReadStreamEndian(kBlankScoreD4, sizeof(kBlankScoreD4), true);
 		} else {
-			error("Movie::loadArchive(): score format not yet supported for version v%d (%d)", humanVersion(_version), _version);
+			r = new Common::MemoryReadStreamEndian(kBlankScoreD6, sizeof(kBlankScoreD6), true);
 		}
 	}
 
