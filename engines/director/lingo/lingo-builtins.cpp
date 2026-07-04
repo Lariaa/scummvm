@@ -3578,6 +3578,16 @@ void LB::b_sendSprite(int nargs) {
 
 		if (!handled) {
 			Symbol h = g_lingo->getHandler(msgName);
+			// getHandler also surfaces score-script (behavior) handlers such as
+			// `on isHot me`, because every script's handlers are aggregated into the
+			// archive-global function table. Those require a live sprite instance;
+			// invoking one here without an instance leaves `me` VOID and crashes on
+			// the first property access (e.g. TKKG5 Ausweis: startMovie does
+			// sendSprite(5, #isHot) before sprite 5's behavior is instantiated).
+			// Director treats sendSprite to a non-responding sprite as a no-op, so
+			// only fall through to instance-less handlers (movie scripts).
+			if (h.type != VOIDSYM && h.ctx && h.ctx->_scriptType == kScoreScript)
+				h.type = VOIDSYM;
 			if (h.type != VOIDSYM) {
 				for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
 					g_lingo->push(extraArgs[j]);
