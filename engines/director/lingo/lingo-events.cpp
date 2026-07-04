@@ -134,8 +134,12 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 		else
 			spriteId = _score->getMouseSpriteIDFromPos(event.mousePos);
 
-		if (event.event == kEventMouseDown || event.event == kEventRightMouseDown)
+		if (event.event == kEventMouseDown || event.event == kEventRightMouseDown) {
 			_lastClickedSpriteId = _score->getActiveSpriteIDFromPos(event.mousePos); // the clickOn
+			// @@TKKG@@ diagnostic instrumentation (temporary) - what clickOn got latched
+			warning("@@TKKG@@ LATCH clickOn=%d at pos=(%d,%d) (dispatchSprite=%d)",
+				_lastClickedSpriteId, event.mousePos.x, event.mousePos.y, spriteId);
+		}
 	}
 	// Very occasionally, we want to specify an event with a channel ID
 	// rather than infer it from the position. Allow it to override.
@@ -282,6 +286,12 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 					inst = _score->_channels[event.channelId]->_scriptInstanceList[event.behaviorIndex].u.obj;
 				else
 					warning("resolveScriptEvent: behaviorIndex %d out of range", event.behaviorIndex);
+				// @@TKKG@@ diagnostic instrumentation (temporary) - per-behavior mouseUp/Down dispatch
+				if (event.event == kEventMouseUp || event.event == kEventMouseDown ||
+						event.event == kEventRightMouseUp || event.event == kEventRightMouseDown)
+					warning("@@TKKG@@ DISP  %s -> channel=%d behaviorIdx=%d member=%s clickOn=%d",
+						_lingo->_eventHandlerTypes[event.event], event.channelId, event.behaviorIndex,
+						scriptId.asString().c_str(), _lastClickedSpriteId);
 
 				const char *evName = _lingo->_eventHandlerTypes[event.event];
 				bool hasHandler = evName && inst && inst->getMethod(evName).type != VOIDSYM;
@@ -951,6 +961,12 @@ Datum Score::createScriptInstance(BehaviorElement *behavior) {
 			}
 		}
 	}
+
+	// TEMP DIAGNOSTIC (T9 root-cause: why do parameterised sprite behaviors come
+	// up empty, e.g. TKKG6 "Gehe zu Szene" property whichSzene?). Log every
+	// behavior's initializer index and raw params string. Revert once identified.
+	warning("DIAG initparams: %s idx=%d raw='%s'",
+		behavior->toString().c_str(), behavior->initializerIndex, behavior->initializerParams.c_str());
 
 	// No initializer, the defaults seeded above are all we have
 	if (behavior->initializerIndex == 0)

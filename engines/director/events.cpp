@@ -287,6 +287,10 @@ bool Movie::processSysEvent(Common::Event &event) {
 			}
 
 			debugC(3, kDebugEvents, "Movie::processSysEvent(): Button Down @(%d, %d), movie '%s'", pos.x, pos.y, _macName.c_str());
+			// @@TKKG@@ diagnostic instrumentation (temporary) - clickOn/hit-test breakdown
+			warning("@@TKKG@@ DOWN pos=(%d,%d) active=%d responds=%d rawtop=%d prevClickOn=%d",
+				pos.x, pos.y, sc->getActiveSpriteIDFromPos(pos), sc->getMouseSpriteIDFromPos(pos),
+				sc->getSpriteIDFromPos(pos), _lastClickedSpriteId);
 			result = processInputEvent(ev, 0, pos);
 
 			// D5 has special behavior here
@@ -304,6 +308,10 @@ bool Movie::processSysEvent(Common::Event &event) {
 			pos = event.mouse;
 
 			debugC(3, kDebugEvents, "Movie::processSysEvent(): Button Up @(%d, %d), movie '%s'", pos.x, pos.y, _macName.c_str());
+// @@TKKG@@ diagnostic instrumentation (temporary) - clickOn/hit-test breakdown
+			warning("@@TKKG@@ UP   pos=(%d,%d) active=%d responds=%d rawtop=%d clickOn=%d",
+				pos.x, pos.y, sc->getActiveSpriteIDFromPos(pos), sc->getMouseSpriteIDFromPos(pos),
+				sc->getSpriteIDFromPos(pos), _lastClickedSpriteId);
 
 			LEvent ev = kEventMouseUp;
 			// In D5 and up, right mouse clicks don't trigger the mouseUp handler.
