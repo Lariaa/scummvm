@@ -2135,6 +2135,24 @@ void LB::b_idleLoadDone(int nargs) {
 
 void LB::b_pass(int nargs) {
 	g_lingo->_passEvent = true;
+
+	// Director semantics ("Ansatz A"): `pass` stops the current handler --
+	// statements following `pass` are not executed. We unwind the running
+	// handler invocation the same way an aborted script does: execute() sees
+	// _abort, cleans up the call stack and returns true. _passEvent stays true,
+	// so the message still continues to the next location in the message
+	// hierarchy and a focused editable text widget still receives the keystroke
+	// (macwindow.cpp gates widget delivery on the callback's _passEvent return).
+	//
+	// This is what makes "Ein Fall fuer Muetze & Co" name entry work: its
+	// keyDown behavior routes a valid character through `pass` and then falls
+	// into an unconditional puppetSound("Error") + dontPassEvent() tail; without
+	// halting on pass that tail runs on every key (beep, and the char is
+	// swallowed).
+	debugC(3, kDebugLingoExec, "@@PASS-TERMINATE@@ b_pass: halting current handler (Director pass semantics), _passEvent stays true, callstack depth %d",
+		(int)g_lingo->_state->callstack.size());
+
+	g_lingo->_abort = true;
 }
 
 void LB::b_pause(int nargs) {
