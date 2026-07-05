@@ -2570,6 +2570,11 @@ void LB::b_idleLoadDone(int nargs) {
 void LB::b_pass(int nargs) {
 	g_lingo->_passEvent = true;
 	g_lingo->_passEventExplicitlyBlocked = false;
+
+	// Director's `pass` stops the current handler. Clearing the blocked flag
+	// above stays necessary even so: a handler further up the chain may have
+	// called dontPassEvent before this one passed.
+	g_lingo->_abort = true;
 }
 
 void LB::b_pause(int nargs) {
