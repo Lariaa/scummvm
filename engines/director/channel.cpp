@@ -300,6 +300,12 @@ bool Channel::isDirty(Sprite *nextSprite) {
 		isDirtyFlag |= _sprite->_castId != nextSprite->_castId ||
 			_sprite->_ink != nextSprite->_ink || _sprite->_backColor != nextSprite->_backColor ||
 			_sprite->_foreColor != nextSprite->_foreColor ||
+			// The score can turn a field editable on the same cast member and
+			// position (e.g. the login name fields in "Ein Fall fuer Muetze & Co"
+			// become editable on frame "LOGIN"+2). Without comparing the editable
+			// flag the channel is never marked dirty, replaceSprite() is skipped,
+			// and the field never becomes editable/focused.
+			_sprite->_editable != nextSprite->_editable ||
 			_sprite->_blendAmount != nextSprite->_blendAmount || _sprite->_thickness != nextSprite->_thickness;
 		if (!_sprite->_moveable)
 			isDirtyFlag |= _sprite->getPosition() != nextSprite->getPosition();
