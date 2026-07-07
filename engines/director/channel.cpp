@@ -641,6 +641,7 @@ bool Channel::isDirty(Sprite *nextSprite) {
 		isDirtyFlag |= _sprite->_castId != nextSprite->_castId ||
 			_sprite->_ink != nextSprite->_ink || _sprite->_backColor != nextSprite->_backColor ||
 			_sprite->_foreColor != nextSprite->_foreColor ||
+			_sprite->_editable != nextSprite->_editable ||
 			_sprite->_blendAmount != nextSprite->_blendAmount ||
 			(_sprite->_thickness & kTThickness) != (nextSprite->_thickness & kTThickness) ||
 			// The line above masks the flip bits out on purpose, so ask for the
