@@ -605,9 +605,18 @@ void Channel::setEditable(bool editable) {
 			// we only set the first editable text member in score active
 			if (editable) {
 				Graphics::MacWidget *activewidget = g_director->_wm->getActiveWidget();
-				if (activewidget == nullptr || !activewidget->isEditable())
+				if (activewidget == nullptr || !activewidget->isEditable()) {
 					g_director->_wm->setActiveWidget(_widget);
+					// TEST DIAGNOSTIC (Cap&Co name entry)
+					warning("@@FOCUSDIAG@@ setEditable: set ACTIVE widget for member %s", _sprite->_castId.asString().c_str());
+				} else {
+					warning("@@FOCUSDIAG@@ setEditable(true) member %s: another editable widget already active (%p), NOT focusing",
+						_sprite->_castId.asString().c_str(), (void *)activewidget);
+				}
 			}
+		} else if (editable) {
+			// TEST DIAGNOSTIC (Cap&Co name entry)
+			warning("@@FOCUSDIAG@@ setEditable(true) member %s: _widget is NULL, cannot focus", _sprite->_castId.asString().c_str());
 		}
 	}
 }

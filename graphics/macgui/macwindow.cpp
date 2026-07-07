@@ -614,6 +614,12 @@ bool MacWindow::processEvent(Common::Event &event) {
 		if (_callback)
 			result = _callback(kBorderNone, event, _dataPtr);
 
+		// TEST DIAGNOSTIC (Cap&Co name entry): why does a keystroke not reach the
+		// editable field? Shows the passEvent return and the active-widget state.
+		warning("@@KEYDIAG@@ keydown: result(passEvent)=%d winEditable=%d active=%p activeEditable=%d",
+			result, (int)_editable, (void *)_wm->getActiveWidget(),
+			_wm->getActiveWidget() ? (int)_wm->getActiveWidget()->isEditable() : -1);
+
 		if (!_editable && !(_wm->getActiveWidget() && _wm->getActiveWidget()->isEditable()))
 			return result;
 
