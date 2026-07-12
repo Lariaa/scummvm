@@ -626,6 +626,18 @@ void BitmapCastMember::createMatte(const Common::Rect &bbox) {
 		colorFound = true;
 	}
 
+	// A 1-bit image always has an edge-connected background that Matte ink is
+	// meant to knock out. Custom game palettes frequently lack a pure-white
+	// entry, so the corner search above fails; that previously left _noMatte set
+	// and rendered the whole image opaque (e.g. TKKG6's credits/intro text drawn
+	// as red-on-black boxes). Fall back to the actual corner colour as the
+	// flood-fill background so the paper still becomes transparent.
+	if (!colorFound && _bitsPerPixel == 1 && tmp.format.isCLUT8() && tmp.w > 0 && tmp.h > 0) {
+		whiteColor = *(const byte *)tmp.getBasePtr(0, 0);
+		colorFound = true;
+		debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s has no pure white; using corner colour 0x%08x as background", _castId, _name.c_str(), whiteColor);
+	}
+
 	if (!colorFound) {
 		debugC(1, kDebugImages, "BitmapCastMember::createMatte(): No white color for matte image cast %d, name %s", _castId, _name.c_str());
 	} else {
