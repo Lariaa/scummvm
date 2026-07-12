@@ -354,8 +354,14 @@ void copyStretchImg(const Graphics::Surface *srcSurface, Graphics::Surface *targ
 
 	Graphics::Surface *temp1 = nullptr;
 	Graphics::Surface *temp2 = nullptr;
-	// Convert source surface to target colourspace (if required)
-	if (srcSurface->format.bytesPerPixel != g_director->_wm->_pixelformat.bytesPerPixel) {
+	// Convert source surface to target colourspace (if required). Compare the
+	// full pixel format, not just the byte depth: a 32-bit surface can differ
+	// from the backend only in channel order (e.g. richtext builds RGBA8888
+	// surfaces while the window is ABGR8888 in true-colour mode). Copying such a
+	// surface raw would swap channels -- black RTE text renders cyan. convertTo
+	// to an identical format is a cheap no-op, so this only adds work when the
+	// formats actually differ.
+	if (srcSurface->format != g_director->_wm->_pixelformat) {
 		temp1 = srcSurface->convertTo(g_director->_wm->_pixelformat, g_director->_wm->getPalette(), g_director->_wm->getPaletteSize(), g_director->_wm->getPalette(), g_director->_wm->getPaletteSize());
 	}
 	// Nearest-neighbour scale source surface to target dimensions (if required)
