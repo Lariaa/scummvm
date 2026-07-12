@@ -449,11 +449,19 @@ void InkPrimitives<T>::drawPoint(int x, int y, uint32 src, void *data) {
 		break;
 	case kInkTypeReverse:
 		if (sizeof(T) == 1) {
-			// XOR dst palette index with src.
-			// Originally designed for 1-bit mode so that
-			// black pixels would appear white on a black
-			// background.
-			*dst ^= src;
+			if (p->oneBitImage || p->ms || p->applyColor) {
+				// XOR dst palette index with src (QuickDraw srcXor).
+				// Correct for 1-bit images, shapes and colourised sprites
+				// (e.g. transition/selection outlines).
+				*dst ^= src;
+			} else {
+				// For colour (>= 8-bit) bitmaps a raw palette-index XOR is
+				// meaningless and produces garbage, since indices are not linear
+				// colour values. Director's Reverse ink keeps the "white pixels
+				// become transparent" behaviour on colour images; other pixels
+				// are copied (same as BackgndTrans).
+				*dst = (src == p->backColor) ? *dst : src;
+			}
 		} else {
 			// In 32-bit mode, this is the opposite??
 			*dst ^= ~(src);
