@@ -919,7 +919,12 @@ Datum Score::createScriptInstance(BehaviorElement *behavior) {
 
 	// Some movies have behaviors with missing scripts
 	if (scr == nullptr) {
-		debugC(7, kDebugLingoExec, "Score::createScriptInstance(): Missing script for behavior %s", behavior->toString().c_str());
+		// @@DROPBEHAVIOR@@ A sprite's Nth behavior silently vanishes here when its
+		// memberID has no kScoreScript context. TKKG7 Intro_t ch3 shows "2 behaviors"
+		// but only member 18 instantiates; the dropped one is likely the soundBusy(3)
+		// narration hold. Surface the memberID so we can tell a D7 behavior-list
+		// parse error (garbage memberID) from an unregistered/mislinked script.
+		debugC(1, kDebugLingoExec, "@@DROPBEHAVIOR@@ Score::createScriptInstance(): Missing kScoreScript for behavior %s", behavior->toString().c_str());
 		return Datum();
 	}
 
