@@ -7,6 +7,8 @@ scummvmAssertEqual(5.55, value("5.55"))
 scummvmAssertEqual([1, 2, 3], value("[1, 2, 3]"))
 -- parray
 scummvmAssertEqual([#a: 1, #b: 2], value("[#a: 1, #b: 2]"))
+-- member references, as serialised into behavior initializer parameters
+scummvmAssertEqual([#alternateImage: member(2, 3)], value("[#alternateImage: (member 2 of castLib 3)]"))
 
 -- expressions
 scummvmAssertEqual(9, value("3*3"))
