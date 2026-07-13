@@ -861,6 +861,16 @@ void Cast::loadCast() {
 	// we use the movie's mapping.
 	uint32 libResourceId = _isExternal ? 1024 : _libResourceId;
 
+	// @@LCTX@@ Diagnose why D7 external casts (e.g. Sz01's global/Sz01.cst) load
+	// members but no Lingo context: shows whether _isExternal took effect and which
+	// resourceId the CASt + later the Lctx lookup use. If an external cast prints
+	// isExternal=0 / resId!=1024, the Lctx lookup at getFirstResource('Lctx', resId)
+	// will miss the context (parented under 1024) and drop all its behaviors.
+	debugC(1, kDebugLoading, "@@LCTX@@ loadCast libId=%d name='%s' isExternal=%d _libResourceId=%d -> lookupResId=%d hasLctx=%d LscrCount=%d",
+		_castLibID, _castName.c_str(), (int)_isExternal, _libResourceId, libResourceId,
+		(int)_castArchive->hasResource(MKTAG('L', 'c', 't', 'x'), -1),
+		_castArchive->getResourceIDList(MKTAG('L', 's', 'c', 'r')).size());
+
 	if (cast.size() > 0) {
 		debugC(2, kDebugLoading, "****** Loading CASt resources for libId %d (%s), resourceId %d", _castLibID, _castName.c_str(), libResourceId);
 
@@ -948,7 +958,13 @@ void Cast::loadCast() {
 	if (_version >= kFileVer400 && !debugChannelSet(-1, kDebugNoBytecode)) {
 		// Try to load script context
 		// Even for multiple casts, ID is 1024
-		if ((r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'x'), libResourceId)) != nullptr) {
+		r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'x'), libResourceId);
+		// @@LCTX@@ Did the parented Lctx lookup succeed? If foundLctx=0 while the
+		// archive has Lctx/Lscr resources, the parentId (lookupResId) is wrong for
+		// this cast -> scripts never register -> behaviors dropped.
+		debugC(1, kDebugLoading, "@@LCTX@@ loadCast libId=%d lookupResId=%d foundLctx=%d",
+			_castLibID, libResourceId, (int)(r != nullptr));
+		if (r != nullptr) {
 			loadLingoContext(*r);
 			delete r;
 		}

@@ -147,6 +147,13 @@ void DirectorSound::playStream(Audio::AudioStream &stream, int soundChannel) {
 
 
 	_mixer->playStream(Audio::Mixer::kSFXSoundType, &_channels[soundChannel]->handle, &stream, -1, getChannelVolume(soundChannel));
+	// @@SNDMIX@@ mixer-level truth: was the stream accepted (handle active) and at
+	// what volume? A sound started at volume 0 that later fades up must have its
+	// live handle raised via setChannelVolume; if the handle is inactive here or
+	// the fade never reaches it, the sound is silent despite good data.
+	debugC(1, kDebugSound, "@@SNDMIX@@ playStream ch %d: playedVol=%d enable=%d handleActive=%d",
+		soundChannel, getChannelVolume(soundChannel), (int)_enable,
+		(int)_mixer->isSoundHandleActive(_channels[soundChannel]->handle));
 	_channels[soundChannel]->originalRate = (int)_mixer->getChannelRate(_channels[soundChannel]->handle);
 	if (_channels[soundChannel]->pitchShiftPercent != 100) {
 		_mixer->setChannelRate(_channels[soundChannel]->handle, _channels[soundChannel]->originalRate*_channels[soundChannel]->pitchShiftPercent/100);
@@ -360,7 +367,18 @@ bool DirectorSound::isChannelActive(int soundChannel) {
 	if (!assertChannel(soundChannel))
 		return false;
 
-	if (!_mixer->isSoundHandleActive(_channels[soundChannel]->handle))
+	bool mixerActive = _mixer->isSoundHandleActive(_channels[soundChannel]->handle);
+	bool looped = _channels[soundChannel]->loopPtr != nullptr;
+	int iters = looped ? (int)_channels[soundChannel]->loopPtr->getCompleteIterations() : -1;
+	bool result = mixerActive && (!looped || iters < 1);
+	// @@SNDBUSY@@ shows what soundBusy(n) actually returns per query. If a sound
+	// that should still be playing (e.g. the narration) reports result=0, the
+	// scene's "if soundBusy(n) then go the frame" hold releases early and the
+	// speech is cut / the scene loops.
+	debugC(1, kDebugSound, "@@SNDBUSY@@ isChannelActive ch %d: mixerActive=%d looped=%d iters=%d -> %d",
+		soundChannel, (int)mixerActive, (int)looped, iters, (int)result);
+
+	if (!mixerActive)
 		return false;
 
 	// Looped sounds are considered to be inactive after the first play
@@ -709,6 +727,12 @@ void DirectorSound::setChannelVolumeInternal(int soundChannel, uint8 volume) {
 
 	if (_enable)
 		_mixer->setChannelVolume(_channels[soundChannel]->handle, _channels[soundChannel]->volume);
+	// @@SNDMIX@@ does a fade/volume-ramp actually reach a live handle? If the voice
+	// (started at vol 0) ramps to 255 but handleActive=0 here, the stream already
+	// ended/was dropped and the volume update goes nowhere -> silent playback.
+	debugC(1, kDebugSound, "@@SNDMIX@@ setChannelVolume ch %d -> %d: enable=%d handleActive=%d",
+		soundChannel, volume, (int)_enable,
+		(int)_mixer->isSoundHandleActive(_channels[soundChannel]->handle));
 }
 
 // -1 represent all the sound channel
