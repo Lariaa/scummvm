@@ -735,6 +735,15 @@ varorthe: var
 chunk: tFIELD refargs		{ $$ = new FuncNode(new Common::String("field"), $refargs); }
 	| tCAST refargs			{ $$ = new FuncNode(new Common::String("cast"), $refargs); }
 	| tMEMBER refargs		{ $$ = new FuncNode(new Common::String("member"), $refargs); }
+	| tMEMBER simpleexpr[member] tOF tCASTLIB simpleexpr[castLib]	{
+		// `member X of castLib Y` is equivalent to `member(X, Y)`. This form is
+		// emitted by Director when serialising a member reference to text (e.g.
+		// behavior initializer parameter lists), so it must parse when such a
+		// string is evaluated at runtime via value().
+		NodeList *args = new NodeList;
+		args->push_back($member);
+		args->push_back($castLib);
+		$$ = new FuncNode(new Common::String("member"), args); }
 	| tCASTLIB refargs		{ $$ = new FuncNode(new Common::String("castLib"), $refargs); }
 	| tCHAR expr[idx] tOF simpleexpr[src]	{
 		$$ = new ChunkExprNode(kChunkChar, $idx, nullptr, $src); }
