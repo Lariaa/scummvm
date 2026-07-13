@@ -1837,8 +1837,28 @@ bool Score::checkSpriteRollOver(uint16 spriteId, Common::Point pos) {
 
 uint16 Score::getRollOverSpriteIDFromPos(Common::Point pos) {
 	for (int i = _channels.size() - 1; i >= 0; i--) {
-		if (_channels[i]->getRollOverBbox().contains(pos))
+		// D4 and below: rollOver() checks against the sprite's last non-zero
+		// contents even after the score cleared it (getRollOverBbox() keeps that
+		// quirk), so keep the plain bounding-box test there.
+		if (g_director->getVersion() < 500) {
+			if (_channels[i]->getRollOverBbox().contains(pos))
+				return i;
+			continue;
+		}
+
+		// D5+: use the same visibility- and matte-aware hit test as every other
+		// sprite lookup (getSpriteIDFromPos/getMouseSpriteIDFromPos). A raw
+		// bounding-box test would also match invisible full-stage catch sprites
+		// (e.g. TKKG6's HME city map layers an invisible matte bitmap and an
+		// invisible full-screen shape on the two topmost channels), so rollOver()
+		// returned one of those instead of the real hotspot underneath -- and the
+		// map's rollover behavior copies `the loc of sprite (rollOver())` onto the
+		// preview sprite, which then rendered at the wrong position.
+		CollisionTest test = _channels[i]->isMouseIn(pos);
+		if (test == kCollisionYes)
 			return i;
+		else if (test == kCollisionHole)
+			break;
 	}
 
 	return 0;
