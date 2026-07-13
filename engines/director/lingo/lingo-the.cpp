@@ -195,6 +195,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheVideoForWindowsPresent,"videoForWindowsPresent",false, 400, true },//	D4 f
 	{ kTheWindow,			"window",			true,  400, false },//			D4
 	{ kTheWindowList,		"windowList",		false, 400, false },//			D4 p
+	{ kTheXtraList,			"xtraList",			false, 700, true },	//					D7 f
 	{ kTheXtras,			"xtras",			false, 500, false },//				D5 p
 	{ kTheNOEntity, nullptr, false, 0, false }
 };
@@ -1200,6 +1201,15 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		break;
 	case kTheXtras: // D5
 		d = getXtrasNum();
+		break;
+	case kTheXtraList: // D7
+		// A linear list of the currently registered Xtras. Games test this to
+		// detect optional Xtras, e.g. Löwenzahn 7 does
+		// `string(the xtraList) contains "DIRECTME"` to require the DirectMedia Xtra.
+		d.type = ARRAY;
+		d.u.farr = new FArray;
+		for (uint i = 0; i < _openXtras.size(); i++)
+			d.u.farr->arr.push_back(Datum(_openXtras[i]));
 		break;
 	default:
 		warning("Lingo::getTheEntity(): Unprocessed getting field \"%s\" of entity %s", field2str(field), entity2str(entity));
