@@ -6,6 +6,25 @@ set a = field "castname"
 set a = script "scriptname"
 set a = window "windowname"
 
+-- member of castLib
+-- Director serialises member references in this form (e.g. in the behavior
+-- initializer parameter lists stored in the score), so it has to parse.
+set a = member 1 of castLib 1
+scummvmAssertEqual(member 1 of castLib 1, member(1, 1))
+
+-- the castLib operand must not be silently dropped
+scummvmAssertEqual(member 1 of castLib 2, member(1, 2))
+scummvmAssert(member 1 of castLib 1 <> member 1 of castLib 2)
+
+-- both operands are expressions, not just literals
+set n = 3
+set libNum = 2
+scummvmAssertEqual(member n of castLib libNum, member(3, 2))
+scummvmAssertEqual(member (n + 1) of castLib libNum, member(4, 2))
+
+-- the exact shape Director emits: parenthesised, inside a property list
+scummvmAssertEqual([#alternateImage: (member 2 of castLib 3)], [#alternateImage: member(2, 3)])
+
 -- assign to field reference
 put "asdf" into field 1
 put "lorem ipsum" into cast 1
