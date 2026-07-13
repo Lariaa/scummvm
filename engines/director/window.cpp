@@ -83,13 +83,23 @@ Window::Window(int id, bool scrollable, bool resizable, bool editable, Graphics:
 }
 
 Window::~Window() {
+	// Tear down every Lingo state (active, play, and frozen) *before* the movie.
+	// Frozen states can still hold refcounts on ScriptContexts / script-instance
+	// objects owned by the movie's casts; deleting the movie first would free that
+	// backing and leave the frozen states referencing destroyed objects (observed
+	// as a "pure virtual method called" abort when quitting via halt while Lingo
+	// was frozen). The active _lingoState was always torn down first here; the
+	// frozen states were the inconsistent case.
 	delete _lingoState;
 	if (_lingoPlayState)
 		delete _lingoPlayState;
-	delete _soundManager;
-	delete _currentMovie;
+	if (!_frozenLingoStates.empty())
+		debugC(1, kDebugLingoExec, "@@TEARDOWN@@ Window::~Window: deleting %d frozen Lingo state(s) before movie", _frozenLingoStates.size());
 	for (uint i = 0; i < _frozenLingoStates.size(); i++)
 		delete _frozenLingoStates[i];
+	_frozenLingoStates.clear();
+	delete _soundManager;
+	delete _currentMovie;
 	if (_puppetTransition)
 		delete _puppetTransition;
 	if (_isModal) {
