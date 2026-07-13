@@ -1781,12 +1781,33 @@ bool Score::checkSpriteRollOver(uint16 spriteId, Common::Point pos) {
 }
 
 uint16 Score::getRollOverSpriteIDFromPos(Common::Point pos) {
+	// @@ROLL@@ TEMPORARY diagnostic (TKKG6 map preview offset): the HME map is
+	// fully runtime-puppeted (the static VWSC score is empty), so channel z-order
+	// and ink only exist at runtime. Dump the whole sprite stack under the cursor
+	// (top->bottom) with member, ink and loc, so we can see whether a hotspot sits
+	// above/below the map bitmap (member 44 of castLib 3) and what ink the map
+	// uses. If member 44 has matte ink, real Director may skip its transparent
+	// pixels while ScummVM's bounding-box test does not -> it would then return the
+	// map instead of the hotspot, and its loc (275,207) mispositions the preview.
+	// The first (topmost) match, marked '*', is what rollOver() returns.
+	int result = -1;
+	Common::String stack;
 	for (int i = _channels.size() - 1; i >= 0; i--) {
-		if (_channels[i]->getRollOverBbox().contains(pos))
-			return i;
+		if (_channels[i]->getRollOverBbox().contains(pos)) {
+			Sprite *sp = _channels[i]->_sprite;
+			stack += Common::String::format("[ch%d %s ink=%d loc=(%d,%d)%s] ",
+				i, sp->_castId.asString().c_str(), (int)sp->_ink,
+				sp->_startPoint.x, sp->_startPoint.y,
+				result < 0 ? "*" : "");
+			if (result < 0)
+				result = i;
+		}
 	}
 
-	return 0;
+	if (result >= 0)
+		warning("@@ROLL@@ pos=(%d,%d) stack: %s", pos.x, pos.y, stack.c_str());
+
+	return result < 0 ? 0 : result;
 }
 
 

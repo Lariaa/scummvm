@@ -506,6 +506,20 @@ void Channel::setCast(CastMemberID memberID) {
 	// Based on Director in a Nutshell, page 15
 	_sprite->setAutoPuppet(kAPCast, true);
 	setNeedsDraw();
+
+	// @@SETCAST@@ TEMPORARY diagnostic (TKKG6 map rollover-preview offset): show
+	// where a Lingo `set the member of sprite` places the new member -- loc
+	// (registration point), dims, stretch flag and the resulting on-stage bbox.
+	// The rollover behavior does `set the loc of sprite 20 to the loc of sprite
+	// (rollOver())` then swaps in the preview image; compare the bbox here with
+	// where it should sit on the city map.
+	if (hasChanged) {
+		Common::Rect nb = getBbox();
+		warning("@@SETCAST@@ member=%s loc=(%d,%d) dims=%dx%d stretch=%d bbox=(%d,%d,%d,%d)",
+			memberID.asString().c_str(), _sprite->_startPoint.x, _sprite->_startPoint.y,
+			_sprite->_width, _sprite->_height, _sprite->_stretch,
+			nb.left, nb.top, nb.right, nb.bottom);
+	}
 }
 
 void Channel::setClean(Sprite *nextSprite, bool partial) {
@@ -761,6 +775,11 @@ void Channel::replaceWidget(CastMemberID previousCastId, bool force) {
 	}
 
 	if (_widget) {
+		// @@WIDGET@@ TEMPORARY diagnostic (TKKG6 Abspann overlap): track text/RTE
+		// widget lifecycle. A DELETE without a later CREATE at the same slot means
+		// the widget went away; a CREATE with no matching DELETE means it persists.
+		warning("@@WIDGET@@ DELETE oldMember=%s (replacing with=%s)",
+			previousCastId.asString().c_str(), _sprite->_castId.asString().c_str());
 		delete _widget;
 		_widget = nullptr;
 	}
@@ -783,6 +802,12 @@ void Channel::replaceWidget(CastMemberID previousCastId, bool force) {
 
 		_widget = _sprite->_cast->createWidget(bbox, this, _sprite->_spriteType);
 		if (_widget) {
+			// @@WIDGET@@ TEMPORARY diagnostic (TKKG6 Abspann overlap): log RTE/text
+			// widget creation with its member + bbox so it can be tracked per frame.
+			if (_sprite->_cast->_type == kCastRichText || _sprite->_cast->_type == kCastText)
+				warning("@@WIDGET@@ CREATE member=%s type=%d bbox=(%d,%d,%d,%d)",
+					_sprite->_castId.asString().c_str(), _sprite->_cast->_type,
+					bbox.left, bbox.top, bbox.right, bbox.bottom);
 			_widget->_priority = _priority;
 			_widget->draw();
 
