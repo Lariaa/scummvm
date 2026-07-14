@@ -188,7 +188,15 @@ Graphics::MacWidget *RichTextCastMember::createWidget(Common::Rect &bbox, Channe
 	Graphics::Surface *dithered = nullptr;
 	Picture *src = _pictureWithBg;
 
-	if (channel->_sprite->_ink == kInkTypeBackgndTrans)
+	// _picture carries its transparency in an alpha channel, which only survives
+	// where the destination has one. In 8-bit the surface is converted to a paletted
+	// image below and the alpha is dropped; every pixel of an RTE alpha map holds the
+	// *foreground* colour and differs only in alpha, so the background collapses into
+	// solid foreground and the text renders as a filled box. Use the background-
+	// coloured picture there instead: in 8-bit, transparency comes from the ink
+	// masking out a real colour, and Channel::getPlotData() points the ink at exactly
+	// the colour this picture paints its background in.
+	if (channel->_sprite->_ink == kInkTypeBackgndTrans && dstBpp != 1)
 		src = _picture;
 
 	if (dstBpp == 1) {
@@ -210,6 +218,16 @@ Graphics::MacWidget *RichTextCastMember::createWidget(Common::Rect &bbox, Channe
 	}
 
 	return widget;
+}
+
+uint32 RichTextCastMember::getBackgroundColor() {
+	byte r, g, b;
+	_pf32.colorToRGB(_bgColor, r, g, b);
+
+	if (g_director->_wm->_pixelformat.isCLUT8())
+		return g_director->_wm->findBestColor(r, g, b);
+
+	return g_director->_wm->_pixelformat.RGBToColor(r, g, b);
 }
 
 bool RichTextCastMember::hasField(int field) {
