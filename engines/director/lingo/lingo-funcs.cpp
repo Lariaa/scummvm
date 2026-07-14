@@ -71,6 +71,29 @@ void Lingo::func_goto(Datum &frame, Datum &movie, bool calledfromgo) {
 		if (!stage->setNextMovie(movieFilenameRaw))
 			return;
 
+		// Director does not reload the movie you are already in (see
+		// Window::loadNextMovie's same-movie skip). `go to frame X of movie (self)`
+		// must therefore act like an in-movie `go to frame`: if we instead stopped
+		// the score and queued a switch to the current movie, loadNextMovie would
+		// skip the load and leave the score kPlayStopped with no movie to load, so
+		// Window::step() falls through to `return false` and the engine shuts down.
+		Movie *curMovie = stage->getCurrentMovie();
+		if (curMovie && curMovie->getArchive()
+				&& stage->getFileName() == curMovie->getArchive()->getPathName().toString(g_director->_dirSeparator)) {
+			stage->_nextMovie.movie.clear();
+
+			if (frame.type == STRING) {
+				debugC(3, kDebugLingoExec, "Lingo::func_goto(): going to frame \"%s\" of current movie \"%s\"", frame.u.s->c_str(), movieFilenameRaw.c_str());
+				score->setStartToLabel(*frame.u.s);
+			} else if (frame.type != VOID) {
+				debugC(3, kDebugLingoExec, "Lingo::func_goto(): going to frame %d of current movie \"%s\"", frame.asInt(), movieFilenameRaw.c_str());
+				score->setCurrentFrame(frame.asInt());
+			}
+
+			score->killScriptInstances(score->getNextFrame());
+			return;
+		}
+
 		// If we reached here from b_go, and the movie is getting swapped out,
 		// reset all of the custom event handlers.
 		if (calledfromgo)
