@@ -33,6 +33,7 @@
 #include "director/castmember/digitalvideo.h"
 #include "director/castmember/filmloop.h"
 #include "director/castmember/movie.h"
+#include "director/castmember/richtext.h"
 #include "director/castmember/text.h"
 
 #include "graphics/macgui/mactext.h"
@@ -172,6 +173,17 @@ DirectorPlotData Channel::getPlotData() {
 			if (widget)
 				pd.srfMask = widget->getGlyphMask();
 		}
+	}
+
+	// A RichText member renders its own background, in the *member's* bgColor.
+	// Background-transparent ink masks out a real colour, and the sprite's backColor
+	// need not be the colour the member actually painted: TKKG6's credits are white
+	// text on a black member background while the sprite's backColor is white, so
+	// keying the sprite's colour knocked out the glyphs instead of the background and
+	// left nothing but their anti-aliased outlines. Key what the member painted.
+	if (_sprite->_cast && _sprite->_cast->_type == kCastRichText
+			&& _sprite->_ink == kInkTypeBackgndTrans) {
+		pd.backColor = ((RichTextCastMember *)_sprite->_cast)->getBackgroundColor();
 	}
 
 	return pd;
