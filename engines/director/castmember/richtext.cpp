@@ -171,7 +171,7 @@ void RichTextCastMember::load() {
 
 
 Graphics::MacWidget *RichTextCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
-	if (!_picture) {
+	if (!_pictureWithBg) {
 		warning("RichTextCastMember::createWidget: No picture");
 		return nullptr;
 	}
@@ -186,10 +186,12 @@ Graphics::MacWidget *RichTextCastMember::createWidget(Common::Rect &bbox, Channe
 	Graphics::MacWidget *widget = new Graphics::MacWidget(g_director->getCurrentWindow()->getMacWindow(), bbox.left, bbox.top, bbox.width(), bbox.height(), g_director->_wm, false);
 
 	Graphics::Surface *dithered = nullptr;
+	// Always render the background: background-transparent ink masks out a real
+	// colour rather than reading an alpha channel, and Channel::getPlotData() points
+	// it at exactly the colour this picture paints its background in. _picture keeps
+	// its transparency in alpha only, and every one of its pixels holds the
+	// *foreground* colour, differing only in alpha -- so the ink can never key it.
 	Picture *src = _pictureWithBg;
-
-	if (channel->_sprite->_ink == kInkTypeBackgndTrans)
-		src = _picture;
 
 	if (dstBpp == 1) {
 		dithered = src->_surface.convertTo(g_director->_wm->_pixelformat, nullptr, 0, g_director->_wm->getPalette(), g_director->_wm->getPaletteSize());
@@ -210,6 +212,16 @@ Graphics::MacWidget *RichTextCastMember::createWidget(Common::Rect &bbox, Channe
 	}
 
 	return widget;
+}
+
+uint32 RichTextCastMember::getBackgroundColor() {
+	byte r, g, b;
+	_pf32.colorToRGB(_bgColor, r, g, b);
+
+	if (g_director->_wm->_pixelformat.isCLUT8())
+		return g_director->_wm->findBestColor(r, g, b);
+
+	return g_director->_wm->_pixelformat.RGBToColor(r, g, b);
 }
 
 bool RichTextCastMember::hasField(int field) {
