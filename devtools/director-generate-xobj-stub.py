@@ -706,11 +706,18 @@ def extract_msgtable_from_data_literal(
     # The most common reason the .text scan fails is not that the msgTable is
     # missing, but that the register call loads its address with instructions
     # other than the expected "push offset table" (MOV into a register, a
-    # different argument order, a different selector...). The table itself is
-    # still present verbatim as a single NUL-terminated ASCII string in a data
-    # section. Locate it directly: it always begins with "xtra <Name>" and is
-    # followed by method-signature / comment lines. This is independent of the
-    # calling code and recovers the large class of Xtras the pattern misses.
+    # different argument order, a different selector...). The table body is
+    # still present verbatim as a NUL-terminated ASCII string in a data section.
+    #
+    # Locate it directly: it always begins with "xtra <Name>", so anchor there
+    # and read to the terminating NUL. Anchoring on the substring also copes
+    # with a stray prefix byte from the preceding datum ("Za'$xtra MD5 ...").
+    #
+    # Some builds keep the header ("xtra fileio -- version %s.%s.%s.r%s", the
+    # version filled in at runtime) in its own string and the method body in the
+    # next one. So also try extending the anchored block over the NUL padding
+    # with the strings that follow, while those still look like table text, and
+    # keep whichever candidate scores highest.
     file.seek(0)
     data = file.read()
     text = data.decode("iso-8859-1")
@@ -720,18 +727,69 @@ def extract_msgtable_from_data_literal(
     for match in re.finditer(r"xtra[ \t]+[A-Za-z_]\w*", text):
         start = match.start()
         nul = text.find("\x00", start)
-        block = text[start : nul if nul >= 0 else start + 6000]
-        score = _score_msgtable_block(block)
-        if score > best_score:
-            best_score = score
-            best_block = block
+        end = nul if nul >= 0 else len(text)
+        candidates = [text[start:end]]
 
-    # Require a few table-like lines so we don't latch onto an unrelated string
-    # that merely happens to start with the word "xtra".
+        extended = candidates[0]
+        pos = end
+        for _ in range(64):
+            while pos < len(text) and text[pos] == "\x00":
+                pos += 1
+            nxt_nul = text.find("\x00", pos)
+            nxt_end = nxt_nul if nxt_nul >= 0 else len(text)
+            nxt = text[pos:nxt_end]
+            if not nxt.strip():
+                # blank filler between the header and the body: skip, don't stop
+                pos = nxt_end
+                continue
+            if _score_msgtable_block(nxt) < 1:
+                break
+            extended += "\n" + nxt
+            candidates.append(extended)
+            pos = nxt_end
+
+        for candidate in candidates:
+            score = _score_msgtable_block(candidate)
+            if score > best_score:
+                best_score = score
+                best_block = candidate
+
+    # Last resort: a few Xtras (e.g. ZipXtra) keep the body nowhere near the
+    # header, so nothing was reachable from the anchor. Take the best-scoring
+    # string in the binary as the body and pair it with the header. This is only
+    # used when the anchored search came up empty, and the gate below still
+    # requires a real header plus enough table lines.
+    if best_score < 3:
+        body = None
+        body_score = 0
+        body_off = -1
+        for match in re.finditer(rb"[\x09\x0a\x0d\x20-\x7e]{8,}", data):
+            block = match.group(0).decode("iso-8859-1")
+            score = _score_msgtable_block(block)
+            if score > body_score:
+                body_score, body, body_off = score, block, match.start()
+        if body and body_score >= 2:
+            # Prefer the header closest in front of the body, but accept one
+            # sitting after it too (ZipXtra stores it well past the table).
+            header_line = None
+            header_dist = None
+            for match in re.finditer(r"xtra[ \t]+[A-Za-z_]\w*[^\x00\r\n]{0,80}", text):
+                dist = abs(match.start() - body_off)
+                if header_dist is None or dist < header_dist:
+                    header_line = match.group(0).strip()
+                    header_dist = dist
+            if header_line and not body.lstrip().lower().startswith("xtra "):
+                best_block = header_line + "\n" + body
+                best_score = _score_msgtable_block(best_block)
+
+    # Require a real "xtra <Name>" header plus a few table-like lines, so we
+    # don't latch onto an unrelated string that merely contains the word "xtra".
     if not best_block or best_score < 3:
         return None
 
     lines = [line.strip() for line in re.split(r"[\r\n]+", best_block) if line.strip()]
+    if not lines[0].lower().startswith("xtra "):
+        return None
     print(f"Recovered msgTable literal from data section (score {best_score})")
     return lines
 
