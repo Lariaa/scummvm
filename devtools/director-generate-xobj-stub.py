@@ -680,6 +680,62 @@ def extract_msgtable_from_pe_resources(
     return [line.strip() for line in methtable_text.split("\n") if line.strip()]
 
 
+# A msgTable line looks like "[+*] name arg1type, arg2type ..." or a comment.
+_MSGTABLE_LINE = re.compile(
+    r"[+*]?\s*[A-Za-z_]\w*\s+" + _MSGTABLE_TYPE_KW + r"\b"
+)
+
+
+def _score_msgtable_block(block: str) -> int:
+    score = 0
+    for line in re.split(r"[\r\n]+", block):
+        stripped = line.strip()
+        if (
+            _MSGTABLE_LINE.match(stripped)
+            or stripped.startswith("--")
+            or stripped.lower().startswith("xtra ")
+            or stripped.lower().startswith("new object")
+        ):
+            score += 1
+    return score
+
+
+def extract_msgtable_from_data_literal(
+    file: BinaryIO, sections: dict[str, PESection]
+) -> list[str] | None:
+    # The most common reason the .text scan fails is not that the msgTable is
+    # missing, but that the register call loads its address with instructions
+    # other than the expected "push offset table" (MOV into a register, a
+    # different argument order, a different selector...). The table itself is
+    # still present verbatim as a single NUL-terminated ASCII string in a data
+    # section. Locate it directly: it always begins with "xtra <Name>" and is
+    # followed by method-signature / comment lines. This is independent of the
+    # calling code and recovers the large class of Xtras the pattern misses.
+    file.seek(0)
+    data = file.read()
+    text = data.decode("iso-8859-1")
+
+    best_block = None
+    best_score = 0
+    for match in re.finditer(r"xtra[ \t]+[A-Za-z_]\w*", text):
+        start = match.start()
+        nul = text.find("\x00", start)
+        block = text[start : nul if nul >= 0 else start + 6000]
+        score = _score_msgtable_block(block)
+        if score > best_score:
+            best_score = score
+            best_block = block
+
+    # Require a few table-like lines so we don't latch onto an unrelated string
+    # that merely happens to start with the word "xtra".
+    if not best_block or best_score < 3:
+        return None
+
+    lines = [line.strip() for line in re.split(r"[\r\n]+", best_block) if line.strip()]
+    print(f"Recovered msgTable literal from data section (score {best_score})")
+    return lines
+
+
 def extract_xcode_win32(file: BinaryIO, pe_offset: int) -> XCode:
     file.seek(pe_offset + 4)
 
@@ -770,9 +826,14 @@ def extract_xcode_win32(file: BinaryIO, pe_offset: int) -> XCode:
                 methtable = data[start:end].decode('iso-8859-1').split('\n')
 
     if not methtable_found:
-        # The msgTable wasn't a static string. Try to rebuild it from the
-        # STRINGTABLE resources (LoadString-based Xtras like PrintOMatic).
-        methtable = extract_msgtable_from_pe_resources(file, sections)
+        # The .text scan didn't match. Fall back to locating the table without
+        # relying on the shape of the register call: first as a verbatim
+        # NUL-terminated literal in a data section (the common case), then
+        # rebuilt from STRINGTABLE resources (LoadString-based Xtras like
+        # PrintOMatic).
+        methtable = extract_msgtable_from_data_literal(file, sections)
+        if not methtable:
+            methtable = extract_msgtable_from_pe_resources(file, sections)
         if not methtable:
             raise ValueError("Could not find msgTable! You may have to copy the Xtra into real Director, run \"put mMessageList(xtra(\"xtraName\"))\" in the message window, then copy the output to a text file.")
 
