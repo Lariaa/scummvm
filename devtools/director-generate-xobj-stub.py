@@ -683,9 +683,11 @@ def extract_msgtable_from_pe_resources(
     return [line.strip() for line in methtable_text.split("\n") if line.strip()]
 
 
-# A msgTable line looks like "[+*] name arg1type, arg2type ..." or a comment.
+# A msgTable line is "[+*] name arg1type, arg2type ...", or - for a handler that
+# takes nothing at all - just "* name -- comment" with no argument list.
 _MSGTABLE_LINE = re.compile(
     r"[+*]?\s*[A-Za-z_]\w*\s+" + _MSGTABLE_TYPE_KW + r"(?!\w)"
+    r"|[+*]\s*[A-Za-z_]\w*\s*(--|$)"
 )
 
 
@@ -1161,6 +1163,10 @@ def generate_xtra_stubs(
     for e in msgtable:
         elem = e.split("--", 1)[0].strip()
         if not elem:
+            continue
+        if elem.startswith("/*"):
+            # An entry the Xtra author commented out, so it isn't registered.
+            # Keep it in the table listing, but don't generate a stub for it.
             continue
         functype = "method"
         if elem.startswith("+"):
