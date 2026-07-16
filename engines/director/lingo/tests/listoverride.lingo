@@ -49,3 +49,27 @@ scummvmAssertEqual(result, "LINTRANS")
 set result = getLast("not a list")
 scummvmAssertEqual(result, "overridden getLast")
 
+
+-- A list builtin must beat a same-named method when called from WITHIN a me
+-- object (parent script / factory). This exercises the code path changed by the
+-- fix: the builtin override is decided before the me-object method lookup, so a
+-- list argument uses the builtin even though the object defines a same-named
+-- method. A non-list argument still resolves to the me method.
+factory ListOverrideFactory
+method mNew
+  return me
+method mCallFromMethod
+  set a = count([1, 2, 3])
+  set b = getLast([10, 20, 30])
+  set c = count("not a list")
+  return [a, b, c]
+method count aList
+  return "local count"
+method getLast aList
+  return "local getLast"
+
+set obj = ListOverrideFactory(mNew)
+set res = obj(mCallFromMethod)
+scummvmAssertEqual(getAt(res, 1), 3)
+scummvmAssertEqual(getAt(res, 2), 30)
+scummvmAssertEqual(getAt(res, 3), "local count")
