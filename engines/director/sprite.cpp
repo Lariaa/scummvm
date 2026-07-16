@@ -283,7 +283,13 @@ MacShape *Sprite::getShape() {
 
 	if (g_director->getVersion() >= 300 && shape->spriteType == kCastMemberSprite) {
 		if (!_cast) {
-			warning("Sprite::getShape(): kCastMemberSprite has no cast defined");
+			// Clearing a sprite from Lingo ("set the member of sprite n to 0") leaves
+			// the channel typed as kCastMemberSprite with no member, and the channel
+			// still counts as active (isEmpty() only tests kInactiveSprite), so it
+			// reaches us every frame with nothing to draw. That is normal -- only a
+			// sprite that names a member we then failed to resolve is worth reporting.
+			if (!_castId.isNull())
+				warning("Sprite::getShape(): sprite has no cast defined for %s", _castId.asString().c_str());
 			delete shape;
 			return nullptr;
 		}
