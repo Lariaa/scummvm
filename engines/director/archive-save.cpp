@@ -156,8 +156,16 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 				Resource parent = castResMap[parentIndex];
 
 				cast = movie->getCastByLibResourceID(parent.libResourceId);
-				TextCastMember *target = (TextCastMember *)cast->getCastMember(parent.castId + cast->_castArrayStart);
-				target->writeSTXTResource(saveFile, it->offset);
+				CastMember *member = cast ? cast->getCastMember(parent.castId + cast->_castArrayStart) : nullptr;
+				if (member && (member->_type == kCastText || member->_type == kCastButton)) {
+					((TextCastMember *)member)->writeSTXTResource(saveFile, it->offset);
+				} else {
+					// The parent is not a text member (e.g. D4 script sources)
+					saveFile->seek(it->offset, SEEK_SET);
+					saveFile->writeUint32LE(it->tag);
+					saveFile->writeUint32LE(it->size);
+					saveFile->writeStream(getResource(it->tag, it->index));
+				}
 			}
 			break;
 
@@ -552,12 +560,17 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 				uint32 parentIndex = findParentIndex(it->tag, it->index);
 				Resource parent = castResMap[parentIndex];
 
-				TextCastMember *target = (TextCastMember *)cast->getCastMember(parent.castId + cast->_castArrayStart);
-				resSize = target->getSTXTResourceSize();
+				cast = movie->getCastByLibResourceID(parent.libResourceId);
+				CastMember *member = cast ? cast->getCastMember(parent.castId + cast->_castArrayStart) : nullptr;
+				if (member && (member->_type == kCastText || member->_type == kCastButton)) {
+					resSize = ((TextCastMember *)member)->getSTXTResourceSize();
+					it->size = resSize;
+				} else {
+					// Kept verbatim; see the matching case in writeToFile()
+					resSize = it->size;
+				}
 
 				it->offset = currentSize;
-				it->size = resSize;
-
 				currentSize += resSize + 8;
 			}
 			break;
