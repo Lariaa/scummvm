@@ -161,6 +161,7 @@
 #include "director/lingo/xtras/b/border.h"
 #include "director/lingo/xtras/a/amplitude.h"
 #include "director/lingo/xtras/b/budapi.h"
+#include "director/lingo/xtras/b/bamac.h"
 #include "director/lingo/xtras/d/directsound.h"
 #include "director/lingo/xtras/d/displayres.h"
 #include "director/lingo/xtras/d/datetime.h"
@@ -190,6 +191,8 @@
 #include "director/lingo/xtras/r/rtk.h"
 #include "director/lingo/xtras/s/scrnutil.h"
 #include "director/lingo/xtras/s/smacker.h"
+#include "director/lingo/xtras/s/soundimpexp.h"
+#include "director/lingo/xtras/s/soundsup.h"
 #include "director/lingo/xtras/s/staytoonedhall.h"
 #include "director/lingo/xtras/s/staytoonedball.h"
 #include "director/lingo/xtras/s/staytoonedglop.h"
@@ -294,6 +297,7 @@ static const struct XLibProto {
 	XLIBDEF(BlitPictXObj,		kXObj,			400),	// D4
 	XLIBDEF(BlockTheDrawingXObj,			kXObj,					400),	// D4
 	XLIBDEF(BorderXtra,			kXtraObj,		500),	// D5
+	XLIBDEF(BudAPIMacXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(BudAPIXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(CDROMXObj,			kXObj,			200),	// D2
 	XLIBDEF(CloseBleedWindowXCMD,kXObj,			300),	// D3
@@ -420,7 +424,9 @@ static const struct XLibProto {
 	XLIBDEF(SmackerXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(SmallUtilXObj,		kXObj,			400),	// D4
 	XLIBDEF(SoundChannelXtra,			kXtraObj,					500),	// D5
+	XLIBDEF(SoundImpExpXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(SoundJam,			kXObj,			400),	// D4
+	XLIBDEF(SoundSupXtra,			kXtraObj,					500),	// D5
 	XLIBDEF(SpaceMgr,			kXObj,			400),	// D4
 	XLIBDEF(StageControlXObj,			kXObj,					300),	// D3
 	XLIBDEF(StageTCXObj,		kXObj,			400),	// D4

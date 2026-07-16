@@ -190,6 +190,7 @@ MODULE_OBJS = \
 	lingo/xlibs/y/yasix.o \
 	lingo/xtras-cast/textxtra.o \
 	lingo/xtras/a/audio.o \
+	lingo/xtras/b/bamac.o \
 	lingo/xtras/b/border.o \
 	lingo/xtras/b/budapi.o \
 	lingo/xtras/d/datetime.o \
@@ -216,6 +217,8 @@ MODULE_OBJS = \
 	lingo/xtras/s/scrnutil.o \
 	lingo/xtras/s/setmouse.o \
 	lingo/xtras/s/smacker.o \
+	lingo/xtras/s/soundimpexp.o \
+	lingo/xtras/s/soundsup.o \
 	lingo/xtras/s/staytoonedball.o \
 	lingo/xtras/s/staytoonedglop.o \
 	lingo/xtras/s/staytoonedhall.o \
