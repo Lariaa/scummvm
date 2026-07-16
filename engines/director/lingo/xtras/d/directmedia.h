@@ -51,6 +51,7 @@ void m_setbalance(int nargs);
 void m_getbalance(int nargs);
 void m_isPastCuePoint(int nargs);
 void m_mostRecentCuePoint(int nargs);
+void m_isDirectShowInstalled(int nargs);
 
 } // End of namespace DirectMediaXtra
 

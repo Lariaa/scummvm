@@ -51,6 +51,13 @@ mostRecentCuePoint (sprite me) -- Returns the index of the last cuepoint passed
 
  */
 
+/*
+ * The Xtra builds its message table at runtime, so the block above (carved from the
+ * help text) is incomplete: it lists the sprite methods only. Löwenzahn 4 ships
+ * DIRECTME.X32 dated 2000-05-24, whose name table also holds a member-level
+ * isDirectShowInstalled, called as `isDirectShowInstalled(member(2))`.
+ */
+
 namespace Director {
 
 const char *DirectMediaXtra::xlibName = "DirectMedia";
@@ -77,7 +84,7 @@ static MethodProto xlibMethods[] = {
 };
 
 static BuiltinProto xlibBuiltins[] = {
-
+	{ "isDirectShowInstalled", DirectMediaXtra::m_isDirectShowInstalled, 1, 1, 500, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
@@ -129,5 +136,13 @@ XOBJSTUB(DirectMediaXtra::m_setbalance, 0)
 XOBJSTUB(DirectMediaXtra::m_getbalance, 0)
 XOBJSTUB(DirectMediaXtra::m_isPastCuePoint, 0)
 XOBJSTUB(DirectMediaXtra::m_mostRecentCuePoint, 0)
+
+void DirectMediaXtra::m_isDirectShowInstalled(int nargs) {
+	// Whether DirectShow is available to play the member's video. Löwenzahn 4 gates
+	// its MPEG intro on this (MPEG\INTROW, `if isDirectShowInstalled(member(2)) = 0
+	// then go("noMP")`), so answer as a Windows install with DirectShow would.
+	g_lingo->dropStack(nargs);
+	g_lingo->push(Datum(1));
+}
 
 }
