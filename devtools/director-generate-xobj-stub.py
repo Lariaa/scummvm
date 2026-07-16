@@ -547,6 +547,33 @@ def extract_xcode_win16(file: BinaryIO, ne_offset: int) -> XCode:
     }
 
 
+_MSGTABLE_TYPE_KW = (
+    r"(object|me|integer|string|point|rect|list|symbol|"
+    r"boolean|float|void|any|globalHeap)"
+)
+
+
+def _looks_like_msgtable_chunk(piece: str) -> bool:
+    # Multi-line chunks are always table content.
+    if "\n" in piece:
+        return True
+    stripped = piece.strip()
+    if not stripped:
+        return True
+    # A lone terminal line: header, comment, global/xtra handler, or a
+    # "<name> <type>..." method signature. Unrelated STRINGTABLE tokens
+    # ("None", "High", "is", ...) match none of these.
+    if (
+        stripped.lower().startswith("xtra ")
+        or stripped.startswith("--")
+        or stripped[0] in "*+"
+    ):
+        return True
+    return (
+        re.match(r"[A-Za-z_]\w*\s+" + _MSGTABLE_TYPE_KW + r"\b", stripped) is not None
+    )
+
+
 def extract_msgtable_from_pe_resources(
     file: BinaryIO, sections: dict[str, PESection]
 ) -> list[str] | None:
@@ -628,8 +655,10 @@ def extract_msgtable_from_pe_resources(
 
     # Find the resource id whose string starts the msgTable ("xtra <Name>"),
     # then concatenate the contiguous run of ids that follow it. The runtime
-    # LoadString() loop reads consecutive ids, and the block is isolated from
-    # other strings by gaps in the id space, so we stop at the first gap.
+    # LoadString() loop reads consecutive ids, so we stop at the first gap in
+    # the id space, or at the first string that no longer looks like msgTable
+    # content (some Xtras, e.g. ActiveX, pack unrelated short tokens into the
+    # ids immediately after the table with no intervening gap).
     start_id = None
     for sid in sorted(strings):
         if strings[sid].lstrip().lower().startswith("xtra "):
@@ -640,7 +669,7 @@ def extract_msgtable_from_pe_resources(
 
     pieces = []
     sid = start_id
-    while sid in strings:
+    while sid in strings and _looks_like_msgtable_chunk(strings[sid]):
         pieces.append(strings[sid])
         sid += 1
     methtable_text = "".join(pieces)
