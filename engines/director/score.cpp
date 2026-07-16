@@ -2054,24 +2054,19 @@ void Score::loadFrames(Common::SeekableReadStreamEndian &stream, uint16 version,
 			prevOff = off;
 		}
 
-		// The on-disk index actually stores numEntries+1 offsets (== listSize/maxVar):
-		// the trailing one is an end-of-data sentinel. We only read numEntries above,
-		// so the final detail entry's length (offset[i+1] - offset[i]) was unknown and
-		// getSpriteDetailsStream() returned nullptr for it -- leaving e.g. the last
-		// sprite behavior's initializer params empty (TKKG2 non-persistent inventory).
-		// Read that trailing sentinel and append it so the last real entry is sizeable.
-		// The stream is positioned right after the numEntries offsets at this point.
+		// The index stores numEntries+1 offsets: the trailing one is an
+		// end-of-data sentinel, needed to size the last detail entry
 		if (numEntries > 0) {
-			uint32 endOff = _framesStream->readUint32();
-			_spriteDetailOffsets.push_back(_frameDataOffset + endOff);
-			_spriteDetailAccessed.push_back(true);
-		}
+			if (listSize == numEntries + 1) {
+				uint32 endOff = _framesStream->readUint32();
+				_spriteDetailOffsets.push_back(_frameDataOffset + endOff);
+				_spriteDetailAccessed.push_back(true);
+			} else {
+				warning("Score::loadFrames(): Unexpected sprite detail list size %d for %d entries; last entry may be truncated",
+					listSize, numEntries);
+			}
 
-		// now seek to the header, which is position 0 in the list.
-		// Guard against an empty detail list (numEntries == 0, e.g. an empty
-		// VWSC score): there is no entry 0 to seek to or mark, and indexing
-		// the empty _spriteDetailAccessed array would assert.
-		if (numEntries > 0) {
+			// now seek to the header, which is position 0 in the list
 			_framesStream->seek(_indexStart, SEEK_SET);
 			uint32 off = _framesStream->readUint32();
 			_framesStream->seek(_frameDataOffset + off, SEEK_SET);
