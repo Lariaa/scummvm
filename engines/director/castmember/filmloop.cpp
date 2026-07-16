@@ -108,15 +108,38 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		return &_subchannels;
 	}
 
-	// get the list of sprite IDs for this frame
-	Common::Array<int> spriteIds;
+	// Build the list of cells to draw: which frame of the loop's own score each one
+	// comes from, and which of its channels.
+	Common::Array<FilmLoopCell> cells;
 	for (uint i = 0; i < _score->_scoreCache[frame]->_sprites.size(); ++i) {
-		if (_score->_scoreCache[frame]->_sprites[i] && !_score->_scoreCache[frame]->_sprites[i]->_castId.isNull())
-			spriteIds.push_back(i);
+		Sprite *cur = _score->_scoreCache[frame]->_sprites[i];
+		if (!cur || cur->_castId.isNull())
+			continue;
+
+		// A cell drawn with Trails leaves its pixels behind. Inside Director the film
+		// loop plays its own score onto its own canvas, so such a channel's earlier
+		// cells stay put and the picture builds up over the loop's frames -- TKKG4's
+		// and TKKG6's intro handwriting is authored exactly that way: one opaque
+		// letter per frame on a single Trails channel, accumulating into a word.
+		// We rebuild this list from scratch on every frame, so nothing survives from
+		// the previous one; replay the channel's earlier cells to reproduce the
+		// accumulation. Frame numbering is relative to the loop, so a looping film
+		// loop wrapping back to frame 0 clears the trail again, as it should.
+		if (cur->_trails) {
+			for (uint f = 0; f < frame; f++) {
+				if (i >= _score->_scoreCache[f]->_sprites.size())
+					continue;
+				Sprite *prev = _score->_scoreCache[f]->_sprites[i];
+				if (prev && !prev->_castId.isNull())
+					cells.push_back(FilmLoopCell(f, i));
+			}
+		}
+
+		cells.push_back(FilmLoopCell(frame, i));
 	}
 
 	debugC(5, kDebugImages, "FilmLoopCastMember::getSubChannels(): castId: %d, frame: %d, count: %d, initRect: %d,%d %dx%d, bbox: %d,%d %dx%d",
-			_castId, frame, spriteIds.size(),
+			_castId, frame, cells.size(),
 			_initialRect.left + _initialRect.width()/2,
 			_initialRect.top + _initialRect.height()/2,
 			_initialRect.width(), _initialRect.height(),
@@ -137,14 +160,14 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 	// If the placement bbox differs from the film loop's _initialRect, the sub-sprites
 	// get stretched (needToScale=1), which shows up as a distorted/oversized figure.
 	debugC(3, kDebugImages, "FilmLoopCastMember::getSubChannels(): cast %d, frame %d, %d sprites: filmloop _initialRect %dx%d@%d,%d, placement bbox %dx%d@%d,%d, needToScale %d (scaleX %.3f scaleY %.3f)",
-		_castId, frame, (int)spriteIds.size(),
+		_castId, frame, (int)cells.size(),
 		_initialRect.width(), _initialRect.height(), _initialRect.left, _initialRect.top,
 		bbox.width(), bbox.height(), bbox.left, bbox.top,
 		needToScale, scaleX, scaleY);
 
 	// copy the sprites in order to the list
-	for (auto &iter : spriteIds) {
-		Sprite src = *_score->_scoreCache[frame]->_sprites[iter];
+	for (auto &iter : cells) {
+		Sprite src = *_score->_scoreCache[iter.frame]->_sprites[iter.channel];
 		if (src._castId.isNull())
 			continue;
 
