@@ -284,14 +284,14 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			}
 
 			if (_vm->getVersion() >= 600) {
-				AbstractObject *inst = nullptr;
+				AbstractObject *scriptInstance = nullptr;
 				if (event.behaviorIndex >= 0 && event.behaviorIndex < (int)_score->_channels[event.channelId]->_scriptInstanceList.size())
-					inst = _score->_channels[event.channelId]->_scriptInstanceList[event.behaviorIndex].u.obj;
+					scriptInstance = _score->_channels[event.channelId]->_scriptInstanceList[event.behaviorIndex].u.obj;
 				else
 					warning("resolveScriptEvent: behaviorIndex %d out of range", event.behaviorIndex);
 
 				const char *evName = _lingo->_eventHandlerTypes[event.event];
-				bool hasHandler = evName && inst && inst->getMethod(evName).type != VOIDSYM;
+				bool hasHandler = evName && scriptInstance && scriptInstance->getMethod(evName).type != VOIDSYM;
 
 				// Only resolve this behavior if it actually defines a handler for the
 				// event. Otherwise leave the event as kNoneScript so processEvents()
@@ -305,7 +305,7 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 				if (hasHandler) {
 					event.scriptType = kScoreScript;
 					event.scriptId = scriptId;
-					event.scriptInstance = inst;
+					event.scriptInstance = scriptInstance;
 				}
 				return;
 			}

@@ -1738,12 +1738,12 @@ static bool instancesHandleMouse(Channel *channel) {
 	static const LEvent mouseEvents[] = { kEventMouseDown, kEventMouseUp, kEventMouseWithin,
 										  kEventMouseEnter, kEventMouseLeave, kEventMouseUpOutSide };
 	for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
-		const Datum &inst = channel->_scriptInstanceList[i];
-		if (inst.type != OBJECT || !inst.u.obj)
+		const Datum &scriptInstance = channel->_scriptInstanceList[i];
+		if (scriptInstance.type != OBJECT || !scriptInstance.u.obj)
 			continue;
 		for (int j = 0; j < ARRAYSIZE(mouseEvents); j++) {
 			const char *name = g_lingo->_eventHandlerTypes[mouseEvents[j]];
-			if (name && inst.u.obj->getMethod(name).type != VOIDSYM)
+			if (name && scriptInstance.u.obj->getMethod(name).type != VOIDSYM)
 				return true;
 		}
 	}
