@@ -33,6 +33,17 @@ struct FilmLoopFrame {
 	Common::HashMap<int, Sprite> sprites;
 };
 
+// One cell to be drawn for the film loop's current frame: which frame of the
+// loop's own score it comes from, and which of that frame's channels. These are
+// usually the current frame, but a channel drawn with Trails also replays its
+// cells from earlier frames, which is how the picture accumulates.
+struct FilmLoopCell {
+	uint frame;
+	uint channel;
+
+	FilmLoopCell(uint f, uint c) : frame(f), channel(c) {}
+};
+
 class FilmLoopCastMember : public CastMember {
 public:
 	FilmLoopCastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream, uint16 version);
