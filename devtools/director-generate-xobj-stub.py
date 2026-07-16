@@ -547,6 +547,110 @@ def extract_xcode_win16(file: BinaryIO, ne_offset: int) -> XCode:
     }
 
 
+def extract_msgtable_from_pe_resources(
+    file: BinaryIO, sections: dict[str, PESection]
+) -> list[str] | None:
+    # Some Xtras (e.g. the PrintOMatic family) do not keep the msgTable as a
+    # static C string. Instead they build it at runtime by concatenating a run
+    # of Windows STRINGTABLE resources via LoadString(). The first line of that
+    # run always starts with "xtra <Name>", so we can reconstruct the table
+    # generically from the .rsrc section without disassembling any code.
+    if ".rsrc" not in sections:
+        return None
+    rsrc = sections[".rsrc"]
+    rsrc_base = rsrc["virt_addr"]
+
+    def rva_to_offset(rva: int) -> int | None:
+        for s in sections.values():
+            span = max(s["virt_size"], s["raw_size"])
+            if s["virt_addr"] <= rva < s["virt_addr"] + span:
+                return s["raw_ptr"] + (rva - s["virt_addr"])
+        return None
+
+    def read_at(offset: int, size: int) -> bytes:
+        file.seek(offset)
+        return file.read(size)
+
+    # Walk the three-level resource directory tree (type / name / language),
+    # collecting the data entries for RT_STRING (type id 6).
+    string_leaves: list[tuple[int, int, int]] = []  # (name_id, data_rva, size)
+
+    def walk(dir_rva: int, level: int, type_id: int, name_id: int) -> None:
+        off = rva_to_offset(rsrc_base + dir_rva)
+        if off is None:
+            return
+        named = read_uint16_le(read_at(off + 12, 2))
+        ided = read_uint16_le(read_at(off + 14, 2))
+        for i in range(named + ided):
+            entry = read_at(off + 16 + i * 8, 8)
+            entry_id = read_uint32_le(entry[0:4])
+            entry_off = read_uint32_le(entry[4:8])
+            if entry_off & 0x80000000:
+                sub = entry_off & 0x7FFFFFFF
+                if level == 0:
+                    walk(sub, 1, entry_id, name_id)
+                elif level == 1:
+                    walk(sub, 2, type_id, entry_id)
+                else:
+                    walk(sub, 3, type_id, name_id)
+            else:
+                leaf_off = rva_to_offset(rsrc_base + entry_off)
+                if leaf_off is None:
+                    continue
+                data_rva = read_uint32_le(read_at(leaf_off, 4))
+                size = read_uint32_le(read_at(leaf_off + 4, 4))
+                if type_id == 6:  # RT_STRING
+                    string_leaves.append((name_id, data_rva, size))
+
+    walk(0, 0, 0, 0)
+    if not string_leaves:
+        return None
+
+    # Each RT_STRING leaf is a bundle of 16 length-prefixed UTF-16LE strings.
+    # String id = (bundle_id - 1) * 16 + index_within_bundle.
+    strings: dict[int, str] = {}
+    for name_id, data_rva, size in string_leaves:
+        data_off = rva_to_offset(data_rva)
+        if data_off is None:
+            continue
+        blob = read_at(data_off, size)
+        pos = 0
+        base_id = ((name_id & 0xFFFF) - 1) * 16
+        for i in range(16):
+            if pos + 2 > len(blob):
+                break
+            length = read_uint16_le(blob[pos : pos + 2])
+            pos += 2
+            if length:
+                text = blob[pos : pos + length * 2].decode("utf-16-le", "replace")
+                pos += length * 2
+                strings[base_id + i] = text
+
+    # Find the resource id whose string starts the msgTable ("xtra <Name>"),
+    # then concatenate the contiguous run of ids that follow it. The runtime
+    # LoadString() loop reads consecutive ids, and the block is isolated from
+    # other strings by gaps in the id space, so we stop at the first gap.
+    start_id = None
+    for sid in sorted(strings):
+        if strings[sid].lstrip().lower().startswith("xtra "):
+            start_id = sid
+            break
+    if start_id is None:
+        return None
+
+    pieces = []
+    sid = start_id
+    while sid in strings:
+        pieces.append(strings[sid])
+        sid += 1
+    methtable_text = "".join(pieces)
+
+    print("Reconstructed msgTable from STRINGTABLE resources "
+          f"(ids {start_id}..{sid - 1})")
+    # Normalise " \n" separators the resources use into clean table lines.
+    return [line.strip() for line in methtable_text.split("\n") if line.strip()]
+
+
 def extract_xcode_win32(file: BinaryIO, pe_offset: int) -> XCode:
     file.seek(pe_offset + 4)
 
@@ -637,7 +741,11 @@ def extract_xcode_win32(file: BinaryIO, pe_offset: int) -> XCode:
                 methtable = data[start:end].decode('iso-8859-1').split('\n')
 
     if not methtable_found:
-        raise ValueError("Could not find msgTable! You may have to copy the Xtra into real Director, run \"put mMessageList(xtra(\"xtraName\"))\" in the message window, then copy the output to a text file.")
+        # The msgTable wasn't a static string. Try to rebuild it from the
+        # STRINGTABLE resources (LoadString-based Xtras like PrintOMatic).
+        methtable = extract_msgtable_from_pe_resources(file, sections)
+        if not methtable:
+            raise ValueError("Could not find msgTable! You may have to copy the Xtra into real Director, run \"put mMessageList(xtra(\"xtraName\"))\" in the message window, then copy the output to a text file.")
 
     for entry in methtable:
         print(entry)
