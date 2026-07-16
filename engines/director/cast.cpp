@@ -754,16 +754,6 @@ void Cast::saveConfig(Common::SeekableWriteStream *writeStream, uint32 offset, u
 		writeStream->writeSint16BE(_netPreloadNumFrames);
 	}
 
-	if (_version >= kFileVer1000 && _version < kFileVer1100) {
-		writeStream->writeUint32BE(_windowFlags);
-		writeStream->writeSint16BE(_windowIconId.castLib);
-		writeStream->writeSint16BE(_windowIconId.member);
-		writeStream->writeSint16BE(_windowMaskId.castLib);
-		writeStream->writeSint16BE(_windowMaskId.member);
-		writeStream->writeSint16BE(_windowDragRegionMaskId.castLib);
-		writeStream->writeSint16BE(_windowDragRegionMaskId.member);
-	}
-
 	// FIXME: can't dereference SeekableWriteStream
 	/*if (debugChannelSet(7, kDebugSaving)) {
 		// Adding +8 because the stream doesn't include the header and the entry for the size itself
