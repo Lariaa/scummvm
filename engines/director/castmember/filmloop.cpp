@@ -226,8 +226,8 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			}
 		}
 
-		debugCN(5, kDebugImages, "FilmLoopCastMember::getSubChannels(): sprite: %d - cast: %s, orig: %d,%d %dx%d",
-				iter, src._castId.asString().c_str(),
+		debugCN(5, kDebugImages, "FilmLoopCastMember::getSubChannels(): sprite: %d (from frame %d) - cast: %s, orig: %d,%d %dx%d",
+				iter.channel, iter.frame, src._castId.asString().c_str(),
 				src._startPoint.x, src._startPoint.y, src._width, src._height);
 
 		// translate sprite relative to the global bounding box
@@ -281,8 +281,8 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 				pC  = *(const byte *)s.getBasePtr(xc, yc);
 			}
 		}
-		debugC(3, kDebugImages, "  film-loop sub-sprite %d: cast %s, ink %d, blend %d, NAT %dx%d, sprW/H %dx%d, final pos %d,%d, stretch %d, corners[TL=%d TR=%d BL=%d BR=%d C=%d]",
-			iter, src._castId.asString().c_str(), src._ink, src._blendAmount,
+		debugC(3, kDebugImages, "  film-loop sub-sprite %d (from frame %d): cast %s, ink %d, blend %d, NAT %dx%d, sprW/H %dx%d, final pos %d,%d, stretch %d, corners[TL=%d TR=%d BL=%d BR=%d C=%d]",
+			iter.channel, iter.frame, src._castId.asString().c_str(), src._ink, src._blendAmount,
 			natRect.width(), natRect.height(), src._width, src._height,
 			src._startPoint.x, src._startPoint.y, src._stretch,
 			pTL, pTR, pBL, pBR, pC);
