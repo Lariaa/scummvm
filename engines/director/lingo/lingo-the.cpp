@@ -1208,13 +1208,29 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		d = getXtrasNum();
 		break;
 	case kTheXtraList: // D7
-		// A linear list of the currently registered Xtras. Games test this to
-		// detect optional Xtras, e.g. Löwenzahn 7 does
-		// `string(the xtraList) contains "DIRECTME"` to require the DirectMedia Xtra.
+		// The Xtras registered with the application, as a linear list of property
+		// lists. Director reports the on-disk file name including its extension:
+		//   [[#name: "DirectSound.x32", #version: "7.0.2r85"], ...]
+		// Games test this to detect optional Xtras, e.g. Löwenzahn 4 requires the
+		// DirectMedia Xtra with `string(the xtraList) contains "DIRECTME.x32"`.
+		// We have no version resources, so #version stays empty, which Director
+		// itself does for Xtras lacking one.
 		d.type = ARRAY;
 		d.u.farr = new FArray;
-		for (uint i = 0; i < _openXtras.size(); i++)
-			d.u.farr->arr.push_back(Datum(_openXtras[i]));
+		for (uint i = 0; i < _openXtraFiles.size(); i++) {
+			Datum name("name");
+			name.type = SYMBOL;
+			Datum version("version");
+			version.type = SYMBOL;
+
+			Datum entry;
+			entry.type = PARRAY;
+			entry.u.parr = new PArray;
+			entry.u.parr->arr.push_back(PCell(name, Datum(_openXtraFiles[i])));
+			entry.u.parr->arr.push_back(PCell(version, Datum(Common::String())));
+
+			d.u.farr->arr.push_back(entry);
+		}
 		break;
 	default:
 		warning("Lingo::getTheEntity(): Unprocessed getting field \"%s\" of entity %s", field2str(field), entity2str(entity));
