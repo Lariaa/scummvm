@@ -526,10 +526,11 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 				// The castIds of cast members start from _castArrayStart
 				CastMember *target = cast->getCastMember(it->castId + cast->_castArrayStart);
 
-				if (target) {
+				if (target && !(target->_type == kCastBitmap && cast->_version >= kFileVer600)) {
 					resSize = target->getCastResourceSize();
 					it->size = resSize;		// getCastResourceSize returns size without header and size
 				} else {
+					// Unloaded members and D6+ bitmaps keep the original bytes
 					resSize = it->size;
 				}
 				it->offset = currentSize;

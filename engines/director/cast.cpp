@@ -998,8 +998,16 @@ void Cast::saveCastData(Common::SeekableWriteStream *writeStream, Resource *res)
 
 	CastType type = kCastTypeAny;
 
-	if (_loadedCast->contains(id)) {
-		CastMember *target = _loadedCast->getVal(id);
+	CastMember *target = _loadedCast->contains(id) ? _loadedCast->getVal(id) : nullptr;
+
+	// writeCastData() only knows the D4/D5 bitmap layout; keep the original
+	// bytes for D6+ bitmaps
+	// TODO: implement the D6+ bitmap writer so runtime modifications
+	// (regPoint, palette, picture) survive saving
+	if (target && target->_type == kCastBitmap && _version >= kFileVer600)
+		warning("STUB: Cast::saveCastData(): keeping original bytes for D6+ bitmap %d, runtime modifications are not saved", id);
+
+	if (target && !(target->_type == kCastBitmap && _version >= kFileVer600)) {
 		// To make it consistent with how the data is stored originally, getResourceSize returns
 		// the size excluding 'CASt' header and the entry for size itself. Adding 8 to compensate for that
 		castSize = target->getCastResourceSize();
