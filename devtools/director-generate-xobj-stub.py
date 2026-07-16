@@ -547,8 +547,10 @@ def extract_xcode_win16(file: BinaryIO, ne_offset: int) -> XCode:
     }
 
 
+# Argument types a msgTable line can name. "*" is the varargs marker, which for
+# handlers that take no fixed arguments is all a line has ("* netStatus * --").
 _MSGTABLE_TYPE_KW = (
-    r"(object|me|integer|string|point|rect|list|symbol|"
+    r"(object|me|\*|integer|string|point|rect|list|symbol|"
     r"boolean|float|void|any|globalHeap)"
 )
 
@@ -570,7 +572,8 @@ def _looks_like_msgtable_chunk(piece: str) -> bool:
     ):
         return True
     return (
-        re.match(r"[A-Za-z_]\w*\s+" + _MSGTABLE_TYPE_KW + r"\b", stripped) is not None
+        re.match(r"[A-Za-z_]\w*\s+" + _MSGTABLE_TYPE_KW + r"(?!\w)", stripped)
+        is not None
     )
 
 
@@ -682,7 +685,7 @@ def extract_msgtable_from_pe_resources(
 
 # A msgTable line looks like "[+*] name arg1type, arg2type ..." or a comment.
 _MSGTABLE_LINE = re.compile(
-    r"[+*]?\s*[A-Za-z_]\w*\s+" + _MSGTABLE_TYPE_KW + r"\b"
+    r"[+*]?\s*[A-Za-z_]\w*\s+" + _MSGTABLE_TYPE_KW + r"(?!\w)"
 )
 
 
