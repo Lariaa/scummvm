@@ -12,6 +12,11 @@ move cast 1, cast 1
 move cast 1, 3
 move cast 3, 1
 move cast 1
+-- The one-argument form above moved member 1 to the first empty slot,
+-- which is 3 in the test movie. Move it back: all test files share one
+-- movie state, and later tests (the width of cast 1 below, field 1 in
+-- chunks.lingo) rely on the text member still being member 1.
+move cast 3, 1
 
 put findEmpty(cast 10)
 pasteClipBoardInto cast 2
