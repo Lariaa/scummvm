@@ -604,8 +604,26 @@ void Window::loadXtrasFromPath() {
 	// five layers deep in nested folders within this folder,
 	// and they'll still be recognized.
 	Common::ArchiveMemberList targets;
+
+	// matchPathComponents=true lets the leading '*' span directory separators, so an
+	// "xtras" folder nested several levels deep (e.g. next to a projector buried in
+	// Setup/WinRoot/Terzio/<game>/) is still matched, honoring the documented "buried
+	// up to five layers deep" behavior above. matchPathComponents=false would only
+	// match an xtras folder exactly one level below the game root.
 	SearchMan.listMatchingMembers(targets, Common::Path("xtras/*"), true);
-	SearchMan.listMatchingMembers(targets, Common::Path("*/xtras/*"), false);
+	SearchMan.listMatchingMembers(targets, Common::Path("*/xtras/*"), true);
+
+	// SearchMan only caches the game tree to a limited depth (see the addDirectory()
+	// call in the DirectorEngine constructor). Some projectors (e.g. Terzio's Setup
+	// apps under Setup/WinRoot/Terzio/<game>/) sit just deep enough that their sibling
+	// "xtras" folder falls below that cache depth and is missed above. As a fallback,
+	// scan the game directory directly at a larger depth so the Xtras are still found.
+	if (targets.empty()) {
+		Common::FSDirectory xtraSearch(*g_director->getGameDataDir(), 8);
+		xtraSearch.listMatchingMembers(targets, Common::Path("xtras/*"), true);
+		xtraSearch.listMatchingMembers(targets, Common::Path("*/xtras/*"), true);
+	}
+
 	for (auto &it : targets) {
 		if (it->isDirectory())
 			continue;
