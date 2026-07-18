@@ -1,0 +1,46 @@
+-- `the xtraList` (D7) reports the Xtras registered with the application as a linear
+-- list of property lists. Verified against real Director 7 (Windows):
+--
+--   put the xtraList
+--   -- [[#name: "NetLingo.x32", #version: "7.0.2r85"], [#name: "FileXtra.x32", #version: ""], ..]
+--
+-- #name is the on-disk FILE name including its extension, not the Xtra name, and
+-- #version is a string, empty for Xtras without a version resource. Loewenzahn 4
+-- gates its startup on exactly that (checkW.dir, `on checkXtra`):
+--
+--   return string(the xtraList) contains "DIRECTME.x32"
+--
+-- The test target reports D4, where the entity does not exist yet, so switch the
+-- version and reach the entity through value(), which compiles at runtime.
+set savedVer to the scummvmVersion
+set the scummvmVersion to 700
+
+openXLib("DIRECTME.X32")
+
+set xtras to value("the xtraList")
+scummvmAssertEqual(ilk(xtras), #list)
+
+set entry to getAt(xtras, count(xtras))
+scummvmAssertEqual(ilk(entry), #propList)
+scummvmAssertEqual(count(entry), 2)
+scummvmAssertEqual(getPropAt(entry, 1), #name)
+scummvmAssertEqual(getAt(entry, 1), "DIRECTME.X32")
+scummvmAssertEqual(getPropAt(entry, 2), #version)
+scummvmAssertEqual(getAt(entry, 2), "")
+
+-- Loewenzahn 4 requires the DirectMedia Xtra, by file name with extension
+scummvmAssert(value("string(the xtraList)") contains "DIRECTME.x32")
+-- Loewenzahn 7 checks the same Xtra without the extension
+scummvmAssert(value("string(the xtraList)") contains "DIRECTME")
+
+-- Director registers every Xtra file it finds, so the ones we have no
+-- implementation for have to be listed as well
+openXLib("FONTXTRA.X32")
+scummvmAssert(value("string(the xtraList)") contains "FONTXTRA.X32")
+
+-- XObjects are not Xtras and must not show up in the list
+openXLib("FlushXObj")
+scummvmAssert(not (value("string(the xtraList)") contains "FlushXObj"))
+closeXLib("FlushXObj")
+
+set the scummvmVersion to savedVer
