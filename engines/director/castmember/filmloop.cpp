@@ -144,6 +144,22 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			cells.push_back(FilmLoopCell(frame, i));
 	}
 
+	// @@TRAILS@@ [do not merge] Regression probe for the Trails accumulation fix
+	// (947efe4). One line per getSubChannels() call that replayed a trail, so a
+	// normal playthrough yields the complete hit list. Watch for: games other than
+	// the TKKG4/6 intro (unexpected -> possible false-positive _trails parse), and a
+	// large frame/cell count (the replay is linear in the frame number, and every
+	// cell costs a Sprite copy plus a replaceWidget()).
+	uint trailCells = 0;
+	for (auto &c : cells) {
+		if (c.frame != frame)
+			trailCells++;
+	}
+	if (trailCells) {
+		warning("@@TRAILS@@ cast %d frame %u: %u trail cells replayed, %u cells total",
+				_castId, frame, trailCells, (uint)cells.size());
+	}
+
 	debugC(5, kDebugImages, "FilmLoopCastMember::getSubChannels(): castId: %d, frame: %d, count: %d, initRect: %d,%d %dx%d, bbox: %d,%d %dx%d",
 			_castId, frame, cells.size(),
 			_initialRect.left + _initialRect.width()/2,
