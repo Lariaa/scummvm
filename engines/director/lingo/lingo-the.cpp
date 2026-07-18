@@ -200,6 +200,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheVideoForWindowsPresent,"videoForWindowsPresent",false, 400, true },//	D4 f
 	{ kTheWindow,			"window",			true,  400, false },//			D4
 	{ kTheWindowList,		"windowList",		false, 400, false },//			D4 p
+	{ kTheXtraList,			"xtraList",			false, 700, true },	//					D7 f
 	{ kTheXtras,			"xtras",			false, 500, false },//				D5 p
 	{ kTheNOEntity, nullptr, false, 0, false }
 };
@@ -1209,6 +1210,31 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		break;
 	case kTheXtras: // D5
 		d = getXtrasNum();
+		break;
+	case kTheXtraList: // D7
+		// The Xtras registered with the application, as a linear list of property
+		// lists. Director reports the on-disk file name including its extension:
+		//   [[#name: "DirectSound.x32", #version: "7.0.2r85"], ...]
+		// Games test this to detect optional Xtras, e.g. Löwenzahn 4 requires the
+		// DirectMedia Xtra with `string(the xtraList) contains "DIRECTME.x32"`.
+		// We have no version resources, so #version stays empty, which Director
+		// itself does for Xtras lacking one.
+		d.type = ARRAY;
+		d.u.farr = new FArray;
+		for (uint i = 0; i < _openXtraFiles.size(); i++) {
+			Datum name("name");
+			name.type = SYMBOL;
+			Datum version("version");
+			version.type = SYMBOL;
+
+			Datum entry;
+			entry.type = PARRAY;
+			entry.u.parr = new PArray;
+			entry.u.parr->arr.push_back(PCell(name, Datum(_openXtraFiles[i])));
+			entry.u.parr->arr.push_back(PCell(version, Datum(Common::String())));
+
+			d.u.farr->arr.push_back(entry);
+		}
 		break;
 	default:
 		warning("Lingo::getTheEntity(): Unprocessed getting field \"%s\" of entity %s", field2str(field), entity2str(entity));
