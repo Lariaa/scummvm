@@ -111,31 +111,37 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 	// Build the list of cells to draw: which frame of the loop's own score each one
 	// comes from, and which of its channels.
 	Common::Array<FilmLoopCell> cells;
+
+	// A cell drawn with Trails leaves its pixels behind. Inside Director the film
+	// loop plays its own score onto its own canvas, so such a cell stays put and the
+	// picture builds up over the loop's frames -- TKKG4's and TKKG6's intro
+	// handwriting is authored exactly that way: one opaque letter per frame on a
+	// single Trails channel, accumulating into a word. We rebuild this list from
+	// scratch on every frame, so nothing survives from the previous one; replay what
+	// the earlier frames left behind.
+	//
+	// What a Trails channel already drew does not depend on what it holds now: these
+	// intros park the channel on an empty cell for a few frames between two words,
+	// and the finished word has to stay on screen through that pause rather than
+	// blink out and come back. So this is driven by the earlier frames alone, not by
+	// the current one. Frame numbering is relative to the loop, so a looping film
+	// loop wrapping back to frame 0 clears the trail again, as it should.
+	for (uint f = 0; f < frame; f++) {
+		Common::Array<Sprite *> &prevSprites = _score->_scoreCache[f]->_sprites;
+		for (uint i = 0; i < prevSprites.size(); i++) {
+			Sprite *prev = prevSprites[i];
+			if (prev && !prev->_castId.isNull() && prev->_trails)
+				cells.push_back(FilmLoopCell(f, i));
+		}
+	}
+
+	// Then this frame's own cells, on top of the trail. Walking the frames in order
+	// and their channels within each is the order Director paints them in, so
+	// overlapping cells composite the way they did when the loop was authored.
 	for (uint i = 0; i < _score->_scoreCache[frame]->_sprites.size(); ++i) {
 		Sprite *cur = _score->_scoreCache[frame]->_sprites[i];
-		if (!cur || cur->_castId.isNull())
-			continue;
-
-		// A cell drawn with Trails leaves its pixels behind. Inside Director the film
-		// loop plays its own score onto its own canvas, so such a channel's earlier
-		// cells stay put and the picture builds up over the loop's frames -- TKKG4's
-		// and TKKG6's intro handwriting is authored exactly that way: one opaque
-		// letter per frame on a single Trails channel, accumulating into a word.
-		// We rebuild this list from scratch on every frame, so nothing survives from
-		// the previous one; replay the channel's earlier cells to reproduce the
-		// accumulation. Frame numbering is relative to the loop, so a looping film
-		// loop wrapping back to frame 0 clears the trail again, as it should.
-		if (cur->_trails) {
-			for (uint f = 0; f < frame; f++) {
-				if (i >= _score->_scoreCache[f]->_sprites.size())
-					continue;
-				Sprite *prev = _score->_scoreCache[f]->_sprites[i];
-				if (prev && !prev->_castId.isNull())
-					cells.push_back(FilmLoopCell(f, i));
-			}
-		}
-
-		cells.push_back(FilmLoopCell(frame, i));
+		if (cur && !cur->_castId.isNull())
+			cells.push_back(FilmLoopCell(frame, i));
 	}
 
 	debugC(5, kDebugImages, "FilmLoopCastMember::getSubChannels(): castId: %d, frame: %d, count: %d, initRect: %d,%d %dx%d, bbox: %d,%d %dx%d",
