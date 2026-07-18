@@ -51,6 +51,7 @@ FilmLoopCastMember::FilmLoopCastMember(Cast *cast, uint16 castId, Common::Seekab
 	_index = -1;
 	_score = nullptr;
 	_flags = 0;
+	_subchannelsValid = false;
 
 	if (cast->_version >= kFileVer400) {
 		_initialRect = Movie::readRect(stream);
@@ -85,6 +86,7 @@ FilmLoopCastMember::FilmLoopCastMember(Cast *cast, uint16 castId, FilmLoopCastMe
 	if (source._score)
 		_score = new Score(*source._score);
 	_subchannels = source._subchannels;
+	_subchannelsValid = false;
 	_looping = source._looping;
 }
 
@@ -108,6 +110,27 @@ bool FilmLoopCastMember::isModified() {
 Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, uint frame, int parentInk, uint32 parentForeColor, uint32 parentBackColor) {
 	Common::Rect widgetRect(bbox.width() ? bbox.width() : _initialRect.width(), bbox.height() ? bbox.height() : _initialRect.height());
 
+	// Drawing a frame walks a film loop twice -- once to erase the sprite's previous
+	// bounding box, once to draw the new one -- and both passes ask for the same
+	// cells with the same arguments. Rebuilding them is not cheap: every cell costs
+	// a Sprite copy and a replaceWidget(), and a Trails loop's list grows with the
+	// loop's frame number. Hand back what we already built when nothing that feeds
+	// it has changed.
+	//
+	// The movie's frame number is part of the key, so the cells can only ever be
+	// reused within the frame that built them: anything the score does between two
+	// frames -- a palette switch, a cast member replaced under us -- drops the cache
+	// rather than being rendered from stale widgets.
+	uint16 movieFrame = 0;
+	if (g_director->getCurrentMovie() && g_director->getCurrentMovie()->getScore())
+		movieFrame = g_director->getCurrentMovie()->getScore()->getCurrentFrameNum();
+
+	if (_subchannelsValid && frame == _cachedFrame && bbox == _cachedBbox
+			&& parentInk == _cachedInk && parentForeColor == _cachedForeColor
+			&& parentBackColor == _cachedBackColor && movieFrame == _cachedMovieFrame)
+		return &_subchannels;
+
+	_subchannelsValid = false;
 	_subchannels.clear();
 
 	if (!_score || frame >= _score->_scoreCache.size()) {
@@ -318,6 +341,14 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 	for (auto &iter : _subchannels) {
 		iter.replaceWidget();
 	}
+
+	_cachedBbox = bbox;
+	_cachedFrame = frame;
+	_cachedInk = parentInk;
+	_cachedForeColor = parentForeColor;
+	_cachedBackColor = parentBackColor;
+	_cachedMovieFrame = movieFrame;
+	_subchannelsValid = true;
 
 	return &_subchannels;
 }
