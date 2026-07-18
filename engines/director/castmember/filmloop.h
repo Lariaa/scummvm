@@ -88,6 +88,16 @@ public:
 
 	Common::Array<Channel> _subchannels;
 
+	// What _subchannels was last built from, so getSubChannels() can hand the cells
+	// back instead of rebuilding them for a second look at the same frame.
+	bool _subchannelsValid;
+	Common::Rect _cachedBbox;
+	uint _cachedFrame;
+	int _cachedInk;
+	uint32 _cachedForeColor;
+	uint32 _cachedBackColor;
+	uint16 _cachedMovieFrame;
+
 	Score *_score;
 };
 
