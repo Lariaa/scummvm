@@ -556,8 +556,12 @@ Common::Rect Sprite::getBbox(bool unstretched) {
 }
 
 void Sprite::setBbox(int l, int t, int r, int b) {
-	_width = r - l;
-	_height = b - t;
+	// A rect that is degenerate in only one axis is legitimate: Lingo uses it to
+	// build a one-dimensional rail, e.g. for `the constraint of sprite`. Clamp each
+	// axis on its own -- zeroing both would collapse such a rail down to its
+	// top-left corner, pinning the constrained sprite there.
+	_width = MAX<int>(0, r - l);
+	_height = MAX<int>(0, b - t);
 
 	Common::Rect source(_width, _height);
 	if (_cast) {
@@ -565,9 +569,6 @@ void Sprite::setBbox(int l, int t, int r, int b) {
 	}
 	_startPoint.x = (int16)(l - source.left);
 	_startPoint.y = (int16)(t - source.top);
-
-	if (_width <= 0 || _height <= 0)
-		_width = _height = 0;
 
 	// Based on Director in a Nutshell, page 15
 	setAutoPuppet(kAPBbox, true);
