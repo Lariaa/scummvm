@@ -77,6 +77,7 @@ public:
 	bool getEditable();
 	void setEditable(bool editable);
 	void replaceSprite(Sprite *nextSprite);
+	void updateScriptData(Sprite *nextSprite);
 	void replaceWidget(CastMemberID previousCastId = CastMemberID(0, 0), bool force = false);
 	bool updateWidget();
 	void updateTextCast();
