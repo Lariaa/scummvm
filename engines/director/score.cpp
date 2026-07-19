@@ -997,7 +997,20 @@ void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 			channel->_startFrame == nextSprite->_spriteInfo.startFrame;
 
 		if (autoPuppetContested && !ownsLiveSpan && (nextSprite->_copyBackMask & kSCBCastId)) {
+			// @@AP@@ the score reclaims a channel from Lingo.
+			debugC(1, kDebugImages, "@@AP@@ updateSprites(): CH %d DROP autoPuppet 0x%x, chan %s -> frame %s, mask 0x%x, frame %d, span chan [%d-%d] vs frame [%d-%d]",
+				i, currentSprite->_autoPuppet, currentSprite->_castId.asString().c_str(),
+				nextSprite->_castId.asString().c_str(), nextSprite->_copyBackMask, _curFrameNumber,
+				channel->_startFrame, channel->_endFrame,
+				nextSprite->_spriteInfo.startFrame, nextSprite->_spriteInfo.endFrame);
 			currentSprite->_autoPuppet = 0;
+		} else if (autoPuppetContested && ownsLiveSpan) {
+			// @@AP@@ the case the span check now protects -- this is where TKKG4's bar
+			// guests used to be reclaimed by the score and disappear.
+			debugC(1, kDebugImages, "@@AP@@ updateSprites(): CH %d KEEP autoPuppet 0x%x, chan %s vs frame %s, mask 0x%x, frame %d, span [%d-%d]",
+				i, currentSprite->_autoPuppet, currentSprite->_castId.asString().c_str(),
+				nextSprite->_castId.asString().c_str(), nextSprite->_copyBackMask, _curFrameNumber,
+				channel->_startFrame, channel->_endFrame);
 		}
 
 		// widget content has changed and needs a redraw.
@@ -2332,6 +2345,9 @@ bool Score::loadFrame(int frameNum, bool loadCast) {
 
 	if (frameNum <= (int)_curFrameNumber) {
 		debugC(7, kDebugLoading, "****** Resetting frame %d to start 0x%x", sourceFrame, (uint32)_framesStream->pos());
+		// @@AP@@ rewind branch: every sprite gets the blanket kSCBNoMask below,
+		// so kSCBCastId is set even where the score asserts no new member.
+		debugC(1, kDebugImages, "@@AP@@ loadFrame(): REWIND to %d from %d (blanket copyBackMask)", frameNum, _curFrameNumber);
 		// If we are going back, we need to rebuild frames from start
 		_currentFrame->reset();
 
