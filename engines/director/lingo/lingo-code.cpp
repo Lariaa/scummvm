@@ -86,6 +86,7 @@ static const struct FuncDescr {
 	{ LC::c_div,			"c_div",			"" },
 	{ LC::c_eq,				"c_eq",				"" },
 	{ LC::c_field,			"c_field",			"" },
+	{ LC::c_fieldeval,		"c_fieldeval",		"" },
 	{ LC::c_fieldref,		"c_fieldref",		"" },
 	{ LC::c_floatpush,		"c_floatpush",		"f" },
 	{ LC::c_globalinit,		"c_globalinit",		"s" },
@@ -2108,21 +2109,38 @@ void LC::c_hilite() {
 	}
 }
 
-void LC::c_fieldref() {
-	Datum castLib;
-	if (g_director->getVersion() >= 500)
-		castLib = g_lingo->pop();
+static Datum fieldRefPop2() {
+	// A VOID castLib makes toCastMemberID() use the default lookup,
+	// same as the pre-D5 single-operand form.
+	Datum castLib = g_lingo->pop();
 	Datum member = g_lingo->pop();
 	Datum res = g_lingo->toCastMemberID(member, castLib);
 	res.type = FIELDREF;
-	g_lingo->push(res);
+	return res;
 }
 
-void LC::c_field() {
-	LC::c_fieldref();
-	Datum d = g_lingo->pop();
+// Emitted by the source compiler only. Always takes two operands
+// (member, castLib) regardless of the current Director version: the
+// operand count is baked in at compile time, and the version may have
+// changed by the time the code runs (the scummvmVersion test switch),
+// or the code may be compiled at a version the movie didn't start with
+// (`do` strings in D5+ games).
+void LC::c_fieldref() {
+	g_lingo->push(fieldRefPop2());
+}
+
+void LC::c_fieldeval() {
+	Datum d = fieldRefPop2();
 	Datum ref = d.eval();
 	g_lingo->push(ref.eval());
+}
+
+// Bytecode opcode 0x1b. Real movie bytecode provides a castLib operand
+// from D5 on, so here the operand count legitimately follows the version.
+void LC::c_field() {
+	if (g_director->getVersion() < 500)
+		g_lingo->push(Datum());
+	LC::c_fieldeval();
 }
 
 void LC::c_asserterror() {
