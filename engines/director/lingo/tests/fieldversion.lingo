@@ -1,0 +1,22 @@
+-- Source-compiled field refs must keep working when the Director version
+-- changes between compilation and execution: this whole file is compiled
+-- under the version active at file start, then the switch below happens
+-- at runtime. Before c_fieldref got a fixed operand count, running the
+-- D4-compiled refs under D5+ popped a bogus castLib operand off the
+-- stack and crashed with a stack underflow.
+
+put "hello" into field 1
+scummvmAssertEqual(field 1, "hello")
+
+set the scummvmVersion to 500
+
+put "world" into field 1
+scummvmAssertEqual(field 1, "world")
+scummvmAssertEqual(char 1 to 5 of field 1, "world")
+
+set the scummvmVersion to 700
+
+put "again" into field 1
+scummvmAssertEqual(field 1, "again")
+
+set the scummvmVersion to 400

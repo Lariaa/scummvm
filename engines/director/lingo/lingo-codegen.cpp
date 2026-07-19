@@ -1235,10 +1235,18 @@ bool LingoCompiler::visitFuncNode(FuncNode *node) {
 	NodeStore store(node);
 	if (node->name->equalsIgnoreCase("field") && node->args->size() >= 1) {
 		COMPILE((*node->args)[0]);
+		// Always provide a castLib operand: c_fieldref/c_fieldeval take a
+		// fixed operand count so that the code stays valid even if the
+		// Director version changes between compilation and execution.
+		if (node->args->size() >= 2) {
+			COMPILE((*node->args)[1]);
+		} else {
+			code1(LC::c_voidpush);
+		}
 		if (_refMode) {
 			code1(LC::c_fieldref);
 		} else {
-			code1(LC::c_field);
+			code1(LC::c_fieldeval);
 		}
 		return true;
 	}
