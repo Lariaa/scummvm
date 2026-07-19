@@ -517,6 +517,13 @@ void Channel::setCast(CastMemberID memberID) {
 
 	// Based on Director in a Nutshell, page 15
 	_sprite->setAutoPuppet(kAPCast, true);
+	// @@AP@@ did the auto-puppet actually stick? (setAutoPuppet bails on _puppet
+	// or version < 600) -- this is what protects a Lingo-set member from the score.
+	// frame 0/1 means the puppet comes from prepareMovie, i.e. scene setup that is
+	// meant to hold for the whole movie; later frames are mid-play interactions.
+	debugC(1, kDebugImages, "@@AP@@ setCast(): CH %d -> %s, puppet %d, autoPuppet now 0x%x, frame %d, span [%d-%d]",
+		_priority, memberID.asString().c_str(), _sprite->_puppet, _sprite->_autoPuppet,
+		_score ? _score->getCurrentFrameNum() : -1, _startFrame, _endFrame);
 	setNeedsDraw();
 }
 
@@ -580,6 +587,12 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 			}
 		} else {
 			previousCastId = _sprite->_castId;
+			// @@AP@@ the score reclaims the channel here. If the member differs,
+			// this is where a Lingo-set guest sprite is replaced by the placeholder.
+			if (_sprite->_castId != nextSprite->_castId)
+				debugC(1, kDebugImages, "@@AP@@ setClean(): CH %d REPLACE %s -> %s, partial %d, autoPuppet 0x%x, mask 0x%x",
+					_priority, _sprite->_castId.asString().c_str(), nextSprite->_castId.asString().c_str(),
+					partial, _sprite->_autoPuppet, nextSprite->_copyBackMask);
 			replaceSprite(nextSprite);
 		}
 	}
