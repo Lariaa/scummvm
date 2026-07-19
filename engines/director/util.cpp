@@ -917,19 +917,24 @@ static void indexGameTree(const Common::FSNode &dir, const Common::String &relBa
 // last resort we resolve the bare base name anywhere in the game tree, using a
 // one-time index that is rebuilt only if the game directory changes.
 static Common::Path resolveBasenameInGameTree(const Common::String &baseName, const char **exts) {
-	static Common::String s_indexedFor;
-	static Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> s_index;
+	// Deliberately heap-allocated and never freed: destructors of plain
+	// function-local statics run from the exit handlers after the backend
+	// is torn down, and the String destructors would then lock the already
+	// destroyed memory-pool mutex ("pure virtual method called" on quit).
+	static Common::String *s_indexedFor = new Common::String();
+	static Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> *s_index =
+		new Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo>();
 
 	if (baseName.empty())
 		return Common::Path();
 
 	Common::String gameDir = g_director->getGameDataDir()->getPath().toString();
-	if (s_indexedFor != gameDir) {
-		s_index.clear();
-		indexGameTree(*g_director->getGameDataDir(), Common::String(), s_index, 0);
-		s_indexedFor = gameDir;
+	if (*s_indexedFor != gameDir) {
+		s_index->clear();
+		indexGameTree(*g_director->getGameDataDir(), Common::String(), *s_index, 0);
+		*s_indexedFor = gameDir;
 		debugC(1, kDebugPaths, "resolveBasenameInGameTree(): indexed %u files under '%s'",
-			(uint)s_index.size(), gameDir.c_str());
+			(uint)s_index->size(), gameDir.c_str());
 	}
 
 	Common::Array<Common::String> candidates;
@@ -941,8 +946,8 @@ static Common::Path resolveBasenameInGameTree(const Common::String &baseName, co
 	}
 
 	for (auto &cand : candidates) {
-		if (s_index.contains(cand))
-			return Common::Path(s_index[cand], g_director->_dirSeparator);
+		if (s_index->contains(cand))
+			return Common::Path((*s_index)[cand], g_director->_dirSeparator);
 	}
 	return Common::Path();
 }
