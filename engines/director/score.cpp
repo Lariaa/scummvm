@@ -957,21 +957,36 @@ void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 		Sprite *currentSprite = channel->_sprite;
 		Sprite *nextSprite = _currentFrame->_sprites[i];
 
-		// The score advancing to a frame that asserts a new cast member on a channel
-		// (kSCBCastId set in this frame's freshly-loaded delta = a score sprite-span
-		// boundary) must reclaim it from a stale auto-puppet. A Lingo `set the member
-		// of sprite` (e.g. an unreleased hotspot/rollover "dummy" graphic) auto-puppets
-		// the cast; isDirty(), setClean() and replaceSprite() all then skip the cast for
-		// an auto-puppeted sprite, so the score's own sprite would be blocked forever
-		// (TKKG5: the grandmother's gesture channel stuck on a global dummy after a
-		// hotspot interaction). Dropping the auto-puppet here lets the score's sprite
-		// take over. Gated on frameChanged: only a real frame advance/jump re-reads the
-		// delta, so kSCBCastId is current; a same-frame reload ("go to frame" loop)
-		// carries a stale mask and must NOT clobber a live Lingo puppet (e.g. the
-		// TKKG5 member-card buttons). Explicit puppetSprite is always left untouched.
-		if (frameChanged && currentSprite && nextSprite && !currentSprite->_puppet &&
-				currentSprite->_autoPuppet && (nextSprite->_copyBackMask & kSCBCastId) &&
-				currentSprite->_castId != nextSprite->_castId) {
+		// The score must be able to reclaim a channel from a stale auto-puppet. A Lingo
+		// `set the member of sprite` (e.g. an unreleased hotspot/rollover "dummy"
+		// graphic) auto-puppets the cast; isDirty(), setClean() and replaceSprite() all
+		// then skip the cast for an auto-puppeted sprite, so the score's own sprite
+		// would be blocked forever (TKKG5: the grandmother's gesture channel stuck on a
+		// global dummy after a hotspot interaction). Dropping the auto-puppet here lets
+		// the score's sprite take over.
+		//
+		// The reclaim is keyed on the channel's sprite span, not on the copy-back mask:
+		// a channel that is not inside a live score span it already owns is fair game,
+		// either because it has no span at all (a pure Lingo leftover, TKKG5) or because
+		// the score just started a different one. A channel sitting inside its own,
+		// unchanged span keeps the Lingo member -- the score is not asserting anything
+		// new there. kSCBCastId alone must NOT be used for this: Score::loadFrame()
+		// hands out a blanket kSCBNoMask on a backwards jump, so the bit is set for
+		// every channel regardless of what the score actually says, which used to strip
+		// the auto-puppet off untouched channels (TKKG4: the bar guests Sam Norton and
+		// Elvis, set up in prepareMovie, vanished on the first backwards `go`). It is
+		// kept as an additional guard only.
+		//
+		// Gated on frameChanged: a same-frame reload ("go to frame" loop) carries a
+		// stale mask and span and must not clobber a live Lingo puppet (e.g. the TKKG5
+		// member-card buttons). Explicit puppetSprite is always left untouched.
+		bool autoPuppetContested = frameChanged && currentSprite && nextSprite &&
+			!currentSprite->_puppet && currentSprite->_autoPuppet &&
+			currentSprite->_castId != nextSprite->_castId;
+		bool ownsLiveSpan = nextSprite && channel->_startFrame != -1 &&
+			channel->_startFrame == nextSprite->_spriteInfo.startFrame;
+
+		if (autoPuppetContested && !ownsLiveSpan && (nextSprite->_copyBackMask & kSCBCastId)) {
 			currentSprite->_autoPuppet = 0;
 		}
 
