@@ -2,8 +2,8 @@
 -- getOne() / getPos() ARRAY & PARRAY comparison -- version behaviour check
 -- ============================================================================
 --
--- Purpose: confirm how Director's getOne(list, value) and getPos(list, value)
--- match a value that is itself a list / property list.
+-- How getOne(list, value) and getPos(list, value) match a value that is
+-- itself a list / property list:
 --
 --   * Director 4 and 5 : match by OBJECT IDENTITY  -> a freshly built,
 --                        value-equal list never matches.
@@ -11,50 +11,68 @@
 --                        stay case-sensitive) -> a value-equal list matches
 --                        even when freshly built.
 --
--- Mirrors ScummVM's LC::eqDataStrict (engines/director/lingo/lingo-code.cpp),
--- which switches behaviour at getVersion() >= 600.
---
--- HOW TO RUN
---   Message Window : type each "put ..." line and read the result. Variables
---                    (e.g. "sub") persist between lines in the Message Window.
---   .DIR movie     : paste the "on testArrayVersioning" handler into a movie
---                    script, then type  testArrayVersioning  in the Message
---                    Window. Use this if the Message Window loses variables.
---
--- Results below confirmed on real Director 4/5/6/7 (2026-07-04); see the
--- accompanying array-getpos-version-results.md matrix.
--- Annotation format:  -- <D4> / <D5> / <D6> / <D7>
+-- Exercises LC::eqDataStrict (engines/director/lingo/lingo-code.cpp), which
+-- switches behaviour at getVersion() >= 600. Expected values were confirmed
+-- on real Director 4/5/6/7 (2026-07-04); see the verification matrix in
+-- array-getpos-version-results.md. The manual Message-Window protocol used
+-- for that run is kept as the handler at the bottom of this file.
 -- ============================================================================
 
+set save to the scummvmVersion
 
--- --- version-dependent: identity (D4/D5) vs contents (D6/D7) ---
-put getPos([[13, 14], [20, 5], [7, 7]], [20, 5])
--- 0 / 0 / 2 / 2
-put getOne([#a, #b, [1, 2, 3]], [1, 2, 3])
--- 0 / 0 / 3 / 3
-put getPos([#x: [1, 2], #y: [3, 4]], [3, 4])
--- 0 / 0 / 2 / 2
-put getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]])   -- nested / recursive
--- 0 / 0 / 2 / 2
+-- --- D4/D5: object identity, fresh value-equal lists never match ---
+
+set the scummvmVersion to 400
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [20, 5]), 0)
+scummvmAssertEqual(getOne([#a, #b, [1, 2, 3]], [1, 2, 3]), 0)
+scummvmAssertEqual(getPos([#x: [1, 2], #y: [3, 4]], [3, 4]), 0)
+scummvmAssertEqual(getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]]), 0)
+
+set the scummvmVersion to 500
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [20, 5]), 0)
+scummvmAssertEqual(getOne([#a, #b, [1, 2, 3]], [1, 2, 3]), 0)
+scummvmAssertEqual(getPos([#x: [1, 2], #y: [3, 4]], [3, 4]), 0)
+scummvmAssertEqual(getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]]), 0)
+
+-- --- D6/D7: contents comparison, recursive, value-equal lists match ---
+
+set the scummvmVersion to 600
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [20, 5]), 2)
+scummvmAssertEqual(getOne([#a, #b, [1, 2, 3]], [1, 2, 3]), 3)
+scummvmAssertEqual(getPos([#x: [1, 2], #y: [3, 4]], [3, 4]), 2)
+scummvmAssertEqual(getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]]), 2)
+
+set the scummvmVersion to 700
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [20, 5]), 2)
+scummvmAssertEqual(getOne([#a, #b, [1, 2, 3]], [1, 2, 3]), 3)
+scummvmAssertEqual(getPos([#x: [1, 2], #y: [3, 4]], [3, 4]), 2)
+scummvmAssertEqual(getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]]), 2)
 
 -- --- controls: identical in every version ---
+
+set the scummvmVersion to 400
 set sub to [1, 2, 3]
-put getOne([#a, #b, sub], sub)          -- same object reference
--- 3 / 3 / 3 / 3
-put getPos([5, 10, 15], 10)             -- scalar value
--- 2 / 2 / 2 / 2
-put getPos([[13, 14], [20, 5], [7, 7]], [99, 99])   -- not found
--- 0 / 0 / 0 / 0
+scummvmAssertEqual(getOne([#a, #b, sub], sub), 3)
+scummvmAssertEqual(getPos([5, 10, 15], 10), 2)
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [99, 99]), 0)
+scummvmAssertEqual(getOne([#a, "urgh", "URGH"], "URGH"), 3)
+scummvmAssertEqual(getOne([#a, "urgh"], "URGH"), 0)
 
--- --- getOne/getPos compare STRINGS case-sensitively (unlike rest of Director) ---
-put getOne([#a, "urgh", "URGH"], "URGH")   -- exact case
--- 3 / 3 / 3 / 3
-put getOne([#a, "urgh"], "URGH")           -- case mismatch
--- 0 / 0 / 0 / 0
+set the scummvmVersion to 700
+set sub to [1, 2, 3]
+scummvmAssertEqual(getOne([#a, #b, sub], sub), 3)
+scummvmAssertEqual(getPos([5, 10, 15], 10), 2)
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [99, 99]), 0)
+scummvmAssertEqual(getOne([#a, "urgh", "URGH"], "URGH"), 3)
+scummvmAssertEqual(getOne([#a, "urgh"], "URGH"), 0)
 
+-- all test files share one engine state: always restore the version
+set the scummvmVersion to save
 
 -- ============================================================================
--- .DIR fallback: movie-script handler (type  testArrayVersioning  to run it)
+-- Manual protocol for real Director (Message Window / .DIR movie): type
+-- testArrayVersioning in the Message Window. Expected results per version
+-- are listed in array-getpos-version-results.md.
 -- ============================================================================
 on testArrayVersioning
   put "--- getOne/getPos ARRAY compare (D4/D5 = identity, D6+ = contents) ---"
