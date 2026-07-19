@@ -9,6 +9,9 @@ set a = window "windowname"
 -- member of castLib
 -- Director serialises member references in this form (e.g. in the behavior
 -- initializer parameter lists stored in the score), so it has to parse.
+-- The member() builtin only exists from D5 on, so switch versions for
+-- this block; the test target itself reports D4.
+set the scummvmVersion to 500
 set a = member 1 of castLib 1
 scummvmAssertEqual(member 1 of castLib 1, member(1, 1))
 
@@ -24,6 +27,7 @@ scummvmAssertEqual(member (n + 1) of castLib libNum, member(4, 2))
 
 -- the exact shape Director emits: parenthesised, inside a property list
 scummvmAssertEqual([#alternateImage: (member 2 of castLib 3)], [#alternateImage: member(2, 3)])
+set the scummvmVersion to 400
 
 -- assign to field reference
 put "asdf" into field 1
