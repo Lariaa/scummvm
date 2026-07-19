@@ -17,10 +17,10 @@ set the scummvmVersion to 700
 
 openXLib("DIRECTME.X32")
 
-set xtras to value("the xtraList")
-scummvmAssertEqual(ilk(xtras), #list)
+set xtraEntries to value("the xtraList")
+scummvmAssertEqual(ilk(xtraEntries), #list)
 
-set entry to getAt(xtras, count(xtras))
+set entry to getAt(xtraEntries, count(xtraEntries))
 scummvmAssertEqual(ilk(entry), #propList)
 scummvmAssertEqual(count(entry), 2)
 scummvmAssertEqual(getPropAt(entry, 1), #name)
