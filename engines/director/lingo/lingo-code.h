@@ -136,6 +136,7 @@ void c_open();
 void c_delete();
 void c_hilite();
 void c_field();
+void c_fieldeval();
 void c_fieldref();
 
 // custom instructions for testing
