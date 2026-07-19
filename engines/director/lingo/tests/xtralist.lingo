@@ -12,15 +12,31 @@
 --
 -- The test target reports D4, where the entity does not exist yet, so switch the
 -- version and reach the entity through value(), which compiles at runtime.
+-- All D7 state is captured into variables first; the asserts then run back
+-- at the default version, because the Mac string-equality tables only exist
+-- up to D6 and every character compared at 700 would log a BUILDBOT warning.
+-- `contains` stays case-insensitive at 400, matching Director.
 set savedVer to the scummvmVersion
 set the scummvmVersion to 700
 
 openXLib("DIRECTME.X32")
-
 set xtraEntries to value("the xtraList")
-scummvmAssertEqual(ilk(xtraEntries), #list)
-
 set entry to getAt(xtraEntries, count(xtraEntries))
+set listWithDirectMe to value("string(the xtraList)")
+
+-- Director registers every Xtra file it finds, so the ones we have no
+-- implementation for have to be listed as well
+openXLib("FONTXTRA.X32")
+set listWithFontXtra to value("string(the xtraList)")
+
+-- XObjects are not Xtras and must not show up in the list
+openXLib("FlushXObj")
+set listWithXObj to value("string(the xtraList)")
+closeXLib("FlushXObj")
+
+set the scummvmVersion to savedVer
+
+scummvmAssertEqual(ilk(xtraEntries), #list)
 scummvmAssertEqual(ilk(entry), #propList)
 scummvmAssertEqual(count(entry), 2)
 scummvmAssertEqual(getPropAt(entry, 1), #name)
@@ -29,18 +45,8 @@ scummvmAssertEqual(getPropAt(entry, 2), #version)
 scummvmAssertEqual(getAt(entry, 2), "")
 
 -- Loewenzahn 4 requires the DirectMedia Xtra, by file name with extension
-scummvmAssert(value("string(the xtraList)") contains "DIRECTME.x32")
+scummvmAssert(listWithDirectMe contains "DIRECTME.x32")
 -- Loewenzahn 7 checks the same Xtra without the extension
-scummvmAssert(value("string(the xtraList)") contains "DIRECTME")
-
--- Director registers every Xtra file it finds, so the ones we have no
--- implementation for have to be listed as well
-openXLib("FONTXTRA.X32")
-scummvmAssert(value("string(the xtraList)") contains "FONTXTRA.X32")
-
--- XObjects are not Xtras and must not show up in the list
-openXLib("FlushXObj")
-scummvmAssert(not (value("string(the xtraList)") contains "FlushXObj"))
-closeXLib("FlushXObj")
-
-set the scummvmVersion to savedVer
+scummvmAssert(listWithDirectMe contains "DIRECTME")
+scummvmAssert(listWithFontXtra contains "FONTXTRA.X32")
+scummvmAssert(not (listWithXObj contains "FlushXObj"))
