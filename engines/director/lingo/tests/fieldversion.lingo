@@ -17,6 +17,9 @@ scummvmAssertEqual(char 1 to 5 of field 1, "world")
 set the scummvmVersion to 700
 
 put "again" into field 1
-scummvmAssertEqual(field 1, "again")
 
+-- The Mac string-equality tables only cover up to D6 (getCharEquality in
+-- util.cpp warns for 700 on every character), so switch back before the
+-- string comparison; the D7 part under test is the field write above.
 set the scummvmVersion to 400
+scummvmAssertEqual(field 1, "again")
