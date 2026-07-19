@@ -547,6 +547,7 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 		if (_sprite->_puppet || _sprite->_autoPuppet || (!nextSprite->isQDShape() && partial)) {
 			// Updating scripts, etc. does not require a full re-render
 			_sprite->_scriptId = nextSprite->_scriptId;
+			updateScriptData(nextSprite);
 
 			// When Lingo overrides only a sprite's cast member (`set the member of
 			// sprite`) on a sprite the score is still animating, the member is
@@ -681,6 +682,22 @@ void Channel::updateGlobalAttr() {
 	}
 }
 
+// Score behaviors and the sprite lifetime are scripting data, not rendering data.
+// They have to be carried over from the score even when the sprite is puppeted,
+// otherwise puppetSprite() would silently detach a sprite's behaviors. Director
+// keeps them attached.
+void Channel::updateScriptData(Sprite *nextSprite) {
+	// Both the behavior list and the sprite lifetime are D6+ data
+	if (g_director->getVersion() < 600)
+		return;
+
+	_sprite->_behaviors = nextSprite->_behaviors;
+	_sprite->_spriteInfo = nextSprite->_spriteInfo;
+
+	_startFrame = _sprite->_spriteInfo.startFrame;
+	_endFrame = _sprite->_spriteInfo.endFrame;
+}
+
 void Channel::replaceSprite(Sprite *nextSprite) {
 	if (!nextSprite)
 		return;
@@ -730,10 +747,7 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 		_sprite->_height = height;
 	}
 
-	if (g_director->getVersion() >= 600) {
-		_startFrame = _sprite->_spriteInfo.startFrame;
-		_endFrame = _sprite->_spriteInfo.endFrame;
-	}
+	updateScriptData(nextSprite);
 }
 
 void Channel::setDirty() {
