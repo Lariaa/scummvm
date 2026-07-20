@@ -311,6 +311,13 @@ void Frame::readSpriteD2(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		stream.hexdump(size);
 	}
 
+	if (spritePosition + 1 >= _sprites.size()) {
+		warning("Frame::readSpriteD2(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
+			spritePosition + 1, (int)_sprites.size() - 1, size);
+		stream.skip(size);
+		return;
+	}
+
 	Sprite &sprite = *_sprites[spritePosition + 1];
 
 	uint32 initPos = stream.pos();
@@ -632,6 +639,13 @@ void Frame::readSpriteD4(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 	debugC(5, kDebugLoading, "Frame::readSpriteD4(): sprite: %d offset: %d size: %d, field: %d", spritePosition, offset, size, fieldPosition);
 	if (debugChannelSet(8, kDebugLoading)) {
 		stream.hexdump(size);
+	}
+
+	if (spritePosition + 1 >= _sprites.size()) {
+		warning("Frame::readSpriteD4(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
+			spritePosition + 1, (int)_sprites.size() - 1, size);
+		stream.skip(size);
+		return;
 	}
 
 	Sprite &sprite = *_sprites[spritePosition + 1];
@@ -988,6 +1002,13 @@ void Frame::readSpriteD5(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 	debugC(5, kDebugLoading, "Frame::readSpriteD5(): sprite: %d offset: %d size: %d, field: %d", spritePosition, offset, size, fieldPosition);
 	if (debugChannelSet(8, kDebugLoading)) {
 		stream.hexdump(size);
+	}
+
+	if (spritePosition + 1 >= _sprites.size()) {
+		warning("Frame::readSpriteD5(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
+			spritePosition + 1, (int)_sprites.size() - 1, size);
+		stream.skip(size);
+		return;
 	}
 
 	Sprite &sprite = *_sprites[spritePosition + 1];
@@ -1460,6 +1481,13 @@ void Frame::readSpriteD6(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		return;
 	}
 
+	if (spritePosition + 1 >= _sprites.size()) {
+		warning("Frame::readSpriteD6(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
+			spritePosition + 1, (int)_sprites.size() - 1, size);
+		stream.skip(size);
+		return;
+	}
+
 	Sprite &sprite = *_sprites[spritePosition + 1];
 
 	uint32 initPos = stream.pos();
@@ -1625,7 +1653,7 @@ void Frame::readChannelD7(Common::MemoryReadStreamEndian &stream, uint16 offset,
 	}
 
 	if (offset >= kMainChannelSizeD7) {
-		byte spritePosition = (offset - kMainChannelSizeD7) / kSprChannelSizeD7;
+		uint16 spritePosition = (offset - kMainChannelSizeD7) / kSprChannelSizeD7;
 		uint16 nextStart = (spritePosition + 1) * kSprChannelSizeD7 + kMainChannelSizeD7;
 
 		while (size > 0) {
@@ -1933,6 +1961,13 @@ void Frame::readSpriteD7(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 	debugC(5, kDebugLoading, "Frame::readSpriteD7(): sprite: %d offset: %d size: %d, field: %d", spritePosition, offset, size, fieldPosition);
 	if (debugChannelSet(8, kDebugLoading)) {
 		stream.hexdump(size);
+	}
+
+	if (spritePosition + 1 >= _sprites.size()) {
+		warning("Frame::readSpriteD7(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
+			spritePosition + 1, (int)_sprites.size() - 1, size);
+		stream.skip(size);
+		return;
 	}
 
 	Sprite &sprite = *_sprites[spritePosition + 1];
