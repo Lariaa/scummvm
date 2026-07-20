@@ -383,15 +383,17 @@ void BudAPIXtra::m_baFindDrive(int nargs) {
 	// baFindDrive(startDrive, fileName): locate the drive holding fileName and
 	// return its drive letter. Used by CD-detection code (e.g. TKKG 7's
 	// cdPathClass: `baFindDrive("c", uniqueName)`), which then builds the CD
-	// path as `Drive & ":\"`. Under ScummVM all data lives in the game
-	// directory, so we report a synthetic CD letter whenever the marker file
-	// actually resolves. convertPath() later strips the drive prefix, so the
-	// constructed path resolves against the game tree as usual.
+	// path as `Drive & ":\"`. The marker file is the title's own projector in
+	// the CD root (TKKG 7: "TKKG 7.exe", TKKG 8: "Tkkg 8.exe"), so a plain
+	// lookup in the game directory is enough. Under ScummVM all data lives
+	// there, so we report a synthetic CD letter whenever the marker resolves.
+	// convertPath() later strips the drive prefix, so the constructed path
+	// resolves against the game tree as usual.
 	Common::String fileName = (nargs >= 1) ? g_lingo->pop().asString() : Common::String();
 	if (nargs >= 2)
 		g_lingo->pop(); // startDrive, unused
 
-	bool found = !fileName.empty() && !findPath(fileName, true, true, false, nullptr, "", true).empty();
+	bool found = !fileName.empty() && !findPath(fileName).empty();
 	// Report the same synthetic CD letter that baDiskInfo() reports as a CD-Rom.
 	Common::String result = found ? Common::String("e") : Common::String("");
 	debugC(3, kDebugXObj, "BudAPIXtra::m_baFindDrive: file '%s' -> '%s'",
