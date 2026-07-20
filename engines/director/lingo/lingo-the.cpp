@@ -104,6 +104,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheKeyPressed,		"keyPressed",		false, 500, false },//				D5 p
 	{ kTheKeyUpScript,		"keyUpScript",		false, 400, false },//			D4 p
 	{ kTheLabelList,		"labelList",		false, 300, true },	//		D3 f
+	{ kTheLastChannel,		"lastChannel",		false, 500, false },//				D5 p
 	{ kTheLastClick,		"lastClick",		false, 200, true },	// D2 f
 	{ kTheLastEvent,		"lastEvent",		false, 200, true },	// D2 f
 	{ kTheLastFrame,		"lastFrame",		false, 400, false },//			D4 p
@@ -718,6 +719,11 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 	case kTheLabelList:
 		d.type = STRING;
 		d.u.s = score->getLabelList();
+		break;
+	case kTheLastChannel:
+		// Number of channels the score was authored with. Read from the
+		// score header for D7+, hardcoded 48 (D5) / 120 (D6) before that.
+		d = (int)score->_numChannelsDisplayed;
 		break;
 	case kTheLastClick:
 		d = (int)(_vm->getMacTicks() - movie->_lastClickTime);
