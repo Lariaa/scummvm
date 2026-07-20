@@ -85,6 +85,7 @@ enum TheEntityType {
 	kTheKeyPressed,
 	kTheKeyUpScript,
 	kTheLabelList,
+	kTheLastChannel,
 	kTheLastClick,
 	kTheLastEvent,
 	kTheLastFrame,
