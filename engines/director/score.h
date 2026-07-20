@@ -197,7 +197,7 @@ public:
 	uint16 _framesVersion;
 	uint16 _spriteRecordSize;
 	uint16 _numChannels;
-	int16 _numChannelsDisplayed;  // D7+, no-op in earlier versions
+	int16 _numChannelsDisplayed;  // Channels the score was authored with; from the header for D7+, 48/120 for D5/D6
 	//  20 bytes in total
 
 	int16 _maxChannelsUsed; // max channel number used in the score, used to optimize rendering
