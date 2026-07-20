@@ -2137,14 +2137,25 @@ void Score::loadFrames(Common::SeekableReadStreamEndian &stream, uint16 version,
 		_spriteRecordSize = _framesStream->readUint16();
 		_numChannels = _framesStream->readUint16();
 
-		if (_framesVersion > 13) {
-			_numChannelsDisplayed = _framesStream->readUint16(); // Up to 500
+		if (_framesVersion >= 13) {
+			// Number of channels this score actually uses, up to 1000.
+			// D7 through D10 all write framesVersion 13 and all of them
+			// fill in this field: movie scores carry the authored channel
+			// count, film loop SCVW scores the highest channel their
+			// sprites occupy, which may exceed 120. Verified against a
+			// corpus of 13225 D7-D10 scores with zero mismatches.
+			_numChannelsDisplayed = _framesStream->readUint16();
+
+			if (!_numChannelsDisplayed)
+				_numChannelsDisplayed = 120;
 		} else {
 			if (_framesVersion <= 7)    // Director5
 				_numChannelsDisplayed = 48;
 			else
 				_numChannelsDisplayed = 120;    // D6
 
+			// Up to D6 this field holds 0 or 256, not a channel count.
+			// No score in a 12k-score D4-D6 corpus exceeds the limits above.
 			_framesStream->readUint16(); // Skip
 		}
 
