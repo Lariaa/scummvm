@@ -23,6 +23,7 @@
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
+#include "director/lingo/lingo-builtins.h"
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-utils.h"
 #include "director/lingo/xtras/s/soundchannel.h"
@@ -61,7 +62,7 @@ static MethodProto xlibMethods[] = {
 };
 
 static BuiltinProto xlibBuiltins[] = {
-	{ "sound", SoundChannelXtra::m_sound, 1, 1, 500, HBLTIN },
+	{ "sound", SoundChannelXtra::m_sound, 1, 3, 500, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
@@ -103,6 +104,21 @@ void SoundChannelXtra::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-XOBJSTUB(SoundChannelXtra::m_sound, 0)
+void SoundChannelXtra::m_sound(int nargs) {
+	// The verbs are the ones Lingo's own `sound` command takes, and so is the
+	// argument order: TKKG 6-9 call sound(#stop, channel) and
+	// sound(#fadeIn, channel, ticks) / sound(#fadeOut, channel, ticks).
+	if (nargs >= 2) {
+		LB::b_sound(nargs);
+		g_lingo->push(Datum(0));
+		return;
+	}
+
+	// The one-argument form hands back a sound object for the channel, which we
+	// do not model.
+	g_lingo->printSTUBWithArglist("SoundChannelXtra::m_sound", nargs);
+	g_lingo->dropStack(nargs);
+	g_lingo->push(Datum(0));
+}
 
 }
