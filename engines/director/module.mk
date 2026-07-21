@@ -242,7 +242,8 @@ MODULE_OBJS = \
 	lingo/xtras/u/uihelper.o \
 	lingo/xtras/v/vlist.o \
 	lingo/xtras/w/wingroup.o \
-	lingo/xtras/x/xmlparser.o
+	lingo/xtras/x/xmlparser.o \
+	lingo/xtras/z/zipxtra.o
 
 
 ifdef USE_IMGUI
