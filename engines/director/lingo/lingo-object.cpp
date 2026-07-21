@@ -210,6 +210,7 @@
 #include "director/lingo/xtras/w/wingroup.h"
 #include "director/lingo/xtras/x/xsound.h"
 #include "director/lingo/xtras/x/xmlparser.h"
+#include "director/lingo/xtras/z/zipxtra.h"
 
 namespace Director {
 
@@ -463,6 +464,7 @@ static const struct XLibProto {
 	XLIBDEF(XPlayAnim,			kXObj,			300),	// D3
 	XLIBDEF(XsoundXtra,			kXtraObj,		500),	// D5
 	XLIBDEF(Yasix,				kXObj,			300),	// D3
+	XLIBDEF(ZipXtraXtra,			kXtraObj,					500),	// D5
 	{ nullptr, nullptr, nullptr, nullptr, 0, 0 }
 };
 
