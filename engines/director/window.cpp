@@ -823,10 +823,28 @@ Common::Path Window::getSharedCastPath() {
 		}
 	}
 
+	// Director 3 and 4 support a single implicit shared cast: a movie automatically
+	// looks for a Shared Cast file *in its own folder*, with no explicit link stored
+	// in the movie (Bruce Epstein, "Macromedia Director in a Nutshell", "Shared Cast
+	// versus external cast libraries"; matches the D4 config chunk having no shared
+	// cast reference). Resolve strictly within the current movie's folder on the real
+	// filesystem instead of going through findMoviePath()/the global SearchMan index:
+	// the latter matches a same-named shared cast in *any* subfolder and would wrongly
+	// attach e.g. CONTENT/SHARED.DIR to a top-level movie (projector stub, logo) that
+	// has no shared cast of its own, making the shared cast's `on stopMovie`/etc. fire
+	// in movies that never linked it.
+	Common::Path base = Common::Path(_currentPath, g_director->_dirSeparator);
+
+	const char *extsD3[] = { ".MMM", nullptr };
+	const char *extsD4[] = { ".DIR", ".DXR", ".EXE", nullptr };
+	const char **exts = (_vm->getVersion() < 400) ? extsD3 : extsD4;
+
 	Common::Path result;
 	for (uint i = 0; i < namesToTry.size(); i++) {
-		debugC(2, kDebugPaths, "getSharedCastPath(): trying '%s'", namesToTry[i].c_str());
-		result = findMoviePath(namesToTry[i], true, true, _currentPath);
+		debugC(2, kDebugPaths, "getSharedCastPath(): trying '%s' in folder '%s'", namesToTry[i].c_str(), _currentPath.c_str());
+		result = resolveFSPath(namesToTry[i], base, false);
+		for (int e = 0; result.empty() && exts[e]; e++)
+			result = resolveFSPath(namesToTry[i] + exts[e], base, false);
 		if (!result.empty()) {
 			debugC(2, kDebugPaths, "getSharedCastPath(): found '%s'", result.toString().c_str());
 			return result;
