@@ -1702,6 +1702,23 @@ void LB::b_getNthFileNameInFolder(int nargs) {
 		}
 	}
 
+	// Next, mix in anything the game has written to the save file storage.
+	// Movies stored with saveMovie() and files written through FileIO only live
+	// there, so a game that checks for its own save by walking the directory
+	// instead of opening it by name would never see it. "Ein Fall fuer Muetze &
+	// Co" does exactly that: it compares every entry of "the pathName" against
+	// "SCORES.DXR" and starts a fresh player profile when there is no match.
+	Common::Archive *saved = SearchMan.getArchive(kSavedFilesArchive);
+	if (saved) {
+		Common::ArchiveMemberList files;
+
+		saved->listMatchingMembers(files, path.append(path.empty() ? "*" : "/*", '/'), true);
+
+		for (auto &fi : files) {
+			fileNameList.push_back(Common::lastPathComponent(fi->getName(), '/'));
+		}
+	}
+
 	// Next, mix in files from the game filesystem (if they exist)
 	if (d.exists()) {
 		Common::FSList f;
@@ -1713,11 +1730,22 @@ void LB::b_getNthFileNameInFolder(int nargs) {
 		}
 	}
 
-	if (!fileNameList.empty() && (uint)fileNum < fileNameList.size()) {
-		// Sort files alphabetically
-		Common::sort(fileNameList.begin(), fileNameList.end());
-		r = Datum(fileNameList[fileNum]);
+	// Sort files alphabetically
+	Common::sort(fileNameList.begin(), fileNameList.end());
+
+	// A name can reach us from more than one source: a save file that a quirk
+	// injects as well, or a save shadowing a file of the same name in the game
+	// folder. Handing out the same entry twice would also shift every index
+	// after it, so collapse duplicates before indexing.
+	for (uint i = 1; i < fileNameList.size();) {
+		if (fileNameList[i].equalsIgnoreCase(fileNameList[i - 1]))
+			fileNameList.remove_at(i);
+		else
+			i++;
 	}
+
+	if ((uint)fileNum < fileNameList.size())
+		r = Datum(fileNameList[fileNum]);
 
 	g_lingo->push(r);
 }
