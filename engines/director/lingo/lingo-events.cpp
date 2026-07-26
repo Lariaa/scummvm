@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/algorithm.h"
+
 #include "director/director.h"
 #include "director/debugger.h"
 #include "director/lingo/lingo.h"
@@ -117,6 +119,25 @@ void Movie::setPrimaryEventHandler(LEvent event, const Common::String &code) {
 	LingoArchive *mainArchive = getMainLingoArch();
 	mainArchive->primaryEventHandlers[event] = code;
 	mainArchive->replaceCode(code, kEventScript, event);
+}
+
+static bool resolveMovieScriptEvent(LingoArchive *archive, int castLibId, LingoEvent &event) {
+	// Look for the first movie script in this cast that handles the event.
+	// scriptContexts is an unordered hash map, so the cast member IDs have to
+	// be sorted to get the cast window order Director searches in.
+	Common::Array<int32> scriptIds;
+	for (auto &it : archive->scriptContexts[kMovieScript])
+		scriptIds.push_back(it._key);
+	Common::sort(scriptIds.begin(), scriptIds.end());
+
+	for (auto &scriptId : scriptIds) {
+		if (archive->scriptContexts[kMovieScript].getVal(scriptId)->_eventHandlers.contains(event.event)) {
+			event.scriptType = kMovieScript;
+			event.scriptId = CastMemberID(scriptId, castLibId);
+			return true;
+		}
+	}
+	return false;
 }
 
 void Movie::resolveScriptEvent(LingoEvent &event) {
@@ -434,25 +455,22 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 
 			// FIXME: shared cast movie scripts could come before main movie ones
 			// Movie scripts are fixed, so it's fine to look them up in advance.
-			for (auto &cast : _casts) {
-				LingoArchive *archive = cast._value->_lingoArchive;
-				for (auto &it : archive->scriptContexts[kMovieScript]) {
-					if (it._value->_eventHandlers.contains(event.event)) {
-						event.scriptType = kMovieScript;
-						event.scriptId = CastMemberID(it._key, cast._key);
-						return;
-					}
-				}
+
+			// _casts is an unordered hash map as well, so walk the cast libs in
+			// ascending order too.
+			Common::Array<int> castLibIds;
+			for (auto &it : _casts)
+				castLibIds.push_back(it._key);
+			Common::sort(castLibIds.begin(), castLibIds.end());
+
+			for (auto &castLibId : castLibIds) {
+				if (resolveMovieScriptEvent(_casts.getVal(castLibId)->_lingoArchive, castLibId, event))
+					return;
 			}
 			LingoArchive *sharedArchive = getSharedLingoArch();
 			if (sharedArchive) {
-				for (auto &it : sharedArchive->scriptContexts[kMovieScript]) {
-					if (it._value->_eventHandlers.contains(event.event)) {
-						event.scriptType = kMovieScript;
-						event.scriptId = CastMemberID(it._key, DEFAULT_CAST_LIB);
-						return;
-					}
-				}
+				if (resolveMovieScriptEvent(sharedArchive, DEFAULT_CAST_LIB, event))
+					return;
 			}
 		}
 		break;
