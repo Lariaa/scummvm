@@ -108,6 +108,10 @@ bool FilmLoopCastMember::isModified() {
 }
 
 Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, uint frame, int parentInk, uint32 parentForeColor, uint32 parentBackColor) {
+	// A placement rect with no dimensions (a sprite that has not been sized yet) means
+	// "draw the loop at its own size", which is what the cells are already stored at.
+	int16 placeWidth = bbox.width() ? bbox.width() : _initialRect.width();
+	int16 placeHeight = bbox.height() ? bbox.height() : _initialRect.height();
 
 	// Drawing a frame walks a film loop twice -- once to erase the sprite's previous
 	// bounding box, once to draw the new one -- and both passes ask for the same
@@ -182,13 +186,13 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			bbox.top + bbox.height()/2,
 			bbox.width(), bbox.height());
 
-	bool needToScale = (bbox.width() != _initialRect.width() || bbox.height() != _initialRect.height());
+	bool needToScale = (placeWidth != _initialRect.width() || placeHeight != _initialRect.height());
 	float scaleX = 1.0f;
 	float scaleY = 1.0f;
 
 	if (needToScale) {
-		scaleX = (float)bbox.width() / _initialRect.width();
-		scaleY = (float)bbox.height() / _initialRect.height();
+		scaleX = (float)placeWidth / _initialRect.width();
+		scaleY = (float)placeHeight / _initialRect.height();
 	}
 
 	// Film loop placement/scaling diagnostics. Enable with: --debugflags=images --debuglevel=3
@@ -274,6 +278,7 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		if (needToScale) {
 			src._startPoint.x = widgetDelta.x * scaleX + bbox.left;
 			src._startPoint.y = widgetDelta.y * scaleY + bbox.top;
+
 			// Scale each cell by itself, don't blow it up to the whole placement rect.
 			// A film loop is a miniature score: one of its frames can hold a dozen
 			// cells that only add up to a figure because each keeps its own size and
