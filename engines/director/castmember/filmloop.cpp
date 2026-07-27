@@ -274,6 +274,21 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		if (needToScale) {
 			src._startPoint.x = widgetDelta.x * scaleX + bbox.left;
 			src._startPoint.y = widgetDelta.y * scaleY + bbox.top;
+			// Scale each cell by itself, don't blow it up to the whole placement rect.
+			// A film loop is a miniature score: one of its frames can hold a dozen
+			// cells that only add up to a figure because each keeps its own size and
+			// sits at its own registration offset (TKKG7's Sz70g1 assembles a figure
+			// from nine such channels). Resizing every cell to the loop's full rect
+			// stacked them all on top of each other, each stretched to the size of the
+			// whole figure. Start from the bitmap's native size for the same reason the
+			// unscaled branch does -- cells are stored at the loop's canvas size --
+			// then apply the placement scale. The registration offset follows along:
+			// BitmapCastMember::getRegistrationOffset() scales it by the sprite's size
+			// over the member's own, which is exactly scaleX/scaleY once the size is.
+			if (src._cast && src._cast->_type == kCastBitmap) {
+				src._width = src._cast->_initialRect.width();
+				src._height = src._cast->_initialRect.height();
+			}
 			src._width = src._width * scaleX;
 			src._height = src._height * scaleY;
 			src._stretch = true;
