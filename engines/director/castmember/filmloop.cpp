@@ -108,7 +108,10 @@ bool FilmLoopCastMember::isModified() {
 }
 
 Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, uint frame, int parentInk, uint32 parentForeColor, uint32 parentBackColor) {
-	Common::Rect widgetRect(bbox.width() ? bbox.width() : _initialRect.width(), bbox.height() ? bbox.height() : _initialRect.height());
+	// A placement rect with no dimensions (a sprite that has not been sized yet) means
+	// "draw the loop at its own size", which is what the cells are already stored at.
+	int16 placeWidth = bbox.width() ? bbox.width() : _initialRect.width();
+	int16 placeHeight = bbox.height() ? bbox.height() : _initialRect.height();
 
 	// Drawing a frame walks a film loop twice -- once to erase the sprite's previous
 	// bounding box, once to draw the new one -- and both passes ask for the same
@@ -183,13 +186,13 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			bbox.top + bbox.height()/2,
 			bbox.width(), bbox.height());
 
-	bool needToScale = (bbox.width() != _initialRect.width() || bbox.height() != _initialRect.height());
+	bool needToScale = (placeWidth != _initialRect.width() || placeHeight != _initialRect.height());
 	float scaleX = 1.0f;
 	float scaleY = 1.0f;
 
 	if (needToScale) {
-		scaleX = (float)bbox.width() / _initialRect.width();
-		scaleY = (float)bbox.height() / _initialRect.height();
+		scaleX = (float)placeWidth / _initialRect.width();
+		scaleY = (float)placeHeight / _initialRect.height();
 	}
 
 	// Film loop placement/scaling diagnostics. Enable with: --debugflags=images --debuglevel=3
@@ -274,8 +277,24 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		if (needToScale) {
 			src._startPoint.x = (src._startPoint.x - _initialRect.left) * scaleX + bbox.left;
 			src._startPoint.y = (src._startPoint.y - _initialRect.top) * scaleY + bbox.top;
-			src._width = widgetRect.width();
-			src._height = widgetRect.height();
+
+			// Scale each cell by itself, don't blow it up to the whole placement rect.
+			// A film loop is a miniature score: one of its frames can hold a dozen
+			// cells that only add up to a figure because each keeps its own size and
+			// sits at its own registration offset (TKKG7's Sz70g1 assembles a figure
+			// from nine such channels). Resizing every cell to the loop's full rect
+			// stacked them all on top of each other, each stretched to the size of the
+			// whole figure. Start from the bitmap's native size for the same reason the
+			// unscaled branch does -- cells are stored at the loop's canvas size --
+			// then apply the placement scale. The registration offset follows along:
+			// BitmapCastMember::getRegistrationOffset() scales it by the sprite's size
+			// over the member's own, which is exactly scaleX/scaleY once the size is.
+			if (src._cast && src._cast->_type == kCastBitmap) {
+				src._width = src._cast->_initialRect.width();
+				src._height = src._cast->_initialRect.height();
+			}
+			src._width = (int16)(src._width * scaleX);
+			src._height = (int16)(src._height * scaleY);
 			src._stretch = true;
 
 			debugCN(5, kDebugImages, ", scaled: %d,%d %dx%d", src._startPoint.x, src._startPoint.y, src._width, src._height);
