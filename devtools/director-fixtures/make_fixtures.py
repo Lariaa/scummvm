@@ -557,7 +557,7 @@ def build_variant(profile, kind):
         frames, main_size=profile.main_size, spr_size=profile.spr_size,
         frames_version=profile.frames_version))
 
-    data = bm.build_rifx(chunks)
+    data = bm.build_rifx(chunks, imap_version=donor.version)
     path = OUT / f"{kind}-{profile.name}.dir"
     path.write_bytes(data)
     return path, data

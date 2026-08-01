@@ -302,7 +302,8 @@ def build_vwsc(frames, num_channels=50):
 # --------------------------------------------------------------------------
 # RIFX container
 # --------------------------------------------------------------------------
-def build_rifx(chunks, *, rifx_type=b"MV93", max_map_entries=None):
+def build_rifx(chunks, *, rifx_type=b"MV93", max_map_entries=None,
+               imap_version=0):
     """chunks: list of (tag, payload) in mmap index order, starting at index 3
     (0/1/2 are RIFX/imap/mmap). Returns the complete archive."""
     n = 3 + len(chunks)
@@ -331,7 +332,13 @@ def build_rifx(chunks, *, rifx_type=b"MV93", max_map_entries=None):
     # imap
     out[imap_offset:imap_offset + 4] = b"imap"
     struct.pack_into(BE + "I", out, imap_offset + 4, imap_payload_size)
-    struct.pack_into(BE + "III", out, imap_offset + 8, 1, mmap_offset, 0)
+    # The version here is 0 for D4, 0x4c1 for D5, 0x4c7 for D6 and so on.
+    # ScummVM ignores it and takes the version from the config chunk, but
+    # Director does not: leaving it at 0 makes Director treat a D6 or D7 movie
+    # as D4 and hunt for a 'VWCF' config chunk that a D5+ movie does not have,
+    # failing with "Could not find chunk: ChunkID='FCWV'".
+    struct.pack_into(BE + "III", out, imap_offset + 8, 1, mmap_offset,
+                     imap_version)
 
     # mmap
     out[mmap_offset:mmap_offset + 4] = b"mmap"
