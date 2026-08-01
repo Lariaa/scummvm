@@ -75,9 +75,14 @@ config, cast library mapping and text member out of a real movie you point it at
         --d6 /path/to/some_d6_movie.dxr --d7 /path/to/some_d7_movie.dxr
 
 That produces `editable-d6.dir`, `listoverride-d6.dir`, `editable-d7.dir` and
-`listoverride-d7.dir`. **These derive from game data and must not be committed** --
-put them in `movies-local/`, which is ignored. The verdicts on stage are the same
-as for the D4 movies.
+`listoverride-d7.dir`, which live in `movies-d6d7/`. The verdicts on stage are the
+same as for the D4 movies:
+
+    scummvm -p devtools/director-fixtures/movies-d6d7 directortest-all
+
+They are kept apart from `movies/` on purpose. Unlike the D4 pair, they clone
+chunks out of a commercial movie, so they carry third party data and are not
+suitable for upstream.
 
 Any movie of the right version with a text cast member works as a donor. Pick a
 big endian one (`RIFX`, not `XFIR`): resource contents follow the container's byte
