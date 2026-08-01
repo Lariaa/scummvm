@@ -215,8 +215,16 @@ void Window::enqueueAllMovies() {
 		return;
 	}
 
-	for (Common::FSList::const_iterator file = files.begin(); file != files.end(); ++file)
-		_movieQueue.push_back(file->getName());
+	for (Common::FSList::const_iterator file = files.begin(); file != files.end(); ++file) {
+		// The detection marker sits in the same directory but is not a movie.
+		// It sorts in among them, and failing to open it aborts the whole run,
+		// so every movie after it would never be reached.
+		Common::String name = file->getName();
+		if (name.equalsIgnoreCase("lingotests") || name.equalsIgnoreCase("lingotests-all"))
+			continue;
+
+		_movieQueue.push_back(name);
+	}
 
 	Common::sort(_movieQueue.begin(), _movieQueue.end());
 
