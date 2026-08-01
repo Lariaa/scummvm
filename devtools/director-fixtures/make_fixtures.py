@@ -257,10 +257,13 @@ def build_listoverride():
         [m_new, m_getlast], script_id=1, assembly_id=1,
         script_flags=lscr_asm.SCRIPT_FLAG_FACTORY_DEF,
         factory_name_id=B_FACTORY,
-        # parentNumber is an index, not a flag: -1 (the value non-factory
-        # scripts carry) makes readers walk off the parent list. 0 is the
-        # valid "no parent" value for a factory.
-        parent_number=0,
+        # parentNumber is an index into the Lctx entry list, not a flag, and
+        # LingoDec resolves it as scripts[parentNumber + 1] to decide which
+        # script owns the factory (lingodec/context.cpp:55). The list is
+        # 1-based, so this factory (Lctx entry 1) must NOT use 0 -- that would
+        # make it its own parent and send writeScriptText into endless
+        # recursion. Point it at entry 2, the script that instantiates it.
+        parent_number=1,
         properties=[-1],
         consts=["IN_OUT", "LINTRANS", "METHOD"])
     factory_src = (
@@ -515,7 +518,8 @@ def build_variant(profile, kind):
         factory = lscr_asm.build_lscr(
             [m_new, m_get], script_id=1, assembly_id=1,
             script_flags=lscr_asm.SCRIPT_FLAG_FACTORY_DEF,
-            factory_name_id=B_FACTORY, parent_number=0, properties=[-1],
+            # see the note in build_listoverride: entry 1 must not own itself
+            factory_name_id=B_FACTORY, parent_number=1, properties=[-1],
             consts=["IN_OUT", "LINTRANS", "METHOD"],
             const_entry_size=profile.const_entry)
         msg = (const_push(0) + lscr_asm.global_push(B_GLOBAL)
