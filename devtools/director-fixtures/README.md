@@ -84,11 +84,20 @@ They are kept apart from `movies/` on purpose. Unlike the D4 pair, they clone
 chunks out of a commercial movie, so they carry third party data and are not
 suitable for upstream.
 
-Any movie of the right version with a text cast member works as a donor. Pick a
-big endian one (`RIFX`, not `XFIR`): resource contents follow the container's byte
-order, and the generator writes big endian throughout. Check a candidate's version
-at **offset 36** of its config chunk, not at offset 2 -- offset 2 is `fileVersion`,
-which is garbage in protected movies.
+Picking a donor:
+
+* It must be **unprotected**, which in practice means a `.dir` and not a `.dxr`.
+  Protection is a flag in the config chunk, so cloning that chunk carries it over
+  and the fixture stays protected whatever you name it -- Director then refuses to
+  open it. The generator checks this and stops. To use a protected movie anyway,
+  run `projectorrays decompile <movie> -o <dir>` first, which writes an open copy.
+* Prefer **big endian** (`RIFX`, not `XFIR`). Structural chunks follow the
+  container's byte order and the generator writes big endian throughout. (`Lscr`
+  and `Lnam` are big endian even inside an `XFIR` movie, so a little endian
+  fixture would need mixed byte order.)
+* Read the version at **offset 36** of the config chunk, not at offset 2 --
+  offset 2 is `fileVersion`, which is garbage in protected movies.
+* It needs a text cast member; the generator clones the first one it finds.
 
 ## Regenerating
 

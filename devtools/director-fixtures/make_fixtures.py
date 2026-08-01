@@ -370,6 +370,28 @@ class Profile:
         self.d5plus = d5plus
 
 
+def check_donor_unprotected(donor, path):
+    """A protected movie (what a .dxr normally is) carries that state in its
+    config chunk, and cloning the chunk carries it along -- the fixture then
+    looks protected no matter what it is called, and Director refuses to open
+    it. Cast::loadConfig reads the flag as an int16 at offset 58 and treats a
+    multiple of 23 as protected (cast.cpp:546).
+
+    ProjectorRays can turn a protected movie into an open one, so a .dxr is
+    usable as a donor after running it through `projectorrays decompile`.
+    """
+    cfg = donor.by_tag("DRCF") or donor.by_tag("VWCF")
+    if not cfg:
+        raise ValueError(f"{path}: no config chunk")
+    body = donor.chunk(cfg[0])
+    protection = struct.unpack(">h", body[58:60])[0]
+    if protection % 23 == 0:
+        raise SystemExit(
+            f"{path} is a protected movie (protection={protection}), and the "
+            f"fixture would inherit that.\nUse an unprotected .dir, or unprotect "
+            f"this one first:\n    projectorrays decompile {path} -o <dir>")
+
+
 def donor_text_member(donor):
     """Returns (CASt resource, STXT resource) of the donor's first text member."""
     cas = donor.by_tag("CAS*")[0]
@@ -412,6 +434,7 @@ def build_variant(profile, kind):
     versions is: 1 = the text member under test, 2 = the result field (a second
     clone of it), 3.. = the scripts."""
     donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
     cast_text, stxt = donor_text_member(donor)
 
     tested_member, result_member = 1, 2
