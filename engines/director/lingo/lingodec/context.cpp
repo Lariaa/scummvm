@@ -56,8 +56,21 @@ void ScriptContext::read(Common::SeekableReadStream &stream) {
 	for (auto it = scripts.begin(); it != scripts.end(); ++it) {
 		Script *script = it->second;
 		if (script->isFactory()) {
-			Script *parent = scripts[script->parentNumber + 1];
-			parent->factories.push_back(script);
+			// parentNumber is an index into this list, so a damaged movie can
+			// point it out of range or at the factory itself. The former reads
+			// a null entry out of the map, the latter sends writeScriptText()
+			// into endless recursion; both crash.
+			auto parentIt = scripts.find(script->parentNumber + 1);
+			if (parentIt == scripts.end() || !parentIt->second) {
+				warning("ScriptContext::read(): factory has out of range parent %d, skipping", script->parentNumber);
+				continue;
+			}
+			if (parentIt->second == script) {
+				warning("ScriptContext::read(): factory is its own parent, skipping");
+				continue;
+			}
+
+			parentIt->second->factories.push_back(script);
 		}
 	}
 }
