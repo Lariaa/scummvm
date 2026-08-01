@@ -49,3 +49,27 @@ scummvmAssertEqual(result, "LINTRANS")
 set result = getLast("not a list")
 scummvmAssertEqual(result, "overridden getLast")
 
+-- The builtin also has to win over a same-named method of the object we are
+-- calling from. That is the shape "Ein Fall fuer Muetze & Co" actually uses:
+-- its SpecialAddresses parent script defines "on getLast me" and still calls
+-- getLast(MovieRef, 2) on a list from its own "new" method. Resolving that to
+-- the local method left the object uninitialized.
+set obj = ListOverrideFactory(mNew)
+scummvmAssertEqual obj(mListResult) "LINTRANS"
+
+-- ...while a non-list argument still reaches the object's own method.
+scummvmAssertEqual obj(mPlainResult) "method getLast"
+
+--
+factory ListOverrideFactory
+method mNew
+    instance listResult, plainResult
+    set listResult = getLast(["IN_OUT", "LINTRANS"], 2)
+    set plainResult = getLast("not a list")
+method getLast
+    return "method getLast"
+method mListResult
+    return listResult
+method mPlainResult
+    return plainResult
+
