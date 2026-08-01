@@ -56,8 +56,10 @@ FACTORY_ME_ARG = -1             # arg 0 of a factory method; the reader maps
                                 # index -1 to "me" (lingo-bytecode.cpp:~1236)
 
 
-def const_push(index):
-    return bytes([OP_CONSTPUSH_B, index * CONST_ENTRY_SIZE])
+def const_push(index, entry_size=CONST_ENTRY_SIZE):
+    """The operand is a byte offset into the constants index, so it scales with
+    the entry size: 6 bytes on D4, 8 from D5 on (lingo-bytecode.cpp:1454)."""
+    return bytes([OP_CONSTPUSH_B, index * entry_size])
 
 
 def name_push(name_index):
@@ -102,23 +104,42 @@ def global_assign(name_index):
 
 
 def the_field_assign(field_num, selector=FIELD_TEXT):
-    """Assigns to 'the <selector> of field <field_num>'. cb_v4theentityassign
-    pops selector, then value, then id -- so the push order is id, value,
-    selector. Confirmed against real bytecode ('41 20 49 1e 41 06 5d 06' =
-    'set the cursor of sprite 32 to <global>')."""
+    """Tail of an assignment to 'the <selector> of field <field_num>'; the value
+    must already be on the stack. cb_v4theentityassign pops selector, then
+    value, then the id -- so the push order is id, value, selector. Confirmed
+    against real bytecode ('41 20 49 1e 41 06 5d 06' = 'set the cursor of
+    sprite 32 to <global>')."""
     return intpush(selector) + bytes([OP_THEENTITYASSIGN_B, BANK_FIELD])
 
 
-def build_consts(strings):
+def field_assign_id(field_num, cast_lib=None):
+    """Leading part of a field assignment, pushed before the value.
+
+    From D5 on, kTheCast and kTheField take the member as two Datums, and
+    cb_v4theentityassign pops the cast lib before the member -- so they go on
+    the stack as member first, then cast lib (lingo-bytecode.cpp:920ff, and
+    toCastMemberID(member, castLib) in lingo.cpp:2002). On D4 only the member
+    is pushed.
+    """
+    if cast_lib is None:
+        return intpush(field_num)
+    return intpush(field_num) + intpush(cast_lib)
+
+
+def build_consts(strings, entry_size=CONST_ENTRY_SIZE):
     """Returns (index_table, store). Strings are stored as a big-endian u32
     length that *includes* the terminating null, then the bytes and the null;
-    entries start on even offsets."""
+    entries start on even offsets. The index entry is a u16 type plus a u32
+    value on D4, and a u32 type plus a u32 value from D5 on."""
     index = bytearray()
     store = bytearray()
     for s in strings:
         raw = s.encode("latin1")
         offset = len(store)
-        index += struct.pack(">HI", 1, offset)      # type 1 = string
+        if entry_size == 8:
+            index += struct.pack(">II", 1, offset)  # type 1 = string
+        else:
+            index += struct.pack(">HI", 1, offset)
         store += struct.pack(">I", len(raw) + 1) + raw + b"\0"
         if len(store) % 2:
             store += b"\0"
@@ -174,7 +195,8 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
                parent_number=-1, unk_block=None, unk3=0, script_flags=0,
                unk4=b"\0" * 4, factory_name_id=-1,
                event_map=None, event_map_flags=0, name_gap=b"",
-               func_unk0=10, consts=(), properties=()):
+               func_unk0=10, consts=(), properties=(),
+               const_entry_size=CONST_ENTRY_SIZE):
     """Serialises one Lscr chunk. `handlers` is a list of Handler,
     `consts` a list of strings referenced by const_push()."""
     if unk_block is None:
@@ -221,7 +243,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
 
     # 4. constants. With none, the index and store collapse onto the event map,
     #    exactly as the reference script does.
-    const_index, const_store = build_consts(consts)
+    const_index, const_store = build_consts(consts, const_entry_size)
     consts_offset = cur()
     body += const_index
     consts_store_offset = cur()

@@ -15,6 +15,7 @@ BE = ">"
 KCAST_LINGO_SCRIPT = 11
 SCRIPT_TYPE_SCORE = 1           # ScriptCastMember: 1 = kScoreScript
 SCRIPT_TYPE_MOVIE = 3           #                   3 = kMovieScript
+DEFAULT_CAST_LIB = 1            # movie.h:25
 CASTLIB_KEY_PARENT = 1024       # KEY* parent id used for cast-wide resources
 
 MAIN_CHANNEL_SIZE_D4 = 40
@@ -56,17 +57,30 @@ def build_cast_info(*, script_id, name="", script_source=""):
     return bytes(out)
 
 
-def build_script_cast(script_id, name, source="", script_type=SCRIPT_TYPE_SCORE):
+def build_script_cast(script_id, name, source="", script_type=SCRIPT_TYPE_SCORE,
+                      d5plus=False):
     """CASt for a script cast member. castData is exactly the 2-byte script
-    type; ScriptCastMember asserts it consumed the whole stream."""
+    type; ScriptCastMember asserts it consumed the whole stream.
+
+    The two header shapes come from Cast::loadCastData (cast.cpp:1570ff): D4
+    stores a u16 data size, a u32 info size and then the castType and flags1
+    bytes inside the data block, with the data before the info. D5 and later
+    store three u32 (type, info size, data size) and put the info block first,
+    with no type/flags1 bytes in the data.
+    """
     cast_data = struct.pack(BE + "H", script_type)
     info = build_cast_info(script_id=script_id, name=name, script_source=source)
     out = bytearray()
-    out += struct.pack(BE + "H", 2 + len(cast_data))   # castDataSize incl. type+flags1
-    out += struct.pack(BE + "I", len(info))            # castInfoSize
-    out += bytes([KCAST_LINGO_SCRIPT, 0])              # castType, flags1
-    out += cast_data
-    out += info
+    if d5plus:
+        out += struct.pack(BE + "III", KCAST_LINGO_SCRIPT, len(info), len(cast_data))
+        out += info
+        out += cast_data
+    else:
+        out += struct.pack(BE + "H", 2 + len(cast_data))   # incl. type+flags1
+        out += struct.pack(BE + "I", len(info))
+        out += bytes([KCAST_LINGO_SCRIPT, 0])              # castType, flags1
+        out += cast_data
+        out += info
     return bytes(out)
 
 
@@ -145,6 +159,117 @@ def main_channel_d4(*, action_id=0, tempo=0):
     out += b"\0" * (MAIN_CHANNEL_SIZE_D4 - len(out))
     assert len(out) == MAIN_CHANNEL_SIZE_D4
     return bytes(out)
+
+
+def sprite_d6(*, cast_member, x, y, w, h, sprite_type=1, ink=0, editable=False,
+              fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
+    """24-byte D6 sprite record (writeSpriteDataD6, frame.cpp).
+    The editable bit is still 0x40, but colorcode moved to byte 20."""
+    out = bytearray()
+    out += bytes([sprite_type, ink, fore, back])
+    out += struct.pack(BE + "hH", cast_lib, cast_member)
+    out += struct.pack(BE + "I", 0)                  # spriteListIdx
+    out += struct.pack(BE + "HH", y, x)
+    out += struct.pack(BE + "HH", h, w)
+    out += bytes([0x40 if editable else 0x00, 0, 0, 0])
+    assert len(out) == 24
+    return bytes(out)
+
+
+def sprite_d7(*, cast_member, x, y, w, h, sprite_type=1, ink=0, editable=False,
+              fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
+    """48-byte D7 sprite record; the first 23 bytes match D6."""
+    out = bytearray(sprite_d6(cast_member=cast_member, x=x, y=y, w=w, h=h,
+                              sprite_type=sprite_type, ink=ink,
+                              editable=editable, fore=fore, back=back,
+                              cast_lib=cast_lib)[:23])
+    out += bytes([0])                                # flags
+    out += bytes([0, 0, 0, 0])                       # fg/bg colour G and B
+    out += struct.pack(BE + "II", 0, 0)              # angleRot, angleSkew
+    out += b"\0" * 12
+    assert len(out) == 48
+    return bytes(out)
+
+
+def main_channel_d6plus(size, *, action_id=0, cast_lib=DEFAULT_CAST_LIB):
+    """D6/D7 main channel. Only the frame script is filled in; everything else
+    stays zero, which reads back as no tempo, transition or palette change.
+
+    Follows readMainChannelsD6/D7: castLib and member are two u16 at offsets 0
+    and 2. Note that writeMainChannelsD6/D7 disagree with that -- they emit a
+    u32 for castLib -- so the reader is the authority here.
+    """
+    out = bytearray(size)
+    struct.pack_into(BE + "HH", out, 0, cast_lib, action_id)
+    return bytes(out)
+
+
+def build_vwsc_d6plus(frames, *, main_size, spr_size, frames_version,
+                      num_channels=50):
+    """D6 and later wrap the familiar score in an index: a small prologue points
+    at a table of offsets, whose entry 0 is the score header and whose entry n is
+    frame n (Score::loadFrames and loadFrame, score.cpp:1905 / :2156).
+
+        0   u32 framesStreamSize (whole chunk)
+        4   u32 ver              (-3)
+        8   u32 listStart        (12)
+        12  u32 numEntries       (frames + 1)
+        16  u32 listSize         (numEntries + 1)
+        20  u32 maxDataLen       (size of the data area)
+        24  u32 offsets[]        relative to the data area
+            data area: score header, then the frames
+    """
+    header, body, frame_offsets = _score_header_and_frames(
+        frames, main_size=main_size, spr_size=spr_size,
+        frames_version=frames_version, num_channels=num_channels)
+    data = header + body
+
+    num_entries = len(frames) + 1
+    list_size = num_entries + 1
+    index_start = 24
+    frame_data_offset = index_start + list_size * 4
+
+    out = bytearray()
+    out += struct.pack(BE + "I", 0)                  # patched below
+    out += struct.pack(BE + "i", -3)
+    out += struct.pack(BE + "I", 12)
+    out += struct.pack(BE + "III", num_entries, list_size, len(data))
+    out += struct.pack(BE + "I", 0)                  # entry 0: the score header
+    for off in frame_offsets:                        # already header relative
+        out += struct.pack(BE + "I", off)
+    out += b"\0" * 4 * (list_size - num_entries)     # spare index slots
+    assert len(out) == frame_data_offset, (len(out), frame_data_offset)
+    out += data
+    struct.pack_into(BE + "I", out, 0, len(out))
+    return bytes(out)
+
+
+def _score_header_and_frames(frames, *, main_size, spr_size, frames_version,
+                             num_channels):
+    """The score header and frame blocks shared by every version from D4 on."""
+    body = bytearray()
+    offsets = []
+    for chans in frames:
+        offsets.append(len(body))
+        frame = bytearray()
+        for ch in sorted(chans):
+            payload = chans[ch]
+            offset = 0 if ch == 0 else main_size + (ch - 1) * spr_size
+            frame += struct.pack(BE + "HH", len(payload), offset)
+            frame += payload
+        body += struct.pack(BE + "H", len(frame) + 2)
+        body += frame
+
+    frame1_offset = 20
+    header = bytearray()
+    header += struct.pack(BE + "I", frame1_offset + len(body))
+    header += struct.pack(BE + "I", frame1_offset)
+    header += struct.pack(BE + "I", len(frames))
+    header += struct.pack(BE + "HH", frames_version, spr_size)
+    header += struct.pack(BE + "H", num_channels)
+    header += struct.pack(BE + "H", 0x0100)          # skipped for framesVersion <= 13
+    assert len(header) == frame1_offset
+    return bytes(header), bytes(body), [frame1_offset + o for o in offsets]
 
 
 def build_vwsc(frames, num_channels=50):
@@ -252,10 +377,18 @@ def find_tests_cpp():
         "engines/director/tests.cpp not found; run this from a ScummVM checkout")
 
 
-def load_donor():
-    """The donor is the test movie embedded in tests.cpp: a complete D4 RIFX
-    with a text member, a shape member and a score, and free of licensing
-    concerns since it already ships with ScummVM."""
+def load_donor(path=None):
+    """Without a path the donor is the test movie embedded in tests.cpp: a
+    complete D4 RIFX with a text member, a shape member and a score, and free of
+    licensing concerns since it already ships with ScummVM.
+
+    For D5 and later there is no such donor in the tree, so `path` may point at
+    any real movie of the wanted version. Its config, cast library mapping and
+    text member get cloned; the result must stay on that machine, since it
+    derives from game data.
+    """
+    if path is not None:
+        return rifx.RifxFile(pathlib.Path(path).read_bytes())
     src = find_tests_cpp()
     m = re.search(r"const byte testMovie\[\]\s*=\s*\{(.*?)\};",
                   src.read_text(encoding="utf-8", errors="replace"), re.S)

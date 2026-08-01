@@ -345,14 +345,253 @@ def make_lscr_b(code, script_id, consts=()):
                                consts=consts)
 
 
+# --------------------------------------------------------------------------
+# D6 / D7 variants
+#
+# There is no license free D6 or D7 donor in the tree, so these clone their
+# config, cast library mapping and text member out of a real movie given on the
+# command line. The result therefore stays local and must not be committed.
+# --------------------------------------------------------------------------
+CLONE_TAGS = ("DRCF", "VWCF", "MCsL", "Sord", "VWFI", "FXmp", "Fmap", "Cinf")
+
+
+class Profile:
+    """Everything that differs between Director versions."""
+
+    def __init__(self, name, *, donor, main_size, spr_size, frames_version,
+                 sprite_writer, const_entry=8, d5plus=True):
+        self.name = name
+        self.donor = donor
+        self.main_size = main_size
+        self.spr_size = spr_size
+        self.frames_version = frames_version
+        self.sprite = sprite_writer
+        self.const_entry = const_entry
+        self.d5plus = d5plus
+
+
+def donor_text_member(donor):
+    """Returns (CASt resource, STXT resource) of the donor's first text member."""
+    cas = donor.by_tag("CAS*")[0]
+    body = donor.chunk(cas)
+    slots = [struct.unpack(">I", body[i:i + 4])[0] for i in range(0, len(body), 4)]
+    by_index = {r.index: r for r in donor.resources}
+
+    key = donor.chunk(donor.by_tag("KEY*")[0])
+    used = struct.unpack(">I", key[8:12])[0]
+    children = {}
+    for i in range(used):
+        off = 12 + i * 12
+        child, parent = struct.unpack(">II", key[off:off + 8])
+        children.setdefault((parent, key[off + 8:off + 12]), []).append(child)
+
+    for mi in slots:
+        res = by_index.get(mi)
+        if not res or res.tag != "CASt":
+            continue
+        cast_type = struct.unpack(">I", donor.chunk(res)[0:4])[0]
+        if cast_type != 3:                      # kCastText
+            continue
+        stxt = children.get((mi, b"STXT"))
+        if stxt:
+            return res, by_index[stxt[0]]
+    raise ValueError("donor has no text member with an STXT")
+
+
+def make_lscr_for(profile, name_index, code, script_id, consts=()):
+    h = lscr_asm.Handler(name_index, code)
+    return lscr_asm.build_lscr([h], script_id=script_id, assembly_id=script_id,
+                               event_map=[-1] * 10 + [0],
+                               event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
+                               consts=consts,
+                               const_entry_size=profile.const_entry)
+
+
+def build_variant(profile, kind):
+    """kind is 'editable' or 'listoverride'. Cast layout for the donor based
+    versions is: 1 = the text member under test, 2 = the result field (a second
+    clone of it), 3.. = the scripts."""
+    donor = bm.load_donor(profile.donor)
+    cast_text, stxt = donor_text_member(donor)
+
+    tested_member, result_member = 1, 2
+    chunks = []
+
+    def add(tag, payload):
+        chunks.append((tag, payload))
+        return 3 + len(chunks) - 1
+
+    i_key = add(b"KEY*", b"")
+    i_cas = add(b"CAS*", b"")
+    i_vwsc = add(b"VWSC", b"")
+    cloned = []
+    for tag in CLONE_TAGS:
+        for res in donor.by_tag(tag):
+            cloned.append((tag, add(tag.encode("latin1"), donor.chunk(res))))
+            break
+
+    i_cast_text = add(b"CASt", donor.chunk(cast_text))
+    i_stxt = add(b"STXT", donor.chunk(stxt))
+    i_cast_res = add(b"CASt", donor.chunk(cast_text))
+    i_stxt_res = add(b"STXT", donor.chunk(stxt))
+
+    def const_push(i):
+        return lscr_asm.const_push(i, profile.const_entry)
+
+    if kind == "editable":
+        names = ["exitFrame", "put", "gEditableResult"]
+        gvar, label = 2, LABEL
+
+        def field_report():
+            msg = (const_push(0) + lscr_asm.global_push(gvar)
+                   + bytes([lscr_asm.OP_AMPERSAND]))
+            return (lscr_asm.field_assign_id(result_member, bm.DEFAULT_CAST_LIB)
+                    + msg
+                    + lscr_asm.the_field_assign(result_member)
+                    + msg + lscr_asm.call_command(1, 1)
+                    + bytes([lscr_asm.OP_PROCRET]))
+
+        def check(expected, first):
+            probe = (lscr_asm.the_sprite_field(SPRITE_CH,
+                                               lscr_asm.SPRITE_EDITABLETEXT)
+                     + lscr_asm.intpush(expected) + bytes([lscr_asm.OP_EQ]))
+            if first:
+                return probe + lscr_asm.global_assign(gvar) + bytes([lscr_asm.OP_PROCRET])
+            return (lscr_asm.global_push(gvar) + lscr_asm.intpush(10)
+                    + bytes([lscr_asm.OP_MUL]) + probe
+                    + bytes([lscr_asm.OP_ADD]) + lscr_asm.global_assign(gvar)
+                    + bytes([lscr_asm.OP_PROCRET]))
+
+        scripts = [("checkFrame1", check(1, True), src_first(1), ()),
+                   ("checkFrame2", check(0, False), src_append(0), ()),
+                   ("checkFrame3", check(1, False), src_append(1), ()),
+                   ("reportResult", field_report(), src_report(), (label,))]
+    else:
+        names = B_NAMES
+        scripts = None                       # filled in after the factory below
+
+    cast_script_idx, lscr_idx = [], []
+    if kind == "editable":
+        for i, (nm, code, src, consts) in enumerate(scripts, start=1):
+            cast_script_idx.append(add(b"CASt", bm.build_script_cast(
+                i, nm, src, bm.SCRIPT_TYPE_SCORE, d5plus=profile.d5plus)))
+            lscr_idx.append(add(b"Lscr", make_lscr_for(
+                profile, 0, code, i, consts)))
+    else:
+        m_new = lscr_asm.Handler(
+            B_MNEW,
+            (const_push(0) + const_push(1) + lscr_asm.make_list(2)
+             + lscr_asm.intpush(2) + lscr_asm.call_function(B_GETLAST, 2)
+             + lscr_asm.global_assign(B_GLOBAL) + bytes([lscr_asm.OP_PROCRET])),
+            arg_names=[lscr_asm.FACTORY_ME_ARG])
+        m_get = lscr_asm.Handler(
+            B_GETLAST,
+            (const_push(2) + lscr_asm.call_command(B_RETURN, 1)
+             + bytes([lscr_asm.OP_PROCRET])),
+            arg_names=[lscr_asm.FACTORY_ME_ARG])
+        factory = lscr_asm.build_lscr(
+            [m_new, m_get], script_id=1, assembly_id=1,
+            script_flags=lscr_asm.SCRIPT_FLAG_FACTORY_DEF,
+            factory_name_id=B_FACTORY, parent_number=0, properties=[-1],
+            consts=["IN_OUT", "LINTRANS", "METHOD"],
+            const_entry_size=profile.const_entry)
+        msg = (const_push(0) + lscr_asm.global_push(B_GLOBAL)
+               + bytes([lscr_asm.OP_AMPERSAND]))
+        report = (lscr_asm.field_assign_id(result_member, bm.DEFAULT_CAST_LIB)
+                  + msg
+                  + lscr_asm.the_field_assign(result_member)
+                  + msg + lscr_asm.call_command(B_PUT, 1)
+                  + bytes([lscr_asm.OP_PROCRET]))
+        run = (lscr_asm.object_call(B_MNEW, B_FACTORY, nargs=1, want_result=False)
+               + bytes([lscr_asm.OP_PROCRET]))
+
+        cast_script_idx.append(add(b"CASt", bm.build_script_cast(
+            1, "MyListFactory", "", bm.SCRIPT_TYPE_MOVIE, d5plus=profile.d5plus)))
+        lscr_idx.append(add(b"Lscr", factory))
+        for sid, (nm, code, consts) in enumerate(
+                [("runFactory", run, ()), ("reportList", report, (B_LABEL,))], start=2):
+            cast_script_idx.append(add(b"CASt", bm.build_script_cast(
+                sid, nm, "", bm.SCRIPT_TYPE_SCORE, d5plus=profile.d5plus)))
+            lscr_idx.append(add(b"Lscr", make_lscr_for(
+                profile, B_EXITFRAME, code, sid, consts)))
+
+    i_lnam = add(b"Lnam", lscr.build_lnam(names))
+    i_lctx = add(b"Lctx", bm.build_lctx(lscr_idx, i_lnam))
+
+    members = [i_cast_text, i_cast_res] + cast_script_idx
+    chunks[i_cas - 3] = (b"CAS*", bm.build_cas(members))
+
+    key_entries = [(i_stxt, i_cast_text, b"STXT"), (i_stxt_res, i_cast_res, b"STXT"),
+                   (i_cas, bm.CASTLIB_KEY_PARENT, b"CAS*"),
+                   (i_vwsc, bm.CASTLIB_KEY_PARENT, b"VWSC"),
+                   (i_lctx, bm.CASTLIB_KEY_PARENT, b"Lctx"),
+                   (i_lnam, bm.CASTLIB_KEY_PARENT, b"Lnam")]
+    for tag, idx in cloned:
+        key_entries.append((idx, bm.CASTLIB_KEY_PARENT, tag.encode("latin1")))
+    for c, s in zip(cast_script_idx, lscr_idx):
+        key_entries.append((s, c, b"Lscr"))
+    chunks[i_key - 3] = (b"KEY*", bm.build_key(key_entries, max_entries=32))
+
+    first_script_member = 3
+
+    def frame(action_member, *, editable=False, back=0):
+        chans = {0: bm.main_channel_d6plus(profile.main_size,
+                                           action_id=action_member),
+                 RESULT_CH: profile.sprite(cast_member=result_member,
+                                           x=20, y=120, w=200, h=40)}
+        if kind == "editable":
+            chans[SPRITE_CH] = profile.sprite(cast_member=tested_member, x=20,
+                                              y=20, w=200, h=40,
+                                              editable=editable, back=back)
+        return chans
+
+    if kind == "editable":
+        frames = [frame(first_script_member + 0, editable=True, back=0),
+                  frame(first_script_member + 1, editable=False, back=255),
+                  frame(first_script_member + 2, editable=True, back=255),
+                  frame(first_script_member + 3, editable=True, back=255)]
+    else:
+        frames = [frame(first_script_member + 1), frame(first_script_member + 2)]
+
+    chunks[i_vwsc - 3] = (b"VWSC", bm.build_vwsc_d6plus(
+        frames, main_size=profile.main_size, spr_size=profile.spr_size,
+        frames_version=profile.frames_version))
+
+    data = bm.build_rifx(chunks)
+    path = OUT / f"{kind}-{profile.name}.dir"
+    path.write_bytes(data)
+    return path, data
+
+
+def report(path, data):
+    print(f"wrote {path.name} ({len(data)} bytes)")
+    f = rifx.RifxFile(data)
+    for r in f.by_tag("Lscr"):
+        s = lscr.Lscr(f.chunk(r))
+        flags = f" FACTORY({s.factory_name_id})" if s.script_flags & 0x10 else ""
+        for fn in s.functions:
+            print(f"   Lscr {r.index}{flags} args={fn.arg_names} "
+                  f"code={fn.code.hex(' ')}")
+
+
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--d6", metavar="MOVIE",
+                    help="a real D6 movie to clone config and text member from")
+    ap.add_argument("--d7", metavar="MOVIE", help="likewise for D7")
+    args = ap.parse_args()
+
     for builder in (build_editable, build_listoverride):
-        p, d = builder()
-        print(f"wrote {p} ({len(d)} bytes)")
-        f = rifx.RifxFile(d)
-        for r in f.by_tag("Lscr"):
-            s = lscr.Lscr(f.chunk(r))
-            flags = f" FACTORY({s.factory_name_id})" if s.script_flags & 0x10 else ""
-            for fn in s.functions:
-                print(f"  Lscr {r.index}{flags} args={fn.arg_names} "
-                      f"code={fn.code.hex(' ')}")
+        report(*builder())
+
+    profiles = []
+    if args.d6:
+        profiles.append(Profile("d6", donor=args.d6, main_size=144, spr_size=24,
+                                frames_version=11, sprite_writer=bm.sprite_d6))
+    if args.d7:
+        profiles.append(Profile("d7", donor=args.d7, main_size=288, spr_size=48,
+                                frames_version=13, sprite_writer=bm.sprite_d7))
+    for profile in profiles:
+        for kind in ("editable", "listoverride"):
+            report(*build_variant(profile, kind))

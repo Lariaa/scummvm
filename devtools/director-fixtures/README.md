@@ -60,6 +60,31 @@ builtin has to win over the object's own method.
 The same case is also covered from source by
 `engines/director/lingo/tests/listoverride.lingo`, which needs no movie.
 
+## Director 6 and 7 variants
+
+The same two checks exist for D6 and D7, because the editable bit lives in a
+different place in every score format (`colorcode & 0x40` sits at byte 18 on D4
+but at byte 20 on D6 and D7) and only these variants exercise
+`readSpriteDataD6`/`D7`. The three commits themselves are version independent, so
+the D4 movies already cover them; these add the version specific score parsing.
+
+There is no license free D6 or D7 donor in the tree, so the generator clones the
+config, cast library mapping and text member out of a real movie you point it at:
+
+    python devtools/director-fixtures/make_fixtures.py \
+        --d6 /path/to/some_d6_movie.dxr --d7 /path/to/some_d7_movie.dxr
+
+That produces `editable-d6.dir`, `listoverride-d6.dir`, `editable-d7.dir` and
+`listoverride-d7.dir`. **These derive from game data and must not be committed** --
+put them in `movies-local/`, which is ignored. The verdicts on stage are the same
+as for the D4 movies.
+
+Any movie of the right version with a text cast member works as a donor. Pick a
+big endian one (`RIFX`, not `XFIR`): resource contents follow the container's byte
+order, and the generator writes big endian throughout. Check a candidate's version
+at **offset 36** of its config chunk, not at offset 2 -- offset 2 is `fileVersion`,
+which is garbage in protected movies.
+
 ## Regenerating
 
     python devtools/director-fixtures/make_fixtures.py
