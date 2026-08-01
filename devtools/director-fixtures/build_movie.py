@@ -1,0 +1,265 @@
+"""Build the Director 4 regression fixture movies.
+
+Container is RIFX (big endian) throughout, like the donor, so no chunk has to
+switch byte order. Layout mirrors what ScummVM reads:
+  RIFXArchive::readMemoryMap        engines/director/archive.cpp:792
+  Cast::loadCastData / loadCastInfo engines/director/cast.cpp:1547 / :1949
+  Movie::loadInfoEntries            engines/director/movie.cpp:368
+  Cast::loadLingoContext            engines/director/cast.cpp:1768
+  Score::loadFrames / readOneFrame  engines/director/score.cpp:1873 / :2229
+"""
+import struct, gzip, re, pathlib
+import rifx, lscr, lscr_asm
+
+BE = ">"
+KCAST_LINGO_SCRIPT = 11
+SCRIPT_TYPE_SCORE = 1           # ScriptCastMember: 1 = kScoreScript
+SCRIPT_TYPE_MOVIE = 3           #                   3 = kMovieScript
+CASTLIB_KEY_PARENT = 1024       # KEY* parent id used for cast-wide resources
+
+MAIN_CHANNEL_SIZE_D4 = 40
+SPR_CHANNEL_SIZE_D4 = 20
+
+
+# --------------------------------------------------------------------------
+# chunk builders
+# --------------------------------------------------------------------------
+CAST_INFO_STRING_COUNT = 7      # what real D4 script members carry
+
+
+def build_cast_info(*, script_id, name="", script_source=""):
+    """castInfo block: header (offset, unk1, unk2, flags, scriptId) then a
+    string table of cumulative offsets.
+
+    String 0 is the raw script source, string 1 the member name as a Pascal
+    string -- Cast::loadCastInfo reads them as strings[0].readString(false) and
+    strings[1].readString() respectively. Real D4 script members always emit
+    seven entries; emitting fewer makes readers that index the later slots run
+    off the end of the block.
+    """
+    name_b = name.encode("latin1")
+    strings = [script_source.encode("latin1"),
+               (bytes([len(name_b)]) + name_b) if name_b else b""]
+    strings += [b""] * (CAST_INFO_STRING_COUNT - len(strings))
+    out = bytearray()
+    out += struct.pack(BE + "I", 20)            # offset to the string table
+    out += struct.pack(BE + "III", 0, 0, 0)     # unk1, unk2, flags
+    out += struct.pack(BE + "I", script_id)
+    out += struct.pack(BE + "H", len(strings))
+    total = 0
+    out += struct.pack(BE + "I", total)
+    for s in strings:
+        total += len(s)
+        out += struct.pack(BE + "I", total)
+    for s in strings:
+        out += s
+    return bytes(out)
+
+
+def build_script_cast(script_id, name, source="", script_type=SCRIPT_TYPE_SCORE):
+    """CASt for a script cast member. castData is exactly the 2-byte script
+    type; ScriptCastMember asserts it consumed the whole stream."""
+    cast_data = struct.pack(BE + "H", script_type)
+    info = build_cast_info(script_id=script_id, name=name, script_source=source)
+    out = bytearray()
+    out += struct.pack(BE + "H", 2 + len(cast_data))   # castDataSize incl. type+flags1
+    out += struct.pack(BE + "I", len(info))            # castInfoSize
+    out += bytes([KCAST_LINGO_SCRIPT, 0])              # castType, flags1
+    out += cast_data
+    out += info
+    return bytes(out)
+
+
+def build_lctx(lscr_indices, lnam_index):
+    """Lctx: 42-byte header, then 12-byte entries holding the mmap index of
+    each Lscr. Entry position (1-based) is the lctxIndex handed to addCodeV4,
+    and must match the scriptId stored in the script member's castInfo."""
+    items_offset = 0x2a
+    entry_size = 12
+    count = len(lscr_indices)
+    out = bytearray()
+    out += struct.pack(BE + "HHHH", 0, 0, 0, 0)
+    out += struct.pack(BE + "ii", count, count)
+    out += struct.pack(BE + "HH", items_offset, entry_size)
+    out += struct.pack(BE + "I", 0)                 # unk1
+    out += struct.pack(BE + "I", 0)                 # fileType
+    out += struct.pack(BE + "I", 0)                 # unk2
+    out += struct.pack(BE + "i", lnam_index)        # nameTableId
+    out += struct.pack(BE + "hH", count, 0)         # validCount, flags
+    out += struct.pack(BE + "h", -1)                # firstUnused: none
+    assert len(out) == items_offset, len(out)
+    for idx in lscr_indices:
+        out += struct.pack(BE + "I", 0)             # unknown
+        out += struct.pack(BE + "i", idx)           # mmap index of the Lscr
+        out += struct.pack(BE + "Hh", 0, -1)        # entryFlags, nextUnused
+    return bytes(out)
+
+
+def build_cas(cast_indices):
+    """CAS* is a positional u32 array: slot i holds the mmap index of the CASt
+    for cast member i+1, or 0 (RIFXArchive::writeCast)."""
+    return b"".join(struct.pack(BE + "I", i) for i in cast_indices)
+
+
+def build_key(entries, max_entries=None):
+    """KEY*: (childIndex, parentIndex, tag) triples."""
+    if max_entries is None:
+        max_entries = len(entries)
+    out = bytearray()
+    out += struct.pack(BE + "HH", 12, 12)
+    out += struct.pack(BE + "II", max_entries, len(entries))
+    for child, parent, tag in entries:
+        out += struct.pack(BE + "II", child, parent)
+        out += tag
+    out += b"\0" * 12 * (max_entries - len(entries))
+    return bytes(out)
+
+
+# --------------------------------------------------------------------------
+# score
+# --------------------------------------------------------------------------
+def sprite_d4(*, cast_member, x, y, w, h, sprite_type=1, ink=0, editable=False,
+              fore=255, back=0, script_id=0):
+    """20-byte D4 sprite record (writeSpriteDataD4, frame.cpp:742)."""
+    colorcode = 0x40 if editable else 0x00
+    out = bytearray()
+    out += bytes([script_id & 0xff, sprite_type, fore, back, 0, ink])
+    out += struct.pack(BE + "H", cast_member)
+    out += struct.pack(BE + "HH", y, x)          # startPoint: y then x
+    out += struct.pack(BE + "HH", h, w)
+    out += struct.pack(BE + "H", script_id)
+    out += bytes([colorcode, 0])                 # colorcode, blendAmount
+    assert len(out) == SPR_CHANNEL_SIZE_D4
+    return bytes(out)
+
+
+def main_channel_d4(*, action_id=0, tempo=0):
+    """40-byte D4 main channel (writeMainChannelsD4, frame.cpp:584).
+    actionId at offset 16 is the per-frame script cast member."""
+    out = bytearray()
+    out += bytes([0, 0, 0, 0, tempo, 0])
+    out += struct.pack(BE + "HH", 0, 0)          # sound1, sound2
+    out += bytes([0, 0, 0, 0, 0, 0])
+    out += struct.pack(BE + "H", action_id)      # 16, 17
+    out += bytes([0, 0])                         # colorScript, colorTrans
+    out += b"\0" * (MAIN_CHANNEL_SIZE_D4 - len(out))
+    assert len(out) == MAIN_CHANNEL_SIZE_D4
+    return bytes(out)
+
+
+def build_vwsc(frames, num_channels=50):
+    """frames: list of {channel_index: payload}; channel 0 is the main channel.
+    Frame encoding per Score::readOneFrame (score.cpp:2229): u16 frameSize
+    (including itself), then (u16 size, u16 offset, data) per channel."""
+    body = bytearray()
+    for chans in frames:
+        frame = bytearray()
+        for ch in sorted(chans):
+            data = chans[ch]
+            offset = 0 if ch == 0 else MAIN_CHANNEL_SIZE_D4 + (ch - 1) * SPR_CHANNEL_SIZE_D4
+            frame += struct.pack(BE + "HH", len(data), offset)
+            frame += data
+        body += struct.pack(BE + "H", len(frame) + 2)
+        body += frame
+
+    header = bytearray()
+    frame1_offset = 20
+    header += struct.pack(BE + "I", frame1_offset + len(body))   # framesStreamSize
+    header += struct.pack(BE + "I", frame1_offset)
+    header += struct.pack(BE + "I", len(frames))
+    header += struct.pack(BE + "HH", 4, SPR_CHANNEL_SIZE_D4)     # framesVersion, spriteRecordSize
+    header += struct.pack(BE + "H", num_channels)
+    header += struct.pack(BE + "H", 0x0100)                      # skipped when framesVersion <= 13
+    assert len(header) == frame1_offset
+    return bytes(header) + bytes(body)
+
+
+# --------------------------------------------------------------------------
+# RIFX container
+# --------------------------------------------------------------------------
+def build_rifx(chunks, *, rifx_type=b"MV93", max_map_entries=None):
+    """chunks: list of (tag, payload) in mmap index order, starting at index 3
+    (0/1/2 are RIFX/imap/mmap). Returns the complete archive."""
+    n = 3 + len(chunks)
+    if max_map_entries is None:
+        max_map_entries = n + 4
+    imap_payload_size = 24
+    mmap_payload_size = 24 + max_map_entries * 20
+
+    imap_offset = 12
+    mmap_offset = imap_offset + 8 + imap_payload_size
+    pos = mmap_offset + 8 + mmap_payload_size
+
+    placed = []
+    for tag, payload in chunks:
+        placed.append((tag, payload, pos))
+        pos += 8 + len(payload)
+        if pos % 2:
+            pos += 1
+    total = pos
+
+    out = bytearray(total)
+    out[0:4] = b"RIFX"
+    struct.pack_into(BE + "I", out, 4, total - 8)
+    out[8:12] = rifx_type
+
+    # imap
+    out[imap_offset:imap_offset + 4] = b"imap"
+    struct.pack_into(BE + "I", out, imap_offset + 4, imap_payload_size)
+    struct.pack_into(BE + "III", out, imap_offset + 8, 1, mmap_offset, 0)
+
+    # mmap
+    out[mmap_offset:mmap_offset + 4] = b"mmap"
+    struct.pack_into(BE + "I", out, mmap_offset + 4, mmap_payload_size)
+    struct.pack_into(BE + "HH", out, mmap_offset + 8, 24, 20)
+    struct.pack_into(BE + "II", out, mmap_offset + 12, max_map_entries, n)
+    out[mmap_offset + 20:mmap_offset + 28] = b"\xff" * 8
+    struct.pack_into(BE + "i", out, mmap_offset + 28, -1)
+
+    entries_base = mmap_offset + 8 + 24
+
+    def put_entry(i, tag, size, offset, flags=0, nxt=0):
+        e = entries_base + i * 20
+        out[e:e + 4] = tag
+        struct.pack_into(BE + "II", out, e + 4, size, offset)
+        struct.pack_into(BE + "HH", out, e + 12, flags, 0)
+        struct.pack_into(BE + "i", out, e + 16, nxt)
+
+    put_entry(0, b"RIFX", total - 8, 0, flags=1)
+    put_entry(1, b"imap", imap_payload_size, imap_offset, flags=1)
+    put_entry(2, b"mmap", mmap_payload_size, mmap_offset)
+
+    for i, (tag, payload, offset) in enumerate(placed):
+        put_entry(3 + i, tag, len(payload), offset)
+        out[offset:offset + 4] = tag
+        struct.pack_into(BE + "I", out, offset + 4, len(payload))
+        out[offset + 8:offset + 8 + len(payload)] = payload
+
+    # unused map slots, mirroring the donor's 'free' entries
+    for i in range(n, max_map_entries):
+        put_entry(i, b"free", 0, 0, flags=12, nxt=-1)
+
+    return bytes(out)
+
+
+def find_tests_cpp():
+    """Locate engines/director/tests.cpp by walking up from this file."""
+    for parent in pathlib.Path(__file__).resolve().parents:
+        candidate = parent / "engines" / "director" / "tests.cpp"
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        "engines/director/tests.cpp not found; run this from a ScummVM checkout")
+
+
+def load_donor():
+    """The donor is the test movie embedded in tests.cpp: a complete D4 RIFX
+    with a text member, a shape member and a score, and free of licensing
+    concerns since it already ships with ScummVM."""
+    src = find_tests_cpp()
+    m = re.search(r"const byte testMovie\[\]\s*=\s*\{(.*?)\};",
+                  src.read_text(encoding="utf-8", errors="replace"), re.S)
+    if not m:
+        raise ValueError("testMovie[] blob not found in %s" % src)
+    data = bytes(int(x, 16) for x in re.findall(r"0x([0-9A-Fa-f]{2})", m.group(1)))
+    return rifx.RifxFile(gzip.decompress(data))
