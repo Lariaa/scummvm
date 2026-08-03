@@ -134,13 +134,20 @@ def build_key(entries, max_entries=None):
 # --------------------------------------------------------------------------
 SPRITE_TYPE_TEXT = 7            # kTextSprite (types.h:162)
 
+# Bit 0x80 of the thickness byte is set on 89% of the sprites in real D4 scores
+# (24505 of 27500 sampled across Max and Marie). ScummVM keeps the byte in
+# Sprite::_thickness but never looks at this bit before D7, so its absence costs
+# nothing there -- Director draws nothing at all without it.
+SPRITE_THICKNESS_DEFAULT = 0x80
+
 
 def sprite_d4(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0,
-              editable=False, fore=255, back=0, script_id=0):
+              editable=False, fore=255, back=0, script_id=0,
+              thickness=SPRITE_THICKNESS_DEFAULT):
     """20-byte D4 sprite record (writeSpriteDataD4, frame.cpp:742)."""
     colorcode = 0x40 if editable else 0x00
     out = bytearray()
-    out += bytes([script_id & 0xff, sprite_type, fore, back, 0, ink])
+    out += bytes([script_id & 0xff, sprite_type, fore, back, thickness, ink])
     out += struct.pack(BE + "H", cast_member)
     out += struct.pack(BE + "HH", y, x)          # startPoint: y then x
     out += struct.pack(BE + "HH", h, w)
@@ -174,7 +181,7 @@ def sprite_d6(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0, e
     out += struct.pack(BE + "I", 0)                  # spriteListIdx
     out += struct.pack(BE + "HH", y, x)
     out += struct.pack(BE + "HH", h, w)
-    out += bytes([0x40 if editable else 0x00, 0, 0, 0])
+    out += bytes([0x40 if editable else 0x00, 0, SPRITE_THICKNESS_DEFAULT, 0])
     assert len(out) == 24
     return bytes(out)
 
