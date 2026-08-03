@@ -606,6 +606,61 @@ def build_variant(profile, kind):
     return path, data
 
 
+def build_probe(profile):
+    """A bisecting movie: the donor's own score, untouched, plus our two text
+    members and nothing else -- no scripts, no generated VWSC.
+
+    Director rejects the D6 and D7 fixtures without saying why. If this one
+    loads, the cast side is sound and the fault is in the score we generate; if
+    it does not, the fault lies earlier, in the cast, the MCsL or the container.
+    """
+    donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
+    cast_text, stxt = donor_text_member(donor)
+
+    chunks = []
+
+    def add(tag, payload):
+        chunks.append((tag, payload))
+        return 3 + len(chunks) - 1
+
+    i_key = add(b"KEY*", b"")
+    i_cas = add(b"CAS*", b"")
+    i_vwsc = add(b"VWSC", donor.chunk(donor.by_tag("VWSC")[0]))
+    cloned = []
+    for tag in CLONE_TAGS:
+        for res in donor.by_tag(tag):
+            cloned.append((tag, add(tag.encode("latin1"), donor.chunk(res))))
+            break
+
+    i_cast_text = add(b"CASt", donor.chunk(cast_text))
+    i_stxt = add(b"STXT", donor.chunk(stxt))
+    i_cast_res = add(b"CASt", donor.chunk(cast_text))
+    i_stxt_res = add(b"STXT", donor.chunk(stxt))
+
+    members = [i_cast_text, i_cast_res]
+    chunks[i_cas - 3] = (b"CAS*", bm.build_cas(members))
+    for tag, idx in cloned:
+        if tag in ("DRCF", "VWCF"):
+            chunks[idx - 3] = (tag.encode("latin1"), config.set_cast_array_end(
+                chunks[idx - 3][1], len(members)))
+        elif tag == "MCsL":
+            chunks[idx - 3] = (b"MCsL", bm.build_mcsl(
+                "Internal", 1, len(members), bm.CASTLIB_KEY_PARENT))
+
+    entries = [(i_stxt, i_cast_text, b"STXT"), (i_stxt_res, i_cast_res, b"STXT"),
+               (i_cas, bm.CASTLIB_KEY_PARENT, b"CAS*"),
+               (i_vwsc, bm.CASTLIB_KEY_PARENT, b"VWSC")]
+    for tag, idx in cloned:
+        entries.append((idx, bm.CASTLIB_KEY_PARENT, tag.encode("latin1")))
+    chunks[i_key - 3] = (b"KEY*", bm.build_key(entries, max_entries=24))
+
+    data = bm.build_rifx(chunks, imap_version=donor.version)
+    path = OUT / f"probe-{profile.name}.dir"
+    path.write_bytes(data)
+    return path, data
+
+
 def report(path, data):
     print(f"wrote {path.name} ({len(data)} bytes)")
     f = rifx.RifxFile(data)
@@ -638,3 +693,4 @@ if __name__ == "__main__":
     for profile in profiles:
         for kind in ("editable", "listoverride"):
             report(*build_variant(profile, kind))
+        report(*build_probe(profile))

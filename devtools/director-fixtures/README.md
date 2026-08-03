@@ -84,6 +84,19 @@ They are kept apart from `movies/` on purpose. Unlike the D4 pair, they clone
 chunks out of a commercial movie, so they carry third party data and are not
 suitable for upstream.
 
+### movies-d6d7/probe
+
+Director rejects the D6 and D7 fixtures without saying what it dislikes. These
+two carry the donor's own score, untouched, plus the two text members and
+nothing else -- no scripts, no generated `VWSC`. Loading one of them in Director
+splits the question in a single try:
+
+* it loads -- the cast side is sound and the fault is in the score we generate
+* it does not -- the fault lies earlier, in the cast, the `MCsL` or the container
+
+They sit in a subdirectory so `directortest-all`, which does not recurse, leaves
+them out of the ScummVM sweep.
+
 Picking a donor:
 
 * It must be **unprotected**, which in practice means a `.dir` and not a `.dxr`.
