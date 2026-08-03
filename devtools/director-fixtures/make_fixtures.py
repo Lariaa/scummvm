@@ -78,19 +78,30 @@ def code_report():
             + bytes([lscr_asm.OP_PROCRET]))
 
 
+# The source kept in the cast info is not decoration: Director compiles from it,
+# and its error messages quote these very lines. It therefore needs the `global`
+# declaration just as much as the Lscr's global list does.
 def src_first(e):
-    return ("on exitFrame\r  set gEditableResult to "
-            "(the editableText of sprite %d = %d)\rend\r" % (SPRITE_CH, e))
+    return ("on exitFrame\r"
+            "  global gEditableResult\r"
+            "  set gEditableResult to (the editableText of sprite %d = %d)\r"
+            "end\r" % (SPRITE_CH, e))
 
 
 def src_append(e):
-    return ("on exitFrame\r  set gEditableResult to gEditableResult * 10 + "
-            "(the editableText of sprite %d = %d)\rend\r" % (SPRITE_CH, e))
+    return ("on exitFrame\r"
+            "  global gEditableResult\r"
+            "  set gEditableResult to gEditableResult * 10 + "
+            "(the editableText of sprite %d = %d)\r"
+            "end\r" % (SPRITE_CH, e))
 
 
 def src_report():
-    return ('on exitFrame\r  set the text of field %d to "%s" & gEditableResult\r'
-            '  put "%s" & gEditableResult\rend\r' % (RESULT_MEMBER, LABEL, LABEL))
+    return ("on exitFrame\r"
+            "  global gEditableResult\r"
+            '  set the text of field %d to "%s" & gEditableResult\r'
+            '  put "%s" & gEditableResult\r'
+            "end\r" % (RESULT_MEMBER, LABEL, LABEL))
 
 
 def make_lscr(code, script_id, consts=()):
@@ -285,9 +296,11 @@ def build_listoverride():
     report_msg = (lscr_asm.const_push(0)
                   + lscr_asm.global_push(B_GLOBAL)
                   + bytes([lscr_asm.OP_AMPERSAND]))
-    report_src = ('on exitFrame\r  set the text of field %d to "%s" & gListResult\r'
-                  '  put "%s" & gListResult\rend\r'
-                  % (RESULT_MEMBER, B_LABEL, B_LABEL))
+    report_src = ("on exitFrame\r"
+                  "  global gListResult\r"
+                  '  set the text of field %d to "%s" & gListResult\r'
+                  '  put "%s" & gListResult\r'
+                  "end\r" % (RESULT_MEMBER, B_LABEL, B_LABEL))
     report_lscr = make_lscr_b(
         (lscr_asm.intpush(RESULT_MEMBER) + report_msg
          + lscr_asm.the_field_assign(RESULT_MEMBER)
