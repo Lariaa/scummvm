@@ -555,6 +555,12 @@ def build_variant(profile, kind):
         if tag in ("DRCF", "VWCF"):
             chunks[idx - 3] = (tag.encode("latin1"), config.set_cast_array_end(
                 chunks[idx - 3][1], len(members)))
+        elif tag == "MCsL":
+            # Built rather than cloned: from D5 on the member range and the
+            # library resource id come from here and override castArrayEnd, so
+            # a donor's mapping would describe the donor's libraries, not ours.
+            chunks[idx - 3] = (b"MCsL", bm.build_mcsl(
+                "Internal", 1, len(members), bm.CASTLIB_KEY_PARENT))
 
     key_entries = [(i_stxt, i_cast_text, b"STXT"), (i_stxt_res, i_cast_res, b"STXT"),
                    (i_cas, bm.CASTLIB_KEY_PARENT, b"CAS*"),

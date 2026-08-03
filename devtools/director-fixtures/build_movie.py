@@ -109,6 +109,49 @@ def build_lctx(lscr_indices, lnam_index):
     return bytes(out)
 
 
+def build_mcsl(name="Internal", min_member=1, max_member=1,
+               lib_resource_id=CASTLIB_KEY_PARENT):
+    """MCsL, the cast library mapping D5 and later use.
+
+    From D5 on this, not the config chunk, is where the member range and the
+    library's resource id come from (Movie::loadCastLibMapping, movie.cpp:154),
+    and it overrides whatever castArrayEnd says. Cloning a donor's MCsL
+    therefore imports its library layout -- for a movie with three libraries and
+    a resource id of 0x10400 that leaves nothing that matches the fixture.
+
+    Layout: a 12 byte header, then at dataOffset an offset table of
+    count * itemsPerCast + 1 entries, the items length, and the items. Per
+    library: item 1 is the name as a Pascal string, item 2 the path (empty for
+    an internal cast), item 3 the preload setting, item 4 the member range and
+    resource id.
+    """
+    name_b = name.encode("latin1")
+    items = [b"",                                           # 0, unused
+             bytes([len(name_b)]) + name_b + b"\0",         # 1, name
+             b"",                                           # 2, path
+             struct.pack(BE + "H", 0),                      # 3, preload
+             struct.pack(BE + "HHI", min_member, max_member, lib_resource_id)]
+
+    offsets, pos = [], 0
+    for it in items:
+        offsets.append(pos)
+        pos += len(it)
+
+    out = bytearray()
+    out += struct.pack(BE + "I", 12)            # dataOffset
+    out += struct.pack(BE + "H", 0)             # unknown
+    out += struct.pack(BE + "H", 1)             # count: one library
+    out += struct.pack(BE + "H", 4)             # itemsPerCast
+    out += struct.pack(BE + "H", 0)             # padding up to dataOffset
+    out += struct.pack(BE + "H", len(items))
+    for off in offsets:
+        out += struct.pack(BE + "I", off)
+    out += struct.pack(BE + "I", pos)           # itemsLen
+    for it in items:
+        out += it
+    return bytes(out)
+
+
 def build_cas(cast_indices):
     """CAS* is a positional u32 array: slot i holds the mmap index of the CASt
     for cast member i+1, or 0 (RIFXArchive::writeCast)."""
