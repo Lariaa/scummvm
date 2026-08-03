@@ -195,7 +195,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
                parent_number=-1, unk_block=None, unk3=0, script_flags=0,
                unk4=b"\0" * 4, factory_name_id=-1,
                event_map=None, event_map_flags=0, name_gap=b"",
-               func_unk0=10, consts=(), properties=(),
+               func_unk0=10, consts=(), properties=(), global_names=(),
                const_entry_size=CONST_ENTRY_SIZE):
     """Serialises one Lscr chunk. `handlers` is a list of Handler,
     `consts` a list of strings referenced by const_push()."""
@@ -230,10 +230,19 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
     if cur() % 2:
         body += b"\0"
 
-    # 3. property list, then the function table
+    # 3. property list, global list, then the function table.
+    #
+    # The global list is how a script declares which names are globals, the
+    # equivalent of writing `global gFoo` in the source. ScummVM creates a
+    # global on first use and so never misses it (cb_globalpush), but Director
+    # treats an undeclared name as a local and refuses it with "Variable used
+    # before assigned a value".
     properties_offset = cur()
     for p in properties:
         body += struct.pack(">h", p)
+    globals_offset = cur()
+    for g in global_names:
+        body += struct.pack(">h", g)
     functions_offset = cur()
     for h, start, ao, vo in zip(handlers, starts, arg_offsets, var_offsets):
         body += struct.pack(">HHII", h.name_index, func_unk0, len(h.code), start)
@@ -269,7 +278,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
     head += struct.pack(">Hh", assembly_id, factory_name_id)
     head += struct.pack(">HII", len(event_map), event_map_offset, event_map_flags)
     head += struct.pack(">HI", len(properties), properties_offset)
-    head += struct.pack(">HI", 0, functions_offset)      # globals (none)
+    head += struct.pack(">HI", len(global_names), globals_offset)
     head += struct.pack(">HI", len(handlers), functions_offset)
     head += struct.pack(">HI", len(consts), consts_offset)
     head += struct.pack(">II", len(consts), consts_store_offset)

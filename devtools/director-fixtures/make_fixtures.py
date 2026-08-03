@@ -98,7 +98,7 @@ def make_lscr(code, script_id, consts=()):
     return lscr_asm.build_lscr([h], script_id=script_id, assembly_id=script_id,
                                event_map=[-1] * 10 + [0],
                                event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
-                               consts=consts)
+                               consts=consts, global_names=[I_GLOBAL])
 
 
 def build_editable():
@@ -258,7 +258,7 @@ def build_listoverride():
     factory_lscr = lscr_asm.build_lscr(
         [m_new, m_getlast], script_id=1, assembly_id=1,
         script_flags=lscr_asm.SCRIPT_FLAG_FACTORY_DEF,
-        factory_name_id=B_FACTORY,
+        factory_name_id=B_FACTORY, global_names=[B_GLOBAL],
         # parentNumber is an index into the Lctx entry list, not a flag, and
         # LingoDec resolves it as scripts[parentNumber + 1] to decide which
         # script owns the factory (lingodec/context.cpp:55). The list is
@@ -349,7 +349,7 @@ def make_lscr_b(code, script_id, consts=()):
     return lscr_asm.build_lscr([h], script_id=script_id, assembly_id=script_id,
                                event_map=[-1] * 10 + [0],
                                event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
-                               consts=consts)
+                               consts=consts, global_names=[B_GLOBAL])
 
 
 # --------------------------------------------------------------------------
@@ -427,12 +427,13 @@ def donor_text_member(donor):
     raise ValueError("donor has no text member with an STXT")
 
 
-def make_lscr_for(profile, name_index, code, script_id, consts=()):
+def make_lscr_for(profile, name_index, code, script_id, consts=(),
+                  global_names=()):
     h = lscr_asm.Handler(name_index, code)
     return lscr_asm.build_lscr([h], script_id=script_id, assembly_id=script_id,
                                event_map=[-1] * 10 + [0],
                                event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
-                               consts=consts,
+                               consts=consts, global_names=global_names,
                                const_entry_size=profile.const_entry)
 
 
@@ -506,7 +507,7 @@ def build_variant(profile, kind):
             cast_script_idx.append(add(b"CASt", bm.build_script_cast(
                 i, nm, src, bm.SCRIPT_TYPE_SCORE, d5plus=profile.d5plus)))
             lscr_idx.append(add(b"Lscr", make_lscr_for(
-                profile, 0, code, i, consts)))
+                profile, 0, code, i, consts, global_names=[2])))
     else:
         m_new = lscr_asm.Handler(
             B_MNEW,
@@ -524,7 +525,7 @@ def build_variant(profile, kind):
             script_flags=lscr_asm.SCRIPT_FLAG_FACTORY_DEF,
             # see the note in build_listoverride: entry 1 must not own itself
             factory_name_id=B_FACTORY, parent_number=1, properties=[-1],
-            consts=["IN_OUT", "LINTRANS", "METHOD"],
+            global_names=[B_GLOBAL], consts=["IN_OUT", "LINTRANS", "METHOD"],
             const_entry_size=profile.const_entry)
         msg = (const_push(0) + lscr_asm.global_push(B_GLOBAL)
                + bytes([lscr_asm.OP_AMPERSAND]))
@@ -544,7 +545,8 @@ def build_variant(profile, kind):
             cast_script_idx.append(add(b"CASt", bm.build_script_cast(
                 sid, nm, "", bm.SCRIPT_TYPE_SCORE, d5plus=profile.d5plus)))
             lscr_idx.append(add(b"Lscr", make_lscr_for(
-                profile, B_EXITFRAME, code, sid, consts)))
+                profile, B_EXITFRAME, code, sid, consts,
+                global_names=[B_GLOBAL])))
 
     i_lnam = add(b"Lnam", lscr.build_lnam(names))
     i_lctx = add(b"Lctx", bm.build_lctx(lscr_idx, i_lnam))
