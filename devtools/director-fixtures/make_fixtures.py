@@ -27,7 +27,7 @@ editable.dir -- covers
       110  isDirty fix missing (the editable-only transition is skipped)
 """
 import struct, pathlib
-import rifx, lscr, lscr_asm, build_movie as bm
+import rifx, lscr, lscr_asm, config, build_movie as bm
 
 OUT = pathlib.Path(__file__).parent / "out"
 OUT.mkdir(exist_ok=True)
@@ -152,6 +152,8 @@ def build_editable():
     script_member = {i: 4 + i for i in range(len(scripts))}   # members 4..7
 
     chunks[i_cas - 3] = (b"CAS*", bm.build_cas(members))
+    chunks[i_vwcf - 3] = (b"VWCF", config.set_cast_array_end(
+        chunks[i_vwcf - 3][1], len(members)))
 
     key_entries = [
         (i_stxt, i_cast_text, b"STXT"),
@@ -310,6 +312,8 @@ def build_listoverride():
     MEMBER_RUN, MEMBER_REP = 5, 6
 
     chunks[i_cas - 3] = (b"CAS*", bm.build_cas(members))
+    chunks[i_vwcf - 3] = (b"VWCF", config.set_cast_array_end(
+        chunks[i_vwcf - 3][1], len(members)))
     chunks[i_key - 3] = (b"KEY*", bm.build_key([
         (i_stxt, i_cast_text, b"STXT"),
         (i_stxt_res, i_cast_res, b"STXT"),
@@ -547,6 +551,10 @@ def build_variant(profile, kind):
 
     members = [i_cast_text, i_cast_res] + cast_script_idx
     chunks[i_cas - 3] = (b"CAS*", bm.build_cas(members))
+    for tag, idx in cloned:
+        if tag in ("DRCF", "VWCF"):
+            chunks[idx - 3] = (tag.encode("latin1"), config.set_cast_array_end(
+                chunks[idx - 3][1], len(members)))
 
     key_entries = [(i_stxt, i_cast_text, b"STXT"), (i_stxt_res, i_cast_res, b"STXT"),
                    (i_cas, bm.CASTLIB_KEY_PARENT, b"CAS*"),
