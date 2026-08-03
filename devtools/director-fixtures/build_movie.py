@@ -132,8 +132,11 @@ def build_key(entries, max_entries=None):
 # --------------------------------------------------------------------------
 # score
 # --------------------------------------------------------------------------
-def sprite_d4(*, cast_member, x, y, w, h, sprite_type=1, ink=0, editable=False,
-              fore=255, back=0, script_id=0):
+SPRITE_TYPE_TEXT = 7            # kTextSprite (types.h:162)
+
+
+def sprite_d4(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0,
+              editable=False, fore=255, back=0, script_id=0):
     """20-byte D4 sprite record (writeSpriteDataD4, frame.cpp:742)."""
     colorcode = 0x40 if editable else 0x00
     out = bytearray()
@@ -161,7 +164,7 @@ def main_channel_d4(*, action_id=0, tempo=0):
     return bytes(out)
 
 
-def sprite_d6(*, cast_member, x, y, w, h, sprite_type=1, ink=0, editable=False,
+def sprite_d6(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0, editable=False,
               fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
     """24-byte D6 sprite record (writeSpriteDataD6, frame.cpp).
     The editable bit is still 0x40, but colorcode moved to byte 20."""
@@ -176,7 +179,7 @@ def sprite_d6(*, cast_member, x, y, w, h, sprite_type=1, ink=0, editable=False,
     return bytes(out)
 
 
-def sprite_d7(*, cast_member, x, y, w, h, sprite_type=1, ink=0, editable=False,
+def sprite_d7(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0, editable=False,
               fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
     """48-byte D7 sprite record; the first 23 bytes match D6."""
     out = bytearray(sprite_d6(cast_member=cast_member, x=x, y=y, w=w, h=h,
