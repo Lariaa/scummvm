@@ -674,6 +674,59 @@ def build_probe(profile):
     return path, data
 
 
+def build_probe_d4():
+    """The D4 counterpart of build_probe: our container and cast, but the
+    donor's own score, which holds one frame with one sprite.
+
+    Director 5 loads editable.dir and shows its cast correctly, yet its score
+    window stays empty. If this movie shows the donor's sprite, the container
+    and the cast are fine and the fault is in the VWSC we generate; if it does
+    not, the score is being rejected for a reason that has nothing to do with
+    how we lay out frames.
+    """
+    donor = bm.load_donor()
+    keep = {}
+    for r in donor.resources:
+        if r.tag in ("VWCF", "Sord", "VWFI", "VWFM", "CASt", "STXT", "VWSC"):
+            keep.setdefault(r.tag, []).append(r)
+
+    chunks = []
+
+    def add(tag, payload):
+        chunks.append((tag, payload))
+        return 3 + len(chunks) - 1
+
+    i_key = add(b"KEY*", b"")
+    i_vwcf = add(b"VWCF", donor.chunk(keep["VWCF"][0]))
+    i_cas = add(b"CAS*", b"")
+    i_sord = add(b"Sord", donor.chunk(keep["Sord"][0]))
+    i_vwfi = add(b"VWFI", donor.chunk(keep["VWFI"][0]))
+    i_vwfm = add(b"VWFM", donor.chunk(keep["VWFM"][0]))
+    i_vwsc = add(b"VWSC", donor.chunk(keep["VWSC"][0]))     # untouched
+    i_cast_text = add(b"CASt", donor.chunk(keep["CASt"][0]))
+    i_stxt = add(b"STXT", donor.chunk(keep["STXT"][0]))
+    i_cast_shape = add(b"CASt", donor.chunk(keep["CASt"][1]))
+
+    members = [i_cast_text, i_cast_shape]
+    chunks[i_cas - 3] = (b"CAS*", bm.build_cas(members))
+    chunks[i_vwcf - 3] = (b"VWCF", config.set_cast_array_end(
+        chunks[i_vwcf - 3][1], len(members)))
+    chunks[i_key - 3] = (b"KEY*", bm.build_key([
+        (i_stxt, i_cast_text, b"STXT"),
+        (i_cas, bm.CASTLIB_KEY_PARENT, b"CAS*"),
+        (i_sord, bm.CASTLIB_KEY_PARENT, b"Sord"),
+        (i_vwcf, bm.CASTLIB_KEY_PARENT, b"VWCF"),
+        (i_vwfi, bm.CASTLIB_KEY_PARENT, b"VWFI"),
+        (i_vwfm, bm.CASTLIB_KEY_PARENT, b"VWFM"),
+        (i_vwsc, bm.CASTLIB_KEY_PARENT, b"VWSC"),
+    ], max_entries=16))
+
+    data = bm.build_rifx(chunks)
+    path = OUT / "probe-d4.dir"
+    path.write_bytes(data)
+    return path, data
+
+
 def report(path, data):
     print(f"wrote {path.name} ({len(data)} bytes)")
     f = rifx.RifxFile(data)
@@ -693,7 +746,7 @@ if __name__ == "__main__":
     ap.add_argument("--d7", metavar="MOVIE", help="likewise for D7")
     args = ap.parse_args()
 
-    for builder in (build_editable, build_listoverride):
+    for builder in (build_editable, build_listoverride, build_probe_d4):
         report(*builder())
 
     profiles = []
