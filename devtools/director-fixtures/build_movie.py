@@ -231,7 +231,8 @@ def build_vwsc_d6plus(frames, *, main_size, spr_size, frames_version,
     """
     header, body, frame_offsets = _score_header_and_frames(
         frames, main_size=main_size, spr_size=spr_size,
-        frames_version=frames_version, num_channels=num_channels)
+        frames_version=frames_version, num_channels=num_channels,
+        declared_frames=0)
     data = header + body
 
     num_entries = len(frames) + 1
@@ -255,7 +256,7 @@ def build_vwsc_d6plus(frames, *, main_size, spr_size, frames_version,
 
 
 def _score_header_and_frames(frames, *, main_size, spr_size, frames_version,
-                             num_channels):
+                             num_channels, declared_frames=None):
     """The score header and frame blocks shared by every version from D4 on."""
     body = bytearray()
     offsets = []
@@ -274,7 +275,11 @@ def _score_header_and_frames(frames, *, main_size, spr_size, frames_version,
     header = bytearray()
     header += struct.pack(BE + "I", frame1_offset + len(body))
     header += struct.pack(BE + "I", frame1_offset)
-    header += struct.pack(BE + "I", len(frames))
+    # Every real D6 movie surveyed carries 0 here and lets the reader count the
+    # frames from the offset table instead; ScummVM does exactly that
+    # ("numOfFrames in the header is often incorrect", score.cpp:1999).
+    header += struct.pack(BE + "I",
+                          len(frames) if declared_frames is None else declared_frames)
     header += struct.pack(BE + "HH", frames_version, spr_size)
     header += struct.pack(BE + "H", num_channels)
     header += struct.pack(BE + "H", 0x0100)          # skipped for framesVersion <= 13
