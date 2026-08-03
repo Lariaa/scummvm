@@ -298,6 +298,26 @@ def build_vwsc_d6plus(frames, *, main_size, spr_size, frames_version,
     return bytes(out)
 
 
+def _split_channel(channel, offset, payload, main_size, spr_size):
+    """Turns one channel's state into the chunk shape real movies use.
+
+    Director never writes a channel in one piece: sampled D4 scores emit the
+    sprite record as 16 bytes at the channel start and the remaining four --
+    script id, colour code, blend -- separately, and touch the main channel only
+    where something changed, typically two bytes at offset 16 for the frame
+    script. Writing the whole record instead is accepted by ScummVM, whose
+    reader takes any (size, offset) pair, but leaves Director's score empty.
+    """
+    if channel == 0:
+        # Only the frame script, which is all our main channel ever carries.
+        # D4 keeps it in one u16 at offset 16; D6 and D7 use two, a cast lib and
+        # a member, at offsets 0 and 2 (readMainChannelsD4 vs D6/D7).
+        if main_size == MAIN_CHANNEL_SIZE_D4:
+            return [(offset + 16, payload[16:18])]
+        return [(offset, payload[:4])]
+    return [(offset, payload[:16]), (offset + 16, payload[16:spr_size])]
+
+
 def _score_header_and_frames(frames, *, main_size, spr_size, frames_version,
                              num_channels, declared_frames=None):
     """The score header and frame blocks shared by every version from D4 on."""
@@ -309,8 +329,12 @@ def _score_header_and_frames(frames, *, main_size, spr_size, frames_version,
         for ch in sorted(chans):
             payload = chans[ch]
             offset = 0 if ch == 0 else main_size + (ch - 1) * spr_size
-            frame += struct.pack(BE + "HH", len(payload), offset)
-            frame += payload
+            for off, part in _split_channel(ch, offset, payload,
+                                            main_size, spr_size):
+                if not part:
+                    continue
+                frame += struct.pack(BE + "HH", len(part), off)
+                frame += part
         body += struct.pack(BE + "H", len(frame) + 2)
         body += frame
 
@@ -340,8 +364,13 @@ def build_vwsc(frames, num_channels=50):
         for ch in sorted(chans):
             data = chans[ch]
             offset = 0 if ch == 0 else MAIN_CHANNEL_SIZE_D4 + (ch - 1) * SPR_CHANNEL_SIZE_D4
-            frame += struct.pack(BE + "HH", len(data), offset)
-            frame += data
+            for off, part in _split_channel(ch, offset, data,
+                                            MAIN_CHANNEL_SIZE_D4,
+                                            SPR_CHANNEL_SIZE_D4):
+                if not part:
+                    continue
+                frame += struct.pack(BE + "HH", len(part), off)
+                frame += part
         body += struct.pack(BE + "H", len(frame) + 2)
         body += frame
 
