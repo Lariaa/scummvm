@@ -1,16 +1,24 @@
-# Director 4 regression fixtures
+# Director regression fixtures
 
-Generates small Director 4 movies that make specific engine regressions visible.
+Generates small Director movies that make specific engine regressions visible.
 The movies use nothing but stock Lingo, so they run in real Director as well as
 in ScummVM, and each one prints its verdict into a field on stage (and via `put`,
 which reaches the ScummVM log and Director's Message window).
 
+Status: the D4 pair is proven -- `editable.dir` reports `editable 101` on an
+upstream build and `editable 111` on one with the fixes, which is exactly what it
+exists to distinguish. The D6 and D7 variants load and render in ScummVM but
+Director still refuses them, and their frame scripts do not run; see the trap
+lists at the end before touching them.
+
 ## Running the movies
 
-    scummvm -p devtools/director-fixtures/movies directortest-all
+    scummvm -p devtools/director-fixtures/movies --debugflags=noloop directortest-all
 
 The directory carries the empty `lingotests-all` marker file that the
-`directortest-all` target detects.
+`directortest-all` target detects. Without `noloop` a movie restarts at frame 1
+forever instead of handing over to the next one (`score.cpp:477`), so a plain run
+never terminates.
 
 In Director, open the `.dir` directly and play it. Do not save: Director 6 and
 later convert the file format on save. Each script cast member also carries its
@@ -138,19 +146,59 @@ byte-level specification:
 `on exitFrame / updateStage / end`), which is what the assembler is checked
 against. ProjectorRays decompiles `editable.dir` back to the intended Lingo.
 
-### Traps worth remembering
+### Traps ScummVM will tell you about
 
 * A script cast member's info block needs **seven** strings. String 0 is the raw
   source, string 1 the name as a *Pascal* string -- `Cast::loadCastInfo` reads
   them as `strings[0].readString(false)` and `strings[1].readString()`. Fewer
   entries make readers run off the end of the block.
-* `castArrayEnd` in `VWCF` only gates the D2/D3 path; D4 loads members through
-  `getResourceIDList('CASt')`. Leave `VWCF` alone and its checksum stays valid.
 * mmap entries start at `mmapOffset + 8 + headerSize`; the header size does not
   count the 8 byte tag+size preamble.
 * `Frame::readChannel()` dispatches on the *movie* version, not on the score
   header, so anything testing the editable bit has to be a D4+ movie.
 * The bounds checks in `compileLingoV4` are `>=`, so handler code and the name
   arrays must end strictly before the end of the chunk.
-* For a factory, `parentNumber` is an index, not a flag. ScummVM never reads it,
-  but decompilers do.
+* The D6+ score wraps the familiar header and frames in an offset table; entry 0
+  is the header, entry n is frame n.
+* Constant index entries are 6 bytes on D4 and 8 from D5 on, which also scales
+  the operand of the constant push opcode.
+* From D5 on, `the text of field` takes a cast lib, pushed after the member.
+
+### Traps only Director will tell you about
+
+Everything in this list was invisible to ScummVM -- it is tolerant, or derives
+the value itself -- and every one of them was found by loading the movie in
+Director and reading the error. If you change the generator, assume this list is
+incomplete and test in Director before believing it works.
+
+| Field | Must be | Why ScummVM does not care |
+| ----- | ------- | ------------------------- |
+| `imap` version | the real version (0 for D4, 0x4c7 for D6, 0x57e for D7) | it takes the version from the config chunk |
+| config `protection` (offset 58) | not a multiple of 23, i.e. an unprotected donor | protection does not gate loading |
+| config `castArrayEnd` (offset 14) | the actual member count, **with the checksum recomputed** | it loads members from `CAS*`, and only reads the field on the D2/D3 path |
+| `MCsL` min/maxMember and libResourceId (D5+) | built to match the movie, never cloned | ditto -- and it overrides `castArrayEnd` |
+| sprite type (record byte 1) | the type of the member, 7 for text | it overwrites the score's value from the cast member (`sprite.cpp:550`) |
+| sprite thickness bit 0x80 | set, as on 89% of real D4 sprites | the byte is only ever compared before D7 |
+| factory `parentNumber` | an index at another script, never its own | it stores the field and never reads it |
+| `Lscr` global list | every global the script touches | it creates a global on first use |
+| **the Lingo source in the cast info** | the same `global` declarations as the bytecode | it runs the bytecode and ignores the source |
+
+The last one is the one to remember: the source kept next to the bytecode is not
+documentation. Director compiles from it, and its error messages quote those
+lines. ProjectorRays reads the bytecode, so it will happily confirm a script the
+source contradicts -- the two have to be kept in step by hand.
+
+### If Director refuses a movie
+
+Its messages are terse but specific, and each one so far pointed straight at a
+field:
+
+| Message | It meant |
+| ------- | -------- |
+| `Could not find chunk: ChunkID='FCWV'` | the config chunk was not usable; 'FCWV' is how a Windows build prints 'VWCF' |
+| `Problem reading file ...: -50` | `paramErr` -- a resource was described but absent, in our case by a cloned `MCsL` |
+| `Script error: Variable used before assigned a value` | an undeclared global, in the *source* rather than the bytecode |
+
+`movies-d6d7/probe` exists to split "the score is wrong" from "something earlier
+is wrong" in a single load attempt; build the same kind of cut-down movie when a
+new failure appears rather than guessing at fields.
