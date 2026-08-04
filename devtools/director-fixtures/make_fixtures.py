@@ -814,3 +814,113 @@ def build_ladder():
          for i in range(4)]))
 
     return made
+
+
+# --------------------------------------------------------------------------
+# Bisection ladder for the D6/D7 load failure
+#
+# Unlike D4, even probe-d6/d7 -- which carries the donor's own score -- is
+# refused, so the fault lies before the score. These walk from a faithful copy
+# of the donor towards our fixture, one transformation at a time.
+#
+# Note what the first step already exercises: rebuilding the container renumbers
+# every mmap index, and KEY* refers to chunks by index, so its entries have to
+# be remapped. Cloning a KEY* verbatim into a rebuilt container would point
+# every relationship at the wrong chunk.
+# --------------------------------------------------------------------------
+DROPPED_TAGS = ("VWLB", "VERS", "FCOL", "XTRl", "SCRF", "XMED", "Fmap", "Cinf")
+
+
+def _remap_lctx(chunk, old_to_new):
+    """Lctx points at chunks by mmap index too -- its nameTableId names the Lnam
+    and every entry names an Lscr -- so renumbering the map breaks it just as it
+    breaks KEY*. Missing this is why the faithful clones crashed ProjectorRays
+    while the more heavily rewritten ones did not."""
+    out = bytearray(chunk)
+    name_table = struct.unpack_from(">i", out, 32)[0]
+    if name_table in old_to_new:
+        struct.pack_into(">i", out, 32, old_to_new[name_table])
+
+    count = struct.unpack_from(">i", out, 8)[0]
+    items_offset = struct.unpack_from(">H", out, 16)[0]
+    entry_size = struct.unpack_from(">H", out, 18)[0] or 12
+    for i in range(count):
+        pos = items_offset + i * entry_size + 4
+        if pos + 4 > len(out):
+            break
+        idx = struct.unpack_from(">i", out, pos)[0]
+        if idx in old_to_new:
+            struct.pack_into(">i", out, pos, old_to_new[idx])
+    return bytes(out)
+
+
+def build_donor_clone(donor_path, out_name, drop=(), rebuild_mcsl=False,
+                      patch_config=False):
+    """Re-emits a donor through our own container writer.
+
+    `drop` names tags to leave out, `rebuild_mcsl` swaps in a generated cast
+    library mapping, `patch_config` rewrites castArrayEnd and the checksum. With
+    all three off the result should be the donor in everything but chunk order
+    and mmap numbering.
+    """
+    donor = bm.load_donor(donor_path)
+    keep = [r for r in donor.resources
+            if r.tag not in ("RIFX", "XFIR", "imap", "mmap", "free", "junk")
+            and r.tag not in drop]
+
+    chunks, old_to_new = [], {}
+    for res in keep:
+        payload = donor.chunk(res)
+        chunks.append([res.tag.encode("latin1"), payload])
+        old_to_new[res.index] = 3 + len(chunks) - 1
+
+    # KEY* refers to chunks by mmap index, which we have just renumbered
+    key_src = donor.chunk(donor.by_tag("KEY*")[0])
+    used = struct.unpack(">I", key_src[8:12])[0]
+    entries = []
+    for i in range(used):
+        off = 12 + i * 12
+        child, parent = struct.unpack(">II", key_src[off:off + 8])
+        tag = key_src[off + 8:off + 12]
+        if child not in old_to_new:
+            continue                     # child was dropped
+        # a parent is either another chunk or a cast library id such as 1024
+        entries.append((old_to_new[child], old_to_new.get(parent, parent), tag))
+
+    for chunk in chunks:
+        if chunk[0] == b"KEY*":
+            chunk[1] = bm.build_key(entries, max_entries=max(24, len(entries)))
+        elif chunk[0] == b"Lctx":
+            chunk[1] = _remap_lctx(chunk[1], old_to_new)
+        elif rebuild_mcsl and chunk[0] == b"MCsL":
+            cas = donor.chunk(donor.by_tag("CAS*")[0])
+            chunk[1] = bm.build_mcsl("Internal", 1, len(cas) // 4,
+                                     bm.CASTLIB_KEY_PARENT)
+        elif patch_config and chunk[0] in (b"DRCF", b"VWCF"):
+            cas = donor.chunk(donor.by_tag("CAS*")[0])
+            chunk[1] = config.set_cast_array_end(chunk[1], len(cas) // 4)
+
+    data = bm.build_rifx([(t, p) for t, p in chunks],
+                         imap_version=donor.version)
+    path = OUT / out_name
+    path.write_bytes(data)
+    return path, data
+
+
+def build_ladder_d6d7(profile):
+    """v1 the donor through our container, v2 without the chunks we normally
+    drop, v3 with a generated MCsL, v4 with the config patched as well."""
+    n = profile.name
+    made = []
+    for letter, what, kw in (
+            ("1", "donor through our container", {}),
+            ("2", "without the chunks we drop", {"drop": DROPPED_TAGS}),
+            ("3", "plus a generated MCsL",
+             {"drop": DROPPED_TAGS, "rebuild_mcsl": True}),
+            ("4", "plus the patched config",
+             {"drop": DROPPED_TAGS, "rebuild_mcsl": True,
+              "patch_config": True})):
+        path, data = build_donor_clone(profile.donor, f"ladder-{n}-{letter}.dir",
+                                       **kw)
+        made.append((f"{n}-{letter}", what, path.name, len(data)))
+    return made
