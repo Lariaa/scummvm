@@ -395,6 +395,82 @@ def build_vwsc(frames, num_channels=50):
 # --------------------------------------------------------------------------
 # RIFX container
 # --------------------------------------------------------------------------
+def rebuild_preserving_indices(donor, *, imap_version=None):
+    """Re-emits every resource of `donor` at its original mmap index.
+
+    build_rifx() renumbers, which forces KEY* and Lctx to be rewritten -- the
+    largest edit in what is meant to be a faithful copy. Here the numbering is
+    kept, so every cross reference in the file stays valid untouched and only
+    the offsets move. Free and junk entries are carried along, since the donor
+    counts them in its used count.
+    """
+    entries = sorted(donor.resources, key=lambda r: r.index)
+    count = entries[-1].index + 1
+    header_size, entry_size = 24, 20
+
+    imap_offset = 12
+    mmap_offset = imap_offset + 8 + 24
+    pos = mmap_offset + 8 + header_size + count * entry_size
+
+    placed = {}
+    for res in entries:
+        if res.tag in ("RIFX", "XFIR", "imap", "mmap"):
+            continue
+        if res.size == 0 and res.offset == 0:
+            continue                       # a free slot, no payload to move
+        placed[res.index] = (res.tag.encode("latin1"), donor.chunk(res), pos)
+        pos += 8 + res.size
+        if pos % 2:
+            pos += 1
+    total = pos
+
+    out = bytearray(total)
+    out[0:4] = b"RIFX"
+    struct.pack_into(BE + "I", out, 4, total - 8)
+    out[8:12] = donor.rifx_type.encode("latin1")
+
+    out[imap_offset:imap_offset + 4] = b"imap"
+    struct.pack_into(BE + "I", out, imap_offset + 4, 24)
+    struct.pack_into(BE + "III", out, imap_offset + 8, 1, mmap_offset,
+                     donor.version if imap_version is None else imap_version)
+
+    out[mmap_offset:mmap_offset + 4] = b"mmap"
+    struct.pack_into(BE + "I", out, mmap_offset + 4,
+                     header_size + count * entry_size)
+    struct.pack_into(BE + "HH", out, mmap_offset + 8, header_size, entry_size)
+    struct.pack_into(BE + "II", out, mmap_offset + 12, count, count)
+    out[mmap_offset + 20:mmap_offset + 28] = b"\xff" * 8
+    struct.pack_into(BE + "i", out, mmap_offset + 28, -1)
+
+    base = mmap_offset + 8 + header_size
+    for res in entries:
+        e = base + res.index * entry_size
+        if res.tag == "RIFX" or res.tag == "XFIR":
+            out[e:e + 4] = b"RIFX"
+            struct.pack_into(BE + "II", out, e + 4, total - 8, 0)
+        elif res.tag == "imap":
+            out[e:e + 4] = b"imap"
+            struct.pack_into(BE + "II", out, e + 4, 24, imap_offset)
+        elif res.tag == "mmap":
+            out[e:e + 4] = b"mmap"
+            struct.pack_into(BE + "II", out, e + 4,
+                             header_size + count * entry_size, mmap_offset)
+        elif res.index in placed:
+            tag, payload, offset = placed[res.index]
+            out[e:e + 4] = tag
+            struct.pack_into(BE + "II", out, e + 4, len(payload), offset)
+            out[offset:offset + 4] = tag
+            struct.pack_into(BE + "I", out, offset + 4, len(payload))
+            out[offset + 8:offset + 8 + len(payload)] = payload
+        else:
+            out[e:e + 4] = res.tag.encode("latin1")
+            struct.pack_into(BE + "II", out, e + 4, 0, 0)
+        struct.pack_into(BE + "HH", out, e + 12, res.flags, res.unk1)
+        struct.pack_into(BE + "I", out, e + 16, res.next_free & 0xFFFFFFFF)
+
+    return bytes(out)
+
+
 def build_rifx(chunks, *, rifx_type=b"MV93", max_map_entries=None,
                imap_version=0):
     """chunks: list of (tag, payload) in mmap index order, starting at index 3
