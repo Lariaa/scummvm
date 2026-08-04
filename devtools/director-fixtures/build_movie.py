@@ -177,14 +177,18 @@ def build_key(entries, max_entries=None):
 # --------------------------------------------------------------------------
 SPRITE_TYPE_TEXT = 7            # kTextSprite (types.h:162)
 
-# Bit 0x80 of the thickness byte is set on 89% of the sprites in real D4 scores
-# (24505 of 27500 sampled across Max and Marie). ScummVM keeps the byte in
-# Sprite::_thickness but never looks at this bit before D7, so its absence costs
-# nothing there -- Director draws nothing at all without it.
-SPRITE_THICKNESS_DEFAULT = 0x80
+# Taken from the donor's own sprite records, which probe-d4.dir proves Director
+# renders inside our container. An earlier attempt put 0x80 in the thickness
+# byte, going by a histogram over accumulated frame state -- but that state is
+# rebuilt from partial channel writes, so unwritten bytes carried over from
+# other channels and the count meant nothing. The donor has 0 there and 0x80 in
+# the ink byte, where it reads as Sprite::_stretch.
+SPRITE_THICKNESS_DEFAULT = 0x00
+SPRITE_INK_DEFAULT = 0x80
 
 
-def sprite_d4(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0,
+def sprite_d4(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT,
+              ink=SPRITE_INK_DEFAULT,
               editable=False, fore=255, back=0, script_id=0,
               thickness=SPRITE_THICKNESS_DEFAULT):
     """20-byte D4 sprite record (writeSpriteDataD4, frame.cpp:742)."""
@@ -214,7 +218,8 @@ def main_channel_d4(*, action_id=0, tempo=0):
     return bytes(out)
 
 
-def sprite_d6(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0, editable=False,
+def sprite_d6(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT,
+              ink=SPRITE_INK_DEFAULT, editable=False,
               fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
     """24-byte D6 sprite record (writeSpriteDataD6, frame.cpp).
     The editable bit is still 0x40, but colorcode moved to byte 20."""
@@ -229,7 +234,8 @@ def sprite_d6(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0, e
     return bytes(out)
 
 
-def sprite_d7(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT, ink=0, editable=False,
+def sprite_d7(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT,
+              ink=SPRITE_INK_DEFAULT, editable=False,
               fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
     """48-byte D7 sprite record; the first 23 bytes match D6."""
     out = bytearray(sprite_d6(cast_member=cast_member, x=x, y=y, w=w, h=h,
