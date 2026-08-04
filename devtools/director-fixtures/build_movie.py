@@ -395,7 +395,8 @@ def build_vwsc(frames, num_channels=50):
 # --------------------------------------------------------------------------
 # RIFX container
 # --------------------------------------------------------------------------
-def rebuild_preserving_indices(donor, *, imap_version=None):
+def rebuild_preserving_indices(donor, *, imap_version=None, rewrite_key=False,
+                               extra=(), extra_key=(), replace=None):
     """Re-emits every resource of `donor` at its original mmap index.
 
     build_rifx() renumbers, which forces KEY* and Lctx to be rewritten -- the
@@ -406,6 +407,12 @@ def rebuild_preserving_indices(donor, *, imap_version=None):
     """
     entries = sorted(donor.resources, key=lambda r: r.index)
     count = entries[-1].index + 1
+    replace = dict(replace or {})
+    # appended chunks take the indices after the donor's, so nothing the donor
+    # already references has to move
+    appended = [(3 + 0, tag, payload) for tag, payload in ()]   # placeholder
+    extra_start = count
+    count += len(extra)
     header_size, entry_size = 24, 20
 
     imap_offset = 12
@@ -418,8 +425,14 @@ def rebuild_preserving_indices(donor, *, imap_version=None):
             continue
         if res.size == 0 and res.offset == 0:
             continue                       # a free slot, no payload to move
-        placed[res.index] = (res.tag.encode("latin1"), donor.chunk(res), pos)
-        pos += 8 + res.size
+        payload = replace.get(res.index, donor.chunk(res))
+        placed[res.index] = (res.tag.encode("latin1"), payload, pos)
+        pos += 8 + len(payload)
+        if pos % 2:
+            pos += 1
+    for i, (tag, payload) in enumerate(extra):
+        placed[extra_start + i] = (tag, payload, pos)
+        pos += 8 + len(payload)
         if pos % 2:
             pos += 1
     total = pos
@@ -443,6 +456,16 @@ def rebuild_preserving_indices(donor, *, imap_version=None):
     struct.pack_into(BE + "i", out, mmap_offset + 28, -1)
 
     base = mmap_offset + 8 + header_size
+    for i in range(len(extra)):
+        idx = extra_start + i
+        tag, payload, offset = placed[idx]
+        e = base + idx * entry_size
+        out[e:e + 4] = tag
+        struct.pack_into(BE + "II", out, e + 4, len(payload), offset)
+        out[offset:offset + 4] = tag
+        struct.pack_into(BE + "I", out, offset + 4, len(payload))
+        out[offset + 8:offset + 8 + len(payload)] = payload
+
     for res in entries:
         e = base + res.index * entry_size
         if res.tag == "RIFX" or res.tag == "XFIR":
@@ -457,6 +480,8 @@ def rebuild_preserving_indices(donor, *, imap_version=None):
                              header_size + count * entry_size, mmap_offset)
         elif res.index in placed:
             tag, payload, offset = placed[res.index]
+            if tag == b"KEY*" and (rewrite_key or extra_key):
+                payload = _extend_key(payload, extra_key)
             out[e:e + 4] = tag
             struct.pack_into(BE + "II", out, e + 4, len(payload), offset)
             out[offset:offset + 4] = tag
@@ -469,6 +494,21 @@ def rebuild_preserving_indices(donor, *, imap_version=None):
         struct.pack_into(BE + "I", out, e + 16, res.next_free & 0xFFFFFFFF)
 
     return bytes(out)
+
+
+def _extend_key(payload, extra_key=()):
+    """Re-emits a key table through our own encoder without touching a single
+    index. Renumbering forces us to rewrite KEY*, so this separates the encoder
+    from the renumbering when bisecting."""
+    used = struct.unpack_from(BE + "I", payload, 8)[0]
+    max_entries = struct.unpack_from(BE + "I", payload, 4)[0]
+    entries = []
+    for i in range(used):
+        off = 12 + i * 12
+        child, parent = struct.unpack_from(BE + "II", payload, off)
+        entries.append((child, parent, payload[off + 8:off + 12]))
+    entries.extend(extra_key)
+    return build_key(entries, max_entries=max(max_entries, len(entries)))
 
 
 def build_rifx(chunks, *, rifx_type=b"MV93", max_map_entries=None,
@@ -488,6 +528,11 @@ def build_rifx(chunks, *, rifx_type=b"MV93", max_map_entries=None,
     placed = []
     for tag, payload in chunks:
         placed.append((tag, payload, pos))
+        pos += 8 + len(payload)
+        if pos % 2:
+            pos += 1
+    for i, (tag, payload) in enumerate(extra):
+        placed[extra_start + i] = (tag, payload, pos)
         pos += 8 + len(payload)
         if pos % 2:
             pos += 1
