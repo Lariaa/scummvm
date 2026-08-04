@@ -1141,6 +1141,91 @@ def build_graft_probe(profile):
     return path, data_out
 
 
+# --------------------------------------------------------------------------
+# Bisection ladder for the empty stage, cast side
+#
+# The Director 5 run of ladder-a settled something the earlier reasoning had
+# backwards: ladder-a carries the donor's score *unchanged* and its stage is
+# still empty, while probe-d4 -- same score, same container -- renders. So the
+# score was never the cause, and probe-d4 is the only fixture whose config
+# chunk we do not rewrite and whose cast we do not extend. These four rungs walk
+# that gap one change at a time.
+# --------------------------------------------------------------------------
+def build_cast_ladder():
+    """probe-d4 renders, ladder-a does not, and they share a byte identical
+    VWSC. Everything between them is cast: how many members, whether any of
+    them are scripts, and whether the movie carries a Lingo context."""
+    donor = bm.load_donor()
+    keep = {}
+    for r in donor.resources:
+        if r.tag in ("VWCF", "Sord", "VWFI", "VWFM", "CASt", "STXT", "VWSC"):
+            keep.setdefault(r.tag, []).append(r)
+    made = []
+
+    for letter, n_extra_text, n_scripts, lingo, what in (
+            ("a", 0, 0, False, "2 members -- probe-d4, the control"),
+            ("b", 1, 0, False, "3 members, one more text member"),
+            ("c", 1, 4, False, "7 members, the scripts without their code"),
+            ("d", 1, 4, True, "7 members with Lscr, Lnam and Lctx")):
+        chunks = []
+
+        def add(tag, payload):
+            chunks.append((tag, payload))
+            return 3 + len(chunks) - 1
+
+        i_key = add(b"KEY*", b"")
+        i_vwcf = add(b"VWCF", donor.chunk(keep["VWCF"][0]))
+        i_cas = add(b"CAS*", b"")
+        i_sord = add(b"Sord", donor.chunk(keep["Sord"][0]))
+        i_vwfi = add(b"VWFI", donor.chunk(keep["VWFI"][0]))
+        i_vwfm = add(b"VWFM", donor.chunk(keep["VWFM"][0]))
+        i_vwsc = add(b"VWSC", donor.chunk(keep["VWSC"][0]))
+        i_text = add(b"CASt", donor.chunk(keep["CASt"][0]))
+        i_stxt = add(b"STXT", donor.chunk(keep["STXT"][0]))
+        i_shape = add(b"CASt", donor.chunk(keep["CASt"][1]))
+
+        key = [(i_stxt, i_text, b"STXT")]
+        members = [i_text, i_shape]
+        if n_extra_text:
+            i_res = add(b"CASt", donor.chunk(keep["CASt"][0]))
+            i_res_stxt = add(b"STXT", donor.chunk(keep["STXT"][0]))
+            key.append((i_res_stxt, i_res, b"STXT"))
+            members.append(i_res)
+
+        scripts = [("checkFrame1", code_first(1), src_first(1), ()),
+                   ("checkFrame2", code_append(0), src_append(0), ()),
+                   ("checkFrame3", code_append(1), src_append(1), ()),
+                   ("reportResult", code_report(), src_report(), (LABEL,))]
+        lscr_idx = []
+        for i, (name, code, src, consts) in enumerate(scripts[:n_scripts], 1):
+            members.append(add(b"CASt", bm.build_script_cast(i, name, src)))
+            if lingo:
+                lscr_idx.append(add(b"Lscr", make_lscr(code, i, consts)))
+                key.append((lscr_idx[-1], members[-1], b"Lscr"))
+        if lingo:
+            i_lnam = add(b"Lnam", lscr.build_lnam(NAMES))
+            i_lctx = add(b"Lctx", bm.build_lctx(lscr_idx, i_lnam))
+            key += [(i_lctx, bm.CASTLIB_KEY_PARENT, b"Lctx"),
+                    (i_lnam, bm.CASTLIB_KEY_PARENT, b"Lnam")]
+
+        chunks[i_cas - 3] = (b"CAS*", bm.build_cas(members))
+        chunks[i_vwcf - 3] = (b"VWCF", config.set_cast_array_end(
+            chunks[i_vwcf - 3][1], len(members)))
+        key += [(i_cas, bm.CASTLIB_KEY_PARENT, b"CAS*"),
+                (i_sord, bm.CASTLIB_KEY_PARENT, b"Sord"),
+                (i_vwcf, bm.CASTLIB_KEY_PARENT, b"VWCF"),
+                (i_vwfi, bm.CASTLIB_KEY_PARENT, b"VWFI"),
+                (i_vwfm, bm.CASTLIB_KEY_PARENT, b"VWFM"),
+                (i_vwsc, bm.CASTLIB_KEY_PARENT, b"VWSC")]
+        chunks[i_key - 3] = (b"KEY*", bm.build_key(key, max_entries=24))
+
+        data = bm.build_rifx(chunks)
+        path = OUT / ("castladder-%s.dir" % letter)
+        path.write_bytes(data)
+        made.append((letter, what, path.name, len(data)))
+    return made
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
@@ -1151,7 +1236,7 @@ if __name__ == "__main__":
 
     for builder in (build_editable, build_listoverride, build_probe_d4):
         report(*builder())
-    for letter, what, name, size in build_ladder():
+    for letter, what, name, size in build_ladder() + build_cast_ladder():
         print("wrote %s (%d bytes) -- %s" % (name, size, what))
 
     profiles = []

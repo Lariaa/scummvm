@@ -215,6 +215,21 @@ field:
 is wrong" in a single load attempt; build the same kind of cut-down movie when a
 new failure appears rather than guessing at fields.
 
+### Read the ladder before drawing the conclusion
+
+The first ladder was built on a conclusion that turned out to be wrong. Because
+`probe-d4` rendered and `editable.dir` did not, and the two differ in their
+score, the score looked like the only candidate and the rungs walked from the
+donor's score to ours. Running them in Director 5 showed that **rung a is empty
+too** -- and rung a carries the donor's score, byte for byte identical to the one
+`probe-d4` renders. The score was never the cause. What the ladder actually
+proved is that everything it varies is innocent.
+
+That is what a ladder is for, so this counts as it working, but it cost a round
+of testing that reading rung a first would have saved. `castladder-a` … `-d`
+walk the other gap -- two members, three, seven, and seven with a Lingo context
+-- with the donor's score throughout.
+
 ### Append, never renumber
 
 The D6 and D7 fixtures were first built by reading the donor apart and writing a
