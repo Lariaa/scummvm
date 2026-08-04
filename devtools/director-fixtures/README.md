@@ -184,7 +184,7 @@ incomplete and test in Director before believing it works.
 | config `protection` (offset 58) | not a multiple of 23, i.e. an unprotected donor | protection does not gate loading |
 | config `castArrayEnd` (offset 14) | the actual member count, **with the checksum recomputed** | it loads members from `CAS*`, and only reads the field on the D2/D3 path |
 | `MCsL` min/maxMember and libResourceId (D5+) | built to match the movie, never cloned | ditto -- and it overrides `castArrayEnd` |
-| sprite type (record byte 1) | the type of the member, 7 for text | it overwrites the score's value from the cast member (`sprite.cpp:550`) |
+| sprite type | on D4 the type of the member, 7 for text; **from D5 on 16, `kCastMemberSprite`**, and the member decides | it overwrites the score's value from the cast member (`sprite.cpp:550`) |
 | sprite thickness bit 0x80 | set, as on 89% of real D4 sprites | the byte is only ever compared before D7 |
 | factory `parentNumber` | an index at another script, never its own | it stores the field and never reads it |
 | `Lscr` global list | every global the script touches | it creates a global on first use |
@@ -260,3 +260,12 @@ Director found first; the score writer was not, and it did.
 While you are there, take the geometry from the donor rather than inventing it:
 `donor_score_geometry()` lifts the frames version, sprite record size and channel
 counts out of its header. Those describe the movie, not our frames.
+
+Decoding the donors' frames the same way is worth the few minutes on its own. It
+showed that the sprite records carried the wrong type -- D4 puts the member's own
+type in the record and the generator kept doing that on D6 and D7, where a sprite
+showing a cast member is `kCastMemberSprite`, 16. It also showed that the **D6
+donor's score contains no sprites at all**, only main channel writes. Its black
+stage is therefore genuine and says nothing about the fixture; the two sprite
+records in frame 10 of the D7 donor are the only real reference either version
+has, which is enough, because D6 and D7 share the first 24 bytes of the record.

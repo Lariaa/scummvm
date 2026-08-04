@@ -175,7 +175,12 @@ def build_key(entries, max_entries=None):
 # --------------------------------------------------------------------------
 # score
 # --------------------------------------------------------------------------
-SPRITE_TYPE_TEXT = 7            # kTextSprite (types.h:162)
+SPRITE_TYPE_TEXT = 7            # kTextSprite (types.h:162), the D4 convention
+# From D5 on a sprite that shows a cast member carries kCastMemberSprite and
+# lets the member decide what it is; both sprites in the D7 donor's score do.
+# Writing the D4 value here leaves the Score window empty on D6 and crashes
+# Director 7 outright.
+SPRITE_TYPE_CAST_MEMBER = 16    # kCastMemberSprite (types.h:171)
 
 # Taken from the donor's own sprite records, which probe-d4.dir proves Director
 # renders inside our container. An earlier attempt put 0x80 in the thickness
@@ -218,7 +223,8 @@ def main_channel_d4(*, action_id=0, tempo=0):
     return bytes(out)
 
 
-def sprite_d6(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT,
+def sprite_d6(*, cast_member, x, y, w, h,
+              sprite_type=SPRITE_TYPE_CAST_MEMBER,
               ink=SPRITE_INK_DEFAULT, editable=False,
               fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
     """24-byte D6 sprite record (writeSpriteDataD6, frame.cpp).
@@ -234,7 +240,8 @@ def sprite_d6(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT,
     return bytes(out)
 
 
-def sprite_d7(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT,
+def sprite_d7(*, cast_member, x, y, w, h,
+              sprite_type=SPRITE_TYPE_CAST_MEMBER,
               ink=SPRITE_INK_DEFAULT, editable=False,
               fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
     """48-byte D7 sprite record; the first 23 bytes match D6."""
