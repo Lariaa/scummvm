@@ -83,7 +83,10 @@ config, cast library mapping and text member out of a real movie you point it at
         --d6 /path/to/some_d6_movie.dxr --d7 /path/to/some_d7_movie.dxr
 
 That produces `editable-d6.dir`, `listoverride-d6.dir`, `editable-d7.dir` and
-`listoverride-d7.dir`, which live in `movies-d6d7/`. The verdicts on stage are the
+`listoverride-d7.dir`, which live in `movies-d6d7/`, plus
+`editable-d6-append.dir` and `editable-d7-append.dir`, which build the same movie
+without renumbering the donor's resources -- see "Append, never renumber" below
+for why that distinction exists. The verdicts on stage are the
 same as for the D4 movies:
 
     scummvm -p devtools/director-fixtures/movies-d6d7 directortest-all
@@ -182,6 +185,7 @@ incomplete and test in Director before believing it works.
 | factory `parentNumber` | an index at another script, never its own | it stores the field and never reads it |
 | `Lscr` global list | every global the script touches | it creates a global on first use |
 | **the Lingo source in the cast info** | the same `global` declarations as the bytecode | it runs the bytecode and ignores the source |
+| **every donor resource's mmap index** | unchanged -- append, never repack | it resolves resources through `KEY*` and the maps it just read |
 
 The last one is the one to remember: the source kept next to the bytecode is not
 documentation. Director compiles from it, and its error messages quote those
@@ -198,7 +202,30 @@ field:
 | `Could not find chunk: ChunkID='FCWV'` | the config chunk was not usable; 'FCWV' is how a Windows build prints 'VWCF' |
 | `Problem reading file ...: -50` | `paramErr` -- a resource was described but absent, in our case by a cloned `MCsL` |
 | `Script error: Variable used before assigned a value` | an undeclared global, in the *source* rather than the bytecode |
+| `There is not enough memory ...` | not memory at all -- a resource reference landed on the wrong chunk, in our case because the mmap was renumbered |
 
 `movies-d6d7/probe` exists to split "the score is wrong" from "something earlier
 is wrong" in a single load attempt; build the same kind of cut-down movie when a
 new failure appears rather than guessing at fields.
+
+### Append, never renumber
+
+The D6 and D7 fixtures were first built by reading the donor apart and writing a
+fresh container. That produced a movie ScummVM was perfectly happy with and
+Director 7 answered with "out of memory". The bisection ladder pinned it down:
+`ladder-d6-0`, which keeps every resource at its original index, loads;
+`ladder-d6-1`, identical except that the index space is packed, does not. So the
+container layout is not the problem -- **renumbering is**. Something outside the
+chunks we regenerate refers to mmap indices, and once a resource moves, that
+reference points at whatever now sits there.
+
+`rebuild_preserving_indices()` is the rule made mechanical. Every donor resource
+keeps its index, free and junk entries included; new chunks take indices after
+the donor's last; payloads we do change are swapped in place. `KEY*` is extended
+rather than rebuilt, and `extend_lnam()`/`extend_lctx()` do the same for the name
+table and the script context, whose *positions* are themselves referenced --
+`Lctx.nameTableId` picks the one name table, and an entry's 1-based position is
+the `scriptId` a script cast member stores in its info block.
+
+Practical consequence: a fixture can only ever add to a donor. If you need a
+member the donor does not have, clone one it does have and append the copy.
