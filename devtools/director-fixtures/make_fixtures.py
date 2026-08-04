@@ -915,7 +915,13 @@ def sprite_details(spans):
     `spans` is a list of (startFrame, endFrame, channel); index 0 belongs to the
     score itself, so ours start at 1.
     """
-    entries, indices, n = [], [], 1
+    # Slots 1 and 2 belong to the entry before ours: index 0's SpriteInfo slot is
+    # entry 0, which is the score, so its behaviour and name slots sit unused
+    # right after it. Ours therefore start at 3, and every index is a multiple of
+    # 3 -- which is how ScummVM labels them when it audits unread entries
+    # (`int type = i % 3`, score.cpp:2016) and what both donors do: 3 and 6 on
+    # D6, 84 and 87 on D7.
+    entries, indices, n = [b"", b""], [], 3
     for start, end, channel in spans:
         indices.append(n)
         entries += [bm.build_sprite_info(start_frame=start, end_frame=end,
@@ -1358,7 +1364,7 @@ def build_score_donor_index(profile, main_channel=False, tag="scoreidx",
                for i in range(0, len(cas), 4)]
     member = members.index(cast_text.index) + 1
 
-    idx = 1 if own_details else 3
+    idx = 3
 
     def frame(editable, back):
         chans = {SPRITE_CH: profile.sprite(cast_member=member, x=20, y=20,
@@ -1392,9 +1398,10 @@ def build_score_donor_index(profile, main_channel=False, tag="scoreidx",
     d_offs = [struct.unpack(">I", b[d_idx + 4 * i:d_idx + 4 * i + 4])[0]
               for i in range(d_ls)]
     if own_details:
-        entries = [mine, bm.build_sprite_info(start_frame=1, end_frame=4,
-                                              channel=SPRITE_CH,
-                                              key_frames=key_frames), b"", b""]
+        entries = [mine, b"", b"",
+                   bm.build_sprite_info(start_frame=1, end_frame=4,
+                                        channel=SPRITE_CH,
+                                        key_frames=key_frames), b"", b""]
     else:
         entries = [mine] + [b[d_data + o:d_data + n]
                             for o, n in zip(d_offs, d_offs[1:])][1:]

@@ -191,7 +191,7 @@ incomplete and test in Director before believing it works.
 | **the Lingo source in the cast info** | the same `global` declarations as the bytecode | it runs the bytecode and ignores the source |
 | **every donor resource's mmap index** | unchanged -- append, never repack | it resolves resources through `KEY*` and the maps it just read |
 | sprite fore/back colour | a palette index that is actually visible -- the donor's, not a round number | it renders through `transformColor()` and its own palette handling |
-| **`spriteListIdx`** (D6+, sprites and the frame script) | a real detail index, never 0 | `if (sprite->_spriteListIdx)` skips the lookup (`score.cpp:2081`); Director follows it unconditionally, and 0 is entry 0, the score |
+| **`spriteListIdx`** (D6+, sprites and the frame script) | a real detail index, never 0, and **always a multiple of 3** | `if (sprite->_spriteListIdx)` skips the lookup (`score.cpp:2081`); Director follows it unconditionally, and 0 is entry 0, the score. An index off the multiple of 3 makes it read a behaviour list as a SpriteInfo and die |
 | D6+ `numOfFrames` | 0 on framesVersion 11, the real count on 13 | it recounts the frames itself (`score.cpp:1999`) |
 
 The last one is the one to remember: the source kept next to the bytecode is not
