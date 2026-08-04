@@ -1072,6 +1072,75 @@ def build_score_probe(profile):
     return path, data
 
 
+def build_graft_probe(profile):
+    """The donor's own score, with exactly one channel write grafted into it.
+
+    score-d6 rebuilds the score from scratch and Director shows nothing. This
+    changes as little as possible instead: the donor's header stays byte for
+    byte, its frames keep the main channel state they set up, and frame 1 gains
+    a single sprite write for a text member we appended. Only the lengths that
+    have to follow are touched.
+
+        it shows the text -- the container and header are right and the fault is
+                             in how we build frames
+        it stays empty    -- the fault is in the header or the geometry, because
+                             nothing else is left
+    """
+    donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
+    cast_text, cast_stxt = donor_text_member(donor)
+
+    next_index = max(r.index for r in donor.resources) + 1
+    cas = donor.chunk(donor.by_tag("CAS*")[0])
+    donor_members = [struct.unpack(">I", cas[i:i + 4])[0]
+                     for i in range(0, len(cas), 4)]
+    member = len(donor_members) + 1
+
+    b = donor.chunk(donor.by_tag("VWSC")[0])
+    list_start = struct.unpack(">I", b[8:12])[0]
+    list_size = struct.unpack(">I", b[list_start + 4:list_start + 8])[0]
+    index_start = list_start + 12
+    data = index_start + list_size * 4
+    entry0 = bytearray(b[data + struct.unpack(">I", b[index_start:index_start + 4])[0]:])
+    size, frame1 = struct.unpack(">II", entry0[0:8])
+
+    # frame 1 keeps everything it had and gains one write at the start of
+    # sprite channel 1
+    rec = profile.sprite(cast_member=member, x=20, y=20, w=200, h=40,
+                         editable=True)
+    write = struct.pack(">HH", len(rec), profile.main_size) + rec
+    fsz = struct.unpack(">H", entry0[frame1:frame1 + 2])[0]
+    grafted = (entry0[:frame1]
+               + struct.pack(">H", fsz + len(write))
+               + entry0[frame1 + 2:frame1 + fsz]
+               + write
+               + entry0[frame1 + fsz:size])
+    struct.pack_into(">I", grafted, 0, size + len(write))
+    if len(grafted) % 2:
+        grafted += b"\0"
+
+    out = bytearray()
+    out += struct.pack(">I", 0)
+    out += struct.pack(">i", -3)
+    out += struct.pack(">I", 12)
+    out += struct.pack(">III", 1, 2, len(grafted))
+    out += struct.pack(">II", 0, len(grafted))
+    out += grafted
+    struct.pack_into(">I", out, 0, len(out))
+
+    extra = [(b"CASt", donor.chunk(cast_text)), (b"STXT", donor.chunk(cast_stxt))]
+    replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(donor_members + [next_index]),
+               donor.by_tag("MCsL")[0].index: bm.build_mcsl(
+                   "Internal", 1, len(donor_members) + 1, bm.CASTLIB_KEY_PARENT),
+               donor.by_tag("VWSC")[0].index: bytes(out)}
+    data_out = bm.rebuild_preserving_indices(
+        donor, extra=extra, extra_key=[(next_index + 1, next_index, b"STXT")],
+        replace=replace)
+    path = OUT / f"graft-{profile.name}.dir"
+    path.write_bytes(data_out)
+    return path, data_out
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
@@ -1098,3 +1167,4 @@ if __name__ == "__main__":
         report(*build_probe(profile))
         report(*build_editable_append(profile))
         report(*build_score_probe(profile))
+        report(*build_graft_probe(profile))
