@@ -161,8 +161,12 @@ against. ProjectorRays decompiles `editable.dir` back to the intended Lingo.
   header, so anything testing the editable bit has to be a D4+ movie.
 * The bounds checks in `compileLingoV4` are `>=`, so handler code and the name
   arrays must end strictly before the end of the chunk.
-* The D6+ score wraps the familiar header and frames in an offset table; entry 0
-  is the header, entry n is frame n.
+* The D6+ score wraps the familiar score in an offset table, but does not change
+  it: entry 0 is the *whole* score, header and every frame back to back exactly
+  as before D6. The remaining entries are the per sprite detail blobs
+  (`_spriteDetailOffsets`, `score.cpp:1920`) and a movie without behaviours has
+  none. This one is worth checking against a donor before believing it -- see
+  "A frame per index entry" below.
 * Constant index entries are 6 bytes on D4 and 8 from D5 on, which also scales
   the operand of the constant push opcode.
 * From D5 on, `the text of field` takes a cast lib, pushed after the member.
@@ -203,6 +207,8 @@ field:
 | `Problem reading file ...: -50` | `paramErr` -- a resource was described but absent, in our case by a cloned `MCsL` |
 | `Script error: Variable used before assigned a value` | an undeclared global, in the *source* rather than the bytecode |
 | `There is not enough memory ...` | not memory at all -- a resource reference landed on the wrong chunk, in our case because the mmap was renumbered |
+| Director crashes outright | a sprite pointing at a member of the wrong type; ours put a text sprite on a script member |
+| no message, black stage, empty Score window | the score parsed to zero frames -- check `frame1Offset` and `framesStreamSize` in entry 0 |
 
 `movies-d6d7/probe` exists to split "the score is wrong" from "something earlier
 is wrong" in a single load attempt; build the same kind of cut-down movie when a
@@ -229,3 +235,28 @@ the `scriptId` a script cast member stores in its info block.
 
 Practical consequence: a fixture can only ever add to a donor. If you need a
 member the donor does not have, clone one it does have and append the copy.
+
+### A frame per index entry
+
+The D6+ score writer put each frame in an index entry of its own. ScummVM read
+that back perfectly -- it walks the table and takes whatever it finds -- and
+Director read it as a score with **no frames at all**: a black stage, no error,
+nothing in the Score window. It cost several rounds of testing, because a black
+stage looks exactly like a donor whose own stage is black.
+
+What settled it was decoding both donors' scores with the same parser the writer
+uses, which is the check that had already caught every earlier mistake and which
+the score writer had never been put through. Entry 0 is the whole score: a 20
+byte header whose `frame1Offset` is 20 and whose `framesStreamSize` is where the
+frame stream ends, followed by the frames. Both donors parse to exactly that,
+down to the byte.
+
+The lesson generalises past this one field. **Round-trip every writer against a
+real chunk before trusting it** -- reproduce a donor byte for byte, or decode a
+donor with the same code and check the totals close. `lscr_asm`, `build_mcsl` and
+the config checksum were all built that way and none of them ever produced a bug
+Director found first; the score writer was not, and it did.
+
+While you are there, take the geometry from the donor rather than inventing it:
+`donor_score_geometry()` lifts the frames version, sprite record size and channel
+counts out of its header. Those describe the movie, not our frames.

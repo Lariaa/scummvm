@@ -1025,7 +1025,8 @@ def build_editable_append(profile):
          frame(first_script_member + 2, True, 255),
          frame(first_script_member + 3, True, 255)],
         main_size=profile.main_size, spr_size=profile.spr_size,
-        frames_version=profile.frames_version)
+        frames_version=profile.frames_version,
+        geometry=bm.donor_score_geometry(donor))
 
     replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(members),
                donor.by_tag("MCsL")[0].index: bm.build_mcsl(
@@ -1079,7 +1080,8 @@ def build_score_probe(profile):
     vwsc = bm.build_vwsc_d6plus(
         [frame(True, 0), frame(False, 255), frame(True, 255), frame(True, 255)],
         main_size=profile.main_size, spr_size=profile.spr_size,
-        frames_version=profile.frames_version)
+        frames_version=profile.frames_version,
+        geometry=bm.donor_score_geometry(donor))
 
     replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(members),
                donor.by_tag("MCsL")[0].index: bm.build_mcsl(

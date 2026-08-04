@@ -264,44 +264,66 @@ def main_channel_d6plus(size, *, action_id=0, cast_lib=DEFAULT_CAST_LIB):
 
 
 def build_vwsc_d6plus(frames, *, main_size, spr_size, frames_version,
-                      num_channels=50):
-    """D6 and later wrap the familiar score in an index: a small prologue points
-    at a table of offsets, whose entry 0 is the score header and whose entry n is
-    frame n (Score::loadFrames and loadFrame, score.cpp:1905 / :2156).
+                      num_channels=50, geometry=None):
+    """D6 and later wrap the score in an index, but the score itself is unchanged.
 
         0   u32 framesStreamSize (whole chunk)
         4   u32 ver              (-3)
         8   u32 listStart        (12)
-        12  u32 numEntries       (frames + 1)
+        12  u32 numEntries
         16  u32 listSize         (numEntries + 1)
-        20  u32 maxDataLen       (size of the data area)
+        20  u32 maxDataLen
         24  u32 offsets[]        relative to the data area
-            data area: score header, then the frames
-    """
-    header, body, frame_offsets = _score_header_and_frames(
-        frames, main_size=main_size, spr_size=spr_size,
-        frames_version=frames_version, num_channels=num_channels,
-        declared_frames=0)
-    data = header + body
 
-    num_entries = len(frames) + 1
+    Entry 0 is **the whole score** -- the D4 style header followed by every frame
+    back to back, exactly as before D6. The remaining entries are the per sprite
+    detail blobs ScummVM tracks in `_spriteDetailOffsets` (score.cpp:1920); a
+    movie without behaviours needs none, so we write a single entry.
+
+    This was got wrong once, at the cost of several rounds of testing: putting
+    each frame in an index entry of its own produces a movie ScummVM reads
+    happily -- it walks the table -- and real Director reads as a score with no
+    frames at all, which is a black stage and no error message. Both donors
+    confirm the layout: the frame stream starts at `frame1Offset` = 20 inside
+    entry 0 and runs to `framesStreamSize`.
+    """
+    header, body, _ = _score_header_and_frames(
+        frames, main_size=main_size, spr_size=spr_size,
+        frames_version=frames_version, num_channels=num_channels)
+    if geometry is not None:
+        # frames version, sprite record size and channel counts, taken from the
+        # donor rather than guessed -- they describe the movie, not our frames
+        header = header[:12] + geometry
+    data = bytearray(header + body)
+    if len(data) % 2:                                # donors pad the entry, and
+        data += b"\0"                                # leave the size field odd
+
+    num_entries = 1
     list_size = num_entries + 1
     index_start = 24
-    frame_data_offset = index_start + list_size * 4
 
     out = bytearray()
     out += struct.pack(BE + "I", 0)                  # patched below
     out += struct.pack(BE + "i", -3)
     out += struct.pack(BE + "I", 12)
     out += struct.pack(BE + "III", num_entries, list_size, len(data))
-    out += struct.pack(BE + "I", 0)                  # entry 0: the score header
-    for off in frame_offsets:                        # already header relative
-        out += struct.pack(BE + "I", off)
-    out += b"\0" * 4 * (list_size - num_entries)     # spare index slots
-    assert len(out) == frame_data_offset, (len(out), frame_data_offset)
+    out += struct.pack(BE + "I", 0)                  # entry 0: the score
+    out += struct.pack(BE + "I", len(data))          # end sentinel
+    assert len(out) == index_start + list_size * 4, len(out)
     out += data
     struct.pack_into(BE + "I", out, 0, len(out))
     return bytes(out)
+
+
+def donor_score_geometry(donor):
+    """The donor's frames version, sprite record size and channel counts."""
+    b = donor.chunk(donor.by_tag("VWSC")[0])
+    list_start = struct.unpack_from(BE + "I", b, 8)[0]
+    list_size = struct.unpack_from(BE + "I", b, list_start + 4)[0]
+    index_start = list_start + 12
+    data = index_start + list_size * 4
+    off = struct.unpack_from(BE + "I", b, index_start)[0]
+    return b[data + off + 12:data + off + 20]
 
 
 def _split_channel(channel, offset, payload, main_size, spr_size):
