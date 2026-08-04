@@ -96,11 +96,15 @@ def call_function(name_index, nargs):
 
 
 def global_push(name_index):
-    return bytes([OP_GLOBALPUSH_B, name_index])
+    if name_index <= 0xff:
+        return bytes([OP_GLOBALPUSH_B, name_index])
+    return bytes([OP_GLOBALPUSH_W]) + struct.pack(">H", name_index)
 
 
 def global_assign(name_index):
-    return bytes([OP_GLOBALASSIGN_B, name_index])
+    if name_index <= 0xff:
+        return bytes([OP_GLOBALASSIGN_B, name_index])
+    return bytes([OP_GLOBALASSIGN_W]) + struct.pack(">H", name_index)
 
 
 def the_field_assign(field_num, selector=FIELD_TEXT):
@@ -153,10 +157,21 @@ EXITFRAME_EVENT_COUNT = 11
 EXITFRAME_EVENT_FLAGS = 0x400
 
 
+# Every opcode with a byte operand has a twin taking a uint16, and the reader
+# tells them apart by the opcode alone (lingo-bytecode.cpp:111ff). A donor with
+# a large cast or a long name table needs them.
+OP_INTPUSH_W = 0x81             # c_intpush, int16
+OP_ARGCNORET_W = 0x82           # c_argcnoretpush, uint16
+OP_ARGC_W = 0x83                # c_argcpush, uint16
+OP_CALL_W = 0x97                # cb_call, uint16 name index
+OP_GLOBALPUSH_W = 0x89          # cb_globalpush, uint16 name index
+OP_GLOBALASSIGN_W = 0x8f        # cb_globalassign, uint16 name index
+
+
 def intpush(value):
-    if not -128 <= value <= 127:
-        raise ValueError("use the int16 form (0x81) for %d" % value)
-    return bytes([OP_INTPUSH_B, value & 0xff])
+    if -128 <= value <= 127:
+        return bytes([OP_INTPUSH_B, value & 0xff])
+    return bytes([OP_INTPUSH_W]) + struct.pack(">h", value)
 
 
 def the_sprite_field(sprite_num, selector):
@@ -173,7 +188,10 @@ def call_command(name_index, nargs):
     """Statement-position call: ARGCNORET, so LC::call gets allowRetVal=false.
     Works for HBLTIN builtins, which register in both the command and the
     function table (lingo-builtins.cpp:474)."""
-    return bytes([OP_ARGCNORET_B, nargs, OP_CALL_B, name_index])
+    if name_index <= 0xff:
+        return bytes([OP_ARGCNORET_B, nargs, OP_CALL_B, name_index])
+    return (bytes([OP_ARGCNORET_B, nargs, OP_CALL_W])
+            + struct.pack(">H", name_index))
 
 
 def pad_even(blob, at):

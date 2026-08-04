@@ -403,6 +403,13 @@ def _split_channel(channel, offset, payload, main_size, spr_size):
         # line up that way -- a single 8 byte write would hit case 0+4, which is
         # a u32 read of the same field.
         return [(offset, payload[:4]), (offset + 6, payload[6:8])]
+    if main_size != MAIN_CHANNEL_SIZE_D4:
+        # D6 and D7 do not use the 16 + 4 split at all. Counting the channel
+        # writes in the archive, the whole record in one piece is the second
+        # most common shape either version uses -- 24 bytes at the channel start
+        # 74530 times on D6, 48 bytes 343435 times on D7 -- while 16 at the
+        # start followed by the rest does not appear.
+        return [(offset, payload[:spr_size])]
     return [(offset, payload[:16]), (offset + 16, payload[16:spr_size])]
 
 

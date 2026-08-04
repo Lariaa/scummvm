@@ -288,6 +288,10 @@ staring at one donor can:
 * `spriteListIdx` is never 0 -- 577649 records, not one exception
 * `numOfFrames` is 0 on framesVersion 11 and the real count on 13 -- without
   exception in either direction
+* a channel is written whole or in pieces the D4 shape never uses: counting
+  4.7 million channel writes, the whole record at the channel start is common
+  (24 bytes 74530 times on D6, 48 bytes 343435 times on D7) and the D4 habit of
+  16 bytes then the rest never appears
 
 That last pair mattered because a single donor cannot show you a rule; it can
 only show you one instance of it, and the D6 donor turned out to have no sprites

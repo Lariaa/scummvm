@@ -943,8 +943,8 @@ def build_editable_append(profile):
 
     lnam_res = donor.by_tag("Lnam")[0]
     lnam, name_base = bm.extend_lnam(donor.chunk(lnam_res), NAMES)
-    if name_base + len(NAMES) > 255:
-        raise SystemExit("donor's name table is too long for byte operands")
+    if name_base + len(NAMES) > 0xffff:
+        raise SystemExit("donor's name table is too long")
     n_exit, n_put, n_global = (name_base + i for i in range(3))
 
     def const_push(i):
