@@ -292,18 +292,47 @@ def main_channel_d6plus(size, *, action_id=0, cast_lib=DEFAULT_CAST_LIB,
 SPRITE_INFO_FIXED = 40          # five int32 plus a five field TweenInfo
 
 
-def build_sprite_info(*, start_frame, end_frame, channel, key_frames=()):
+# TweenInfo values every real record carries. The curvature is 0x10000, which
+# is 1.0 in the 16.16 fixed point Director uses; the flags differ between a
+# sprite span and one of the main channel's own spans.
+TWEEN_CURVATURE = 0x10000
+TWEEN_FLAGS_SPRITE = 24589      # 0x600d, on every sprite sampled in the archive
+TWEEN_FLAGS_MAIN = 1            # what the donor's script and transition spans use
+
+
+def build_sprite_info(*, start_frame, end_frame, channel, key_frames=(0,),
+                      tween_flags=None):
     """One detail entry, per SpriteInfo::read (spriteinfo.h:55).
 
-    A sprite's detail index n claims three consecutive entries: n is this
-    struct, n+1 the behaviour list and n+2 the name (score.cpp:2058ff). Both may
-    be empty, but they have to exist, or the entry after them is read as theirs.
+    A detail index n claims three consecutive entries: n is this struct, n+1 the
+    behaviour list and n+2 the name (score.cpp:2058ff). The last two may be
+    empty, but they have to exist, or the entry after them is read as theirs.
+
+    Real records are 44 bytes, not 40: the fixed part followed by a single
+    keyframe of 0. Writing the bare fixed part leaves the keyframe loop with
+    nothing to read, which ScummVM is happy with and Director is not.
     """
+    if tween_flags is None:
+        tween_flags = TWEEN_FLAGS_MAIN if channel == 0 else TWEEN_FLAGS_SPRITE
     out = struct.pack(BE + "iiiii", start_frame, end_frame, 0, 0, channel)
-    out += struct.pack(BE + "iiiii", 0, 0, 0, 0, 0)      # TweenInfo
+    out += struct.pack(BE + "iiiii", TWEEN_CURVATURE, tween_flags, 0, 0, 0)
     for f in key_frames:
         out += struct.pack(BE + "i", f)
     assert len(out) == SPRITE_INFO_FIXED + 4 * len(key_frames)
+    return out
+
+
+def build_detail_directory(indices):
+    """Detail entry 1: how many indices the score uses, then each of them.
+
+    It sits in what the index-modulo-three rule calls a behaviour slot, because
+    it belongs to index 0 -- the score. Both donors carry it and so does every
+    movie sampled from the archive, listing exactly the indices its sprites and
+    main channel spans point at.
+    """
+    out = struct.pack(BE + "I", len(indices))
+    for i in indices:
+        out += struct.pack(BE + "I", i)
     return out
 
 

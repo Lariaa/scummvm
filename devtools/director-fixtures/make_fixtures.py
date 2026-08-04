@@ -921,12 +921,13 @@ def sprite_details(spans):
     # 3 -- which is how ScummVM labels them when it audits unread entries
     # (`int type = i % 3`, score.cpp:2016) and what both donors do: 3 and 6 on
     # D6, 84 and 87 on D7.
-    entries, indices, n = [b"", b""], [], 3
+    entries, indices, n = [None, b""], [], 3
     for start, end, channel in spans:
         indices.append(n)
         entries += [bm.build_sprite_info(start_frame=start, end_frame=end,
                                          channel=channel), b"", b""]
         n += 3
+    entries[0] = bm.build_detail_directory(indices)
     return indices, entries
 
 
@@ -1398,10 +1399,11 @@ def build_score_donor_index(profile, main_channel=False, tag="scoreidx",
     d_offs = [struct.unpack(">I", b[d_idx + 4 * i:d_idx + 4 * i + 4])[0]
               for i in range(d_ls)]
     if own_details:
-        entries = [mine, b"", b"",
+        entries = [mine, bm.build_detail_directory([3]), b"",
                    bm.build_sprite_info(start_frame=1, end_frame=4,
                                         channel=SPRITE_CH,
-                                        key_frames=key_frames), b"", b""]
+                                        **({"key_frames": key_frames}
+                                           if key_frames else {})), b"", b""]
     else:
         entries = [mine] + [b[d_data + o:d_data + n]
                             for o, n in zip(d_offs, d_offs[1:])][1:]
