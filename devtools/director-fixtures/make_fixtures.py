@@ -1335,6 +1335,82 @@ def build_graft_minimal(profile):
     return path, payload
 
 
+def build_score_donor_index(profile, main_channel=False, tag="scoreidx"):
+    """Our frame stream, the donor's detail index. The step after graft0.
+
+    graft0 renders, so the container, the cast, the sprite record and the detail
+    entries are all sound, and what is left is the score we generate. That is
+    still two things at once: the frames and the index around them. This keeps
+    the donor's index entries exactly where they are and swaps only entry 0 for
+    our own four frame score, whose sprites borrow the donor's detail triple.
+
+        it renders -- our frames are fine and the detail entries we generate are
+                      what Director rejects
+        it does not -- our frame stream or its header is at fault
+    """
+    donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
+
+    cast_text, _ = donor_text_member(donor)
+    cas = donor.chunk(donor.by_tag("CAS*")[0])
+    members = [struct.unpack(">I", cas[i:i + 4])[0]
+               for i in range(0, len(cas), 4)]
+    member = members.index(cast_text.index) + 1
+
+    def frame(editable, back):
+        chans = {SPRITE_CH: profile.sprite(cast_member=member, x=20, y=20,
+                                           w=200, h=40, editable=editable,
+                                           back=back, list_idx=3)}
+        if main_channel:
+            # graft0's frames all touch the main channel and it renders; ours
+            # touch nothing but the sprite. This variant closes that gap so the
+            # pair of them tells the two apart.
+            chans[0] = bm.main_channel_d6plus(profile.main_size,
+                                              script_list_idx=3)
+        return chans
+
+    ours = bm.build_vwsc_d6plus(
+        [frame(True, 0), frame(False, 255), frame(True, 255), frame(True, 255)],
+        main_size=profile.main_size, spr_size=profile.spr_size,
+        frames_version=profile.frames_version,
+        geometry=bm.donor_score_geometry(donor))
+
+    # unwrap our entry 0 and drop it into the donor's index
+    lsx = struct.unpack(">I", ours[8:12])[0]
+    ne, ls, _ = struct.unpack(">III", ours[lsx:lsx + 12])
+    idx = lsx + 12
+    mine = ours[idx + ls * 4:]
+
+    b = donor.chunk(donor.by_tag("VWSC")[0])
+    d_ls = struct.unpack(">I", b[struct.unpack(">I", b[8:12])[0] + 4:
+                                 struct.unpack(">I", b[8:12])[0] + 8])[0]
+    d_idx = struct.unpack(">I", b[8:12])[0] + 12
+    d_data = d_idx + d_ls * 4
+    d_offs = [struct.unpack(">I", b[d_idx + 4 * i:d_idx + 4 * i + 4])[0]
+              for i in range(d_ls)]
+    entries = [mine] + [b[d_data + o:d_data + n]
+                        for o, n in zip(d_offs, d_offs[1:])][1:]
+
+    positions, pos = [], 0
+    for e in entries:
+        positions.append(pos)
+        pos += len(e)
+    out = bytearray()
+    out += struct.pack(">I", 0) + struct.pack(">i", -3) + struct.pack(">I", 12)
+    out += struct.pack(">III", len(entries), len(entries) + 1, pos)
+    for o in positions:
+        out += struct.pack(">I", o)
+    out += struct.pack(">I", pos)
+    out += b"".join(entries)
+    struct.pack_into(">I", out, 0, len(out))
+
+    payload = bm.rebuild_preserving_indices(
+        donor, replace={donor.by_tag("VWSC")[0].index: bytes(out)})
+    path = OUT / f"{tag}-{profile.name}.dir"
+    path.write_bytes(payload)
+    return path, payload
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
@@ -1363,3 +1439,6 @@ if __name__ == "__main__":
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
+        report(*build_score_donor_index(profile))
+        report(*build_score_donor_index(profile, main_channel=True,
+                                        tag="scoremain"))
