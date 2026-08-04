@@ -190,6 +190,7 @@ incomplete and test in Director before believing it works.
 | `Lscr` global list | every global the script touches | it creates a global on first use |
 | **the Lingo source in the cast info** | the same `global` declarations as the bytecode | it runs the bytecode and ignores the source |
 | **every donor resource's mmap index** | unchanged -- append, never repack | it resolves resources through `KEY*` and the maps it just read |
+| sprite fore/back colour | a palette index that is actually visible -- the donor's, not a round number | it renders through `transformColor()` and its own palette handling |
 
 The last one is the one to remember: the source kept next to the bytecode is not
 documentation. Director compiles from it, and its error messages quote those

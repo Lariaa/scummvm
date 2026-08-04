@@ -175,6 +175,13 @@ def build_key(entries, max_entries=None):
 # --------------------------------------------------------------------------
 # score
 # --------------------------------------------------------------------------
+# The donor's own text sprite, which probe-d4.dir proves Director renders. The
+# palette index matters: on the Windows default palette 255 is white, so the
+# obvious looking fore=255 draws white text, and on a white stage that is a movie
+# that appears to show nothing at all.
+SPRITE_FORE_D4 = 128
+SPRITE_BACK_D4 = 128
+
 SPRITE_TYPE_TEXT = 7            # kTextSprite (types.h:162), the D4 convention
 # From D5 on a sprite that shows a cast member carries kCastMemberSprite and
 # lets the member decide what it is; both sprites in the D7 donor's score do.
@@ -194,7 +201,8 @@ SPRITE_INK_DEFAULT = 0x80
 
 def sprite_d4(*, cast_member, x, y, w, h, sprite_type=SPRITE_TYPE_TEXT,
               ink=SPRITE_INK_DEFAULT,
-              editable=False, fore=255, back=0, script_id=0,
+              editable=False, fore=SPRITE_FORE_D4, back=SPRITE_BACK_D4,
+              script_id=0,
               thickness=SPRITE_THICKNESS_DEFAULT):
     """20-byte D4 sprite record (writeSpriteDataD4, frame.cpp:742)."""
     colorcode = 0x40 if editable else 0x00
@@ -557,11 +565,6 @@ def build_rifx(chunks, *, rifx_type=b"MV93", max_map_entries=None,
     placed = []
     for tag, payload in chunks:
         placed.append((tag, payload, pos))
-        pos += 8 + len(payload)
-        if pos % 2:
-            pos += 1
-    for i, (tag, payload) in enumerate(extra):
-        placed[extra_start + i] = (tag, payload, pos)
         pos += 8 + len(payload)
         if pos % 2:
             pos += 1

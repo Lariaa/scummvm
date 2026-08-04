@@ -193,7 +193,7 @@ def build_editable(vwsc_override=None, out_name="editable.dir"):
 
     chunks[i_vwsc - 3] = (b"VWSC", vwsc_override if vwsc_override is not None
                           else bm.build_vwsc([
-        frame(True, 0, script_member[0]),
+        frame(True, bm.SPRITE_BACK_D4, script_member[0]),
         frame(False, 255, script_member[1]),
         frame(True, 255, script_member[2]),
         frame(True, 255, script_member[3]),
@@ -739,30 +739,6 @@ def report(path, data):
                   f"code={fn.code.hex(' ')}")
 
 
-if __name__ == "__main__":
-    import argparse
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--d6", metavar="MOVIE",
-                    help="a real D6 movie to clone config and text member from")
-    ap.add_argument("--d7", metavar="MOVIE", help="likewise for D7")
-    args = ap.parse_args()
-
-    for builder in (build_editable, build_listoverride, build_probe_d4):
-        report(*builder())
-
-    profiles = []
-    if args.d6:
-        profiles.append(Profile("d6", donor=args.d6, main_size=144, spr_size=24,
-                                frames_version=11, sprite_writer=bm.sprite_d6))
-    if args.d7:
-        profiles.append(Profile("d7", donor=args.d7, main_size=288, spr_size=48,
-                                frames_version=13, sprite_writer=bm.sprite_d7))
-    for profile in profiles:
-        for kind in ("editable", "listoverride"):
-            report(*build_variant(profile, kind))
-        report(*build_probe(profile))
-
-
 # --------------------------------------------------------------------------
 # Bisection ladder for the empty score in Director
 #
@@ -1094,3 +1070,31 @@ def build_score_probe(profile):
     path = OUT / f"score-{profile.name}.dir"
     path.write_bytes(data)
     return path, data
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--d6", metavar="MOVIE",
+                    help="a real D6 movie to clone config and text member from")
+    ap.add_argument("--d7", metavar="MOVIE", help="likewise for D7")
+    args = ap.parse_args()
+
+    for builder in (build_editable, build_listoverride, build_probe_d4):
+        report(*builder())
+    for letter, what, name, size in build_ladder():
+        print("wrote %s (%d bytes) -- %s" % (name, size, what))
+
+    profiles = []
+    if args.d6:
+        profiles.append(Profile("d6", donor=args.d6, main_size=144, spr_size=24,
+                                frames_version=11, sprite_writer=bm.sprite_d6))
+    if args.d7:
+        profiles.append(Profile("d7", donor=args.d7, main_size=288, spr_size=48,
+                                frames_version=13, sprite_writer=bm.sprite_d7))
+    for profile in profiles:
+        for kind in ("editable", "listoverride"):
+            report(*build_variant(profile, kind))
+        report(*build_probe(profile))
+        report(*build_editable_append(profile))
+        report(*build_score_probe(profile))
