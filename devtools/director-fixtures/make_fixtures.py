@@ -936,7 +936,7 @@ def build_editable_append(profile):
     """
     donor = bm.load_donor(profile.donor)
     check_donor_unprotected(donor, profile.donor)
-    cast_text, _ = donor_text_member(donor)
+    cast_text, cast_stxt = donor_text_member(donor)
 
     next_index = max(r.index for r in donor.resources) + 1
     cas = donor.chunk(donor.by_tag("CAS*")[0])
@@ -964,7 +964,12 @@ def build_editable_append(profile):
                 + bytes([lscr_asm.OP_ADD]) + lscr_asm.global_assign(n_global)
                 + bytes([lscr_asm.OP_PROCRET]))
 
-    result_member = len(donor_members) + 1
+    # Both text members are clones we append. Reaching into the donor's own
+    # numbering does not survive a change of donor: member 1 is a text member in
+    # the D6 donor but a script in the D7 one, and a text sprite pointing at a
+    # script member takes Director 7 down.
+    tested_member = len(donor_members) + 1
+    result_member = len(donor_members) + 2
     msg = (const_push(0) + lscr_asm.global_push(n_global)
            + bytes([lscr_asm.OP_AMPERSAND]))
     report = (lscr_asm.field_assign_id(result_member, bm.DEFAULT_CAST_LIB) + msg
@@ -977,16 +982,20 @@ def build_editable_append(profile):
                ("checkFrame3", check(1, False), src_append(1), ()),
                ("reportResult", report, src_report(), (LABEL,))]
 
-    # indices: result field CASt, its STXT, then a CASt and an Lscr per script
-    i_res, i_res_stxt = next_index, next_index + 1
-    script_cast = [next_index + 2 + 2 * i for i in range(len(scripts))]
-    script_lscr = [next_index + 3 + 2 * i for i in range(len(scripts))]
+    # indices: the two text members with their STXT, then a CASt and an Lscr
+    # per script
+    i_test, i_test_stxt = next_index, next_index + 1
+    i_res, i_res_stxt = next_index + 2, next_index + 3
+    script_cast = [next_index + 4 + 2 * i for i in range(len(scripts))]
+    script_lscr = [next_index + 5 + 2 * i for i in range(len(scripts))]
 
     lctx_res = donor.by_tag("Lctx")[0]
     lctx, script_base = bm.extend_lctx(donor.chunk(lctx_res), script_lscr)
 
     extra = [(b"CASt", donor.chunk(cast_text)),
-             (b"STXT", donor.chunk(donor_text_member(donor)[1]))]
+             (b"STXT", donor.chunk(cast_stxt)),
+             (b"CASt", donor.chunk(cast_text)),
+             (b"STXT", donor.chunk(cast_stxt))]
     for i, (nm, code, src, consts) in enumerate(scripts):
         extra.append((b"CASt", bm.build_script_cast(
             script_base + i, nm, src, bm.SCRIPT_TYPE_SCORE, d5plus=True)))
@@ -998,13 +1007,14 @@ def build_editable_append(profile):
             consts=consts, global_names=[n_global],
             const_entry_size=profile.const_entry)))
 
-    members = donor_members + [i_res] + script_cast
+    members = donor_members + [i_test, i_res] + script_cast
     first_script_member = result_member + 1
 
     def frame(action_member, editable, back):
         return {0: bm.main_channel_d6plus(profile.main_size,
                                           action_id=action_member),
-                SPRITE_CH: profile.sprite(cast_member=1, x=20, y=20, w=200,
+                SPRITE_CH: profile.sprite(cast_member=tested_member,
+                                          x=20, y=20, w=200,
                                           h=40, editable=editable, back=back),
                 RESULT_CH: profile.sprite(cast_member=result_member,
                                           x=20, y=120, w=200, h=40)}
@@ -1024,11 +1034,61 @@ def build_editable_append(profile):
                lnam_res.index: lnam,
                lctx_res.index: lctx}
 
-    key_extra = [(i_res_stxt, i_res, b"STXT")]
+    key_extra = [(i_test_stxt, i_test, b"STXT"), (i_res_stxt, i_res, b"STXT")]
     key_extra += [(l, c, b"Lscr") for c, l in zip(script_cast, script_lscr)]
 
     data = bm.rebuild_preserving_indices(donor, extra=extra,
                                          extra_key=key_extra, replace=replace)
     path = OUT / f"editable-{profile.name}-append.dir"
+    path.write_bytes(data)
+    return path, data
+
+
+def build_score_probe(profile):
+    """Donor plus two text members plus our own score -- and nothing else.
+
+    A black stage is not an answer on its own: ladder-d6-0x shows one too, and
+    that one carries the donor's untouched score. This puts our generated VWSC
+    on a cast that is already known to load, with no scripts anywhere near it,
+    so what the stage shows answers exactly one question -- can Director read a
+    score we wrote?
+    """
+    donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
+    cast_text, cast_stxt = donor_text_member(donor)
+
+    next_index = max(r.index for r in donor.resources) + 1
+    cas = donor.chunk(donor.by_tag("CAS*")[0])
+    donor_members = [struct.unpack(">I", cas[i:i + 4])[0]
+                     for i in range(0, len(cas), 4)]
+
+    i_a, i_a_stxt, i_b, i_b_stxt = (next_index + n for n in range(4))
+    member_a, member_b = len(donor_members) + 1, len(donor_members) + 2
+    extra = [(b"CASt", donor.chunk(cast_text)), (b"STXT", donor.chunk(cast_stxt)),
+             (b"CASt", donor.chunk(cast_text)), (b"STXT", donor.chunk(cast_stxt))]
+    members = donor_members + [i_a, i_b]
+
+    def frame(editable, back):
+        return {0: bm.main_channel_d6plus(profile.main_size),
+                SPRITE_CH: profile.sprite(cast_member=member_a, x=20, y=20,
+                                          w=200, h=40, editable=editable,
+                                          back=back),
+                RESULT_CH: profile.sprite(cast_member=member_b, x=20, y=120,
+                                          w=200, h=40)}
+
+    vwsc = bm.build_vwsc_d6plus(
+        [frame(True, 0), frame(False, 255), frame(True, 255), frame(True, 255)],
+        main_size=profile.main_size, spr_size=profile.spr_size,
+        frames_version=profile.frames_version)
+
+    replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(members),
+               donor.by_tag("MCsL")[0].index: bm.build_mcsl(
+                   "Internal", 1, len(members), bm.CASTLIB_KEY_PARENT),
+               donor.by_tag("VWSC")[0].index: vwsc}
+
+    key_extra = [(i_a_stxt, i_a, b"STXT"), (i_b_stxt, i_b, b"STXT")]
+    data = bm.rebuild_preserving_indices(donor, extra=extra,
+                                         extra_key=key_extra, replace=replace)
+    path = OUT / f"score-{profile.name}.dir"
     path.write_bytes(data)
     return path, data
