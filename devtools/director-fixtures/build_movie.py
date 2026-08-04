@@ -234,13 +234,20 @@ def main_channel_d4(*, action_id=0, tempo=0):
 def sprite_d6(*, cast_member, x, y, w, h,
               sprite_type=SPRITE_TYPE_CAST_MEMBER,
               ink=SPRITE_INK_DEFAULT, editable=False,
-              fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
+              fore=255, back=0, cast_lib=DEFAULT_CAST_LIB, list_idx=0):
     """24-byte D6 sprite record (writeSpriteDataD6, frame.cpp).
-    The editable bit is still 0x40, but colorcode moved to byte 20."""
+    The editable bit is still 0x40, but colorcode moved to byte 20.
+
+    list_idx points at this sprite's detail entries and must not be 0: across
+    577649 sprite records in the archive not one carries 0 there. ScummVM guards
+    with `if (sprite->_spriteListIdx)` (score.cpp:2081) and so never notices,
+    but Director follows the index unconditionally and 0 is entry 0 -- the score
+    itself -- which it then reads as a SpriteInfo.
+    """
     out = bytearray()
     out += bytes([sprite_type, ink, fore, back])
     out += struct.pack(BE + "hH", cast_lib, cast_member)
-    out += struct.pack(BE + "I", 0)                  # spriteListIdx
+    out += struct.pack(BE + "I", list_idx)           # spriteListIdx
     out += struct.pack(BE + "HH", y, x)
     out += struct.pack(BE + "HH", h, w)
     out += bytes([0x40 if editable else 0x00, 0, SPRITE_THICKNESS_DEFAULT, 0])
@@ -251,12 +258,12 @@ def sprite_d6(*, cast_member, x, y, w, h,
 def sprite_d7(*, cast_member, x, y, w, h,
               sprite_type=SPRITE_TYPE_CAST_MEMBER,
               ink=SPRITE_INK_DEFAULT, editable=False,
-              fore=255, back=0, cast_lib=DEFAULT_CAST_LIB):
+              fore=255, back=0, cast_lib=DEFAULT_CAST_LIB, list_idx=0):
     """48-byte D7 sprite record; the first 23 bytes match D6."""
     out = bytearray(sprite_d6(cast_member=cast_member, x=x, y=y, w=w, h=h,
                               sprite_type=sprite_type, ink=ink,
                               editable=editable, fore=fore, back=back,
-                              cast_lib=cast_lib)[:23])
+                              cast_lib=cast_lib, list_idx=list_idx)[:23])
     out += bytes([0])                                # flags
     out += bytes([0, 0, 0, 0])                       # fg/bg colour G and B
     out += struct.pack(BE + "II", 0, 0)              # angleRot, angleSkew
@@ -265,7 +272,8 @@ def sprite_d7(*, cast_member, x, y, w, h,
     return bytes(out)
 
 
-def main_channel_d6plus(size, *, action_id=0, cast_lib=DEFAULT_CAST_LIB):
+def main_channel_d6plus(size, *, action_id=0, cast_lib=DEFAULT_CAST_LIB,
+                        script_list_idx=0):
     """D6/D7 main channel. Only the frame script is filled in; everything else
     stays zero, which reads back as no tempo, transition or palette change.
 
@@ -275,11 +283,32 @@ def main_channel_d6plus(size, *, action_id=0, cast_lib=DEFAULT_CAST_LIB):
     """
     out = bytearray(size)
     struct.pack_into(BE + "HH", out, 0, cast_lib, action_id)
+    # scriptSpriteListIdx: a u16 at offset 6, exactly where the donor puts it
+    # (readMainChannelsD6 case 0+6). Like a sprite's, it must not be 0.
+    struct.pack_into(BE + "H", out, 6, script_list_idx)
     return bytes(out)
 
 
+SPRITE_INFO_FIXED = 40          # five int32 plus a five field TweenInfo
+
+
+def build_sprite_info(*, start_frame, end_frame, channel, key_frames=()):
+    """One detail entry, per SpriteInfo::read (spriteinfo.h:55).
+
+    A sprite's detail index n claims three consecutive entries: n is this
+    struct, n+1 the behaviour list and n+2 the name (score.cpp:2058ff). Both may
+    be empty, but they have to exist, or the entry after them is read as theirs.
+    """
+    out = struct.pack(BE + "iiiii", start_frame, end_frame, 0, 0, channel)
+    out += struct.pack(BE + "iiiii", 0, 0, 0, 0, 0)      # TweenInfo
+    for f in key_frames:
+        out += struct.pack(BE + "i", f)
+    assert len(out) == SPRITE_INFO_FIXED + 4 * len(key_frames)
+    return out
+
+
 def build_vwsc_d6plus(frames, *, main_size, spr_size, frames_version,
-                      num_channels=50, geometry=None):
+                      num_channels=50, geometry=None, details=()):
     """D6 and later wrap the score in an index, but the score itself is unchanged.
 
         0   u32 framesStreamSize (whole chunk)
@@ -318,19 +347,26 @@ def build_vwsc_d6plus(frames, *, main_size, spr_size, frames_version,
     if len(data) % 2:                                # donors pad the entry, and
         data += b"\0"                                # leave the size field odd
 
-    num_entries = 1
+    entries = [bytes(data)] + [bytes(d) for d in details]
+    num_entries = len(entries)
     list_size = num_entries + 1
     index_start = 24
+
+    offsets, pos = [], 0
+    for e in entries:
+        offsets.append(pos)
+        pos += len(e)
 
     out = bytearray()
     out += struct.pack(BE + "I", 0)                  # patched below
     out += struct.pack(BE + "i", -3)
     out += struct.pack(BE + "I", 12)
-    out += struct.pack(BE + "III", num_entries, list_size, len(data))
-    out += struct.pack(BE + "I", 0)                  # entry 0: the score
-    out += struct.pack(BE + "I", len(data))          # end sentinel
+    out += struct.pack(BE + "III", num_entries, list_size, pos)
+    for off in offsets:
+        out += struct.pack(BE + "I", off)
+    out += struct.pack(BE + "I", pos)                # end sentinel
     assert len(out) == index_start + list_size * 4, len(out)
-    out += data
+    out += b"".join(entries)
     struct.pack_into(BE + "I", out, 0, len(out))
     return bytes(out)
 
@@ -362,7 +398,11 @@ def _split_channel(channel, offset, payload, main_size, spr_size):
         # a member, at offsets 0 and 2 (readMainChannelsD4 vs D6/D7).
         if main_size == MAIN_CHANNEL_SIZE_D4:
             return [(offset + 16, payload[16:18])]
-        return [(offset, payload[:4])]
+        # The donor writes these as two pieces, 4 bytes of cast lib and member
+        # then 2 bytes of scriptSpriteListIdx, and the reader's case labels only
+        # line up that way -- a single 8 byte write would hit case 0+4, which is
+        # a u32 read of the same field.
+        return [(offset, payload[:4]), (offset + 6, payload[6:8])]
     return [(offset, payload[:16]), (offset + 16, payload[16:spr_size])]
 
 

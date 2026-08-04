@@ -191,6 +191,8 @@ incomplete and test in Director before believing it works.
 | **the Lingo source in the cast info** | the same `global` declarations as the bytecode | it runs the bytecode and ignores the source |
 | **every donor resource's mmap index** | unchanged -- append, never repack | it resolves resources through `KEY*` and the maps it just read |
 | sprite fore/back colour | a palette index that is actually visible -- the donor's, not a round number | it renders through `transformColor()` and its own palette handling |
+| **`spriteListIdx`** (D6+, sprites and the frame script) | a real detail index, never 0 | `if (sprite->_spriteListIdx)` skips the lookup (`score.cpp:2081`); Director follows it unconditionally, and 0 is entry 0, the score |
+| D6+ `numOfFrames` | 0 on framesVersion 11, the real count on 13 | it recounts the frames itself (`score.cpp:1999`) |
 
 The last one is the one to remember: the source kept next to the bytecode is not
 documentation. Director compiles from it, and its error messages quote those
@@ -272,6 +274,24 @@ real chunk before trusting it** -- reproduce a donor byte for byte, or decode a
 donor with the same code and check the totals close. `lscr_asm`, `build_mcsl` and
 the config checksum were all built that way and none of them ever produced a bug
 Director found first; the score writer was not, and it did.
+
+### Measure it against the archive
+
+Two of the traps above were settled not by reading Director's source, which we
+do not have, but by counting what real movies do. Sweeping every Director file
+under a games archive takes a few minutes and answers questions no amount of
+staring at one donor can:
+
+* entry 0 is the whole score -- **5020 of 5020** D6+ scores parse that way
+* a cast member sprite is type 16 -- 549273 records say so and none says
+  anything else
+* `spriteListIdx` is never 0 -- 577649 records, not one exception
+* `numOfFrames` is 0 on framesVersion 11 and the real count on 13 -- without
+  exception in either direction
+
+That last pair mattered because a single donor cannot show you a rule; it can
+only show you one instance of it, and the D6 donor turned out to have no sprites
+in its score at all. When a field's correct value is not obvious, count.
 
 While you are there, take the geometry from the donor rather than inventing it:
 `donor_score_geometry()` lifts the frames version, sprite record size and channel

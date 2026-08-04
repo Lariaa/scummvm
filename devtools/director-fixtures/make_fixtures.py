@@ -902,6 +902,28 @@ def build_ladder_d6d7(profile):
     return made
 
 
+
+def sprite_details(spans):
+    """Allocates the detail entries a D6+ score needs and returns their indices.
+
+    Every sprite and every frame script points at a detail index, and it may not
+    be 0 -- across 577649 records in the archive not one is. Each index claims
+    three entries: the SpriteInfo, the behaviour list and the name. We have no
+    behaviours and no names, so the last two are empty, but they still occupy
+    their slot, or the entry after them is read as theirs.
+
+    `spans` is a list of (startFrame, endFrame, channel); index 0 belongs to the
+    score itself, so ours start at 1.
+    """
+    entries, indices, n = [], [], 1
+    for start, end, channel in spans:
+        indices.append(n)
+        entries += [bm.build_sprite_info(start_frame=start, end_frame=end,
+                                         channel=channel), b"", b""]
+        n += 3
+    return indices, entries
+
+
 def build_editable_append(profile):
     """The D6/D7 editable fixture, built by appending to the donor.
 
@@ -986,23 +1008,30 @@ def build_editable_append(profile):
     members = donor_members + [i_test, i_res] + script_cast
     first_script_member = result_member + 1
 
-    def frame(action_member, editable, back):
+    # both sprites span all four frames; each frame script is its own one frame
+    # span in the script channel
+    idx, details = sprite_details(
+        [(1, 4, SPRITE_CH), (1, 4, RESULT_CH)]
+        + [(i + 1, i + 1, 0) for i in range(4)])
+
+    def frame(i, editable, back):
         return {0: bm.main_channel_d6plus(profile.main_size,
-                                          action_id=action_member),
+                                          action_id=first_script_member + i,
+                                          script_list_idx=idx[2 + i]),
                 SPRITE_CH: profile.sprite(cast_member=tested_member,
                                           x=20, y=20, w=200,
-                                          h=40, editable=editable, back=back),
+                                          h=40, editable=editable, back=back,
+                                          list_idx=idx[0]),
                 RESULT_CH: profile.sprite(cast_member=result_member,
-                                          x=20, y=120, w=200, h=40)}
+                                          x=20, y=120, w=200, h=40,
+                                          list_idx=idx[1])}
 
     vwsc = bm.build_vwsc_d6plus(
-        [frame(first_script_member + 0, True, 0),
-         frame(first_script_member + 1, False, 255),
-         frame(first_script_member + 2, True, 255),
-         frame(first_script_member + 3, True, 255)],
+        [frame(0, True, 0), frame(1, False, 255),
+         frame(2, True, 255), frame(3, True, 255)],
         main_size=profile.main_size, spr_size=profile.spr_size,
         frames_version=profile.frames_version,
-        geometry=bm.donor_score_geometry(donor))
+        geometry=bm.donor_score_geometry(donor), details=details)
 
     replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(members),
                donor.by_tag("MCsL")[0].index: bm.build_mcsl(
@@ -1045,19 +1074,20 @@ def build_score_probe(profile):
              (b"CASt", donor.chunk(cast_text)), (b"STXT", donor.chunk(cast_stxt))]
     members = donor_members + [i_a, i_b]
 
+    idx, details = sprite_details([(1, 4, SPRITE_CH), (1, 4, RESULT_CH)])
+
     def frame(editable, back):
-        return {0: bm.main_channel_d6plus(profile.main_size),
-                SPRITE_CH: profile.sprite(cast_member=member_a, x=20, y=20,
+        return {SPRITE_CH: profile.sprite(cast_member=member_a, x=20, y=20,
                                           w=200, h=40, editable=editable,
-                                          back=back),
+                                          back=back, list_idx=idx[0]),
                 RESULT_CH: profile.sprite(cast_member=member_b, x=20, y=120,
-                                          w=200, h=40)}
+                                          w=200, h=40, list_idx=idx[1])}
 
     vwsc = bm.build_vwsc_d6plus(
         [frame(True, 0), frame(False, 255), frame(True, 255), frame(True, 255)],
         main_size=profile.main_size, spr_size=profile.spr_size,
         frames_version=profile.frames_version,
-        geometry=bm.donor_score_geometry(donor))
+        geometry=bm.donor_score_geometry(donor), details=details)
 
     replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(members),
                donor.by_tag("MCsL")[0].index: bm.build_mcsl(
@@ -1106,8 +1136,10 @@ def build_graft_probe(profile):
 
     # frame 1 keeps everything it had and gains one write at the start of
     # sprite channel 1
+    # The donor's whole index survives here, so its detail entries stay valid;
+    # entry 3 is the triple its own frame script uses and serves ours as well.
     rec = profile.sprite(cast_member=member, x=20, y=20, w=200, h=40,
-                         editable=True)
+                         editable=True, list_idx=3)
     write = struct.pack(">HH", len(rec), profile.main_size) + rec
     fsz = struct.unpack(">H", entry0[frame1:frame1 + 2])[0]
     grafted = (entry0[:frame1]
