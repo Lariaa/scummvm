@@ -617,3 +617,49 @@ def load_donor(path=None):
         raise ValueError("testMovie[] blob not found in %s" % src)
     data = bytes(int(x, 16) for x in re.findall(r"0x([0-9A-Fa-f]{2})", m.group(1)))
     return rifx.RifxFile(gzip.decompress(data))
+
+
+def extend_lnam(payload, names):
+    """Appends names to a name table, keeping the existing ones at their index.
+
+    The Lctx has a single nameTableId, so a movie has one name list; scripts we
+    append have to share the donor's. Returns (chunk, base) where base is the
+    index our first name landed on.
+    """
+    head = payload[0:8]
+    offset = struct.unpack_from(BE + "H", payload, 16)[0]
+    count = struct.unpack_from(BE + "H", payload, 18)[0]
+    existing, pos = [], offset
+    for _ in range(count):
+        n = payload[pos]
+        existing.append(payload[pos + 1:pos + 1 + n].decode("latin1"))
+        pos += 1 + n
+    return lscr.build_lnam(existing + list(names), head), len(existing)
+
+
+def extend_lctx(payload, lscr_indices):
+    """Appends script context entries, keeping the donor's at their position.
+
+    An entry's 1-based position is the lctxIndex handed to addCodeV4 and has to
+    match the scriptId in the member's cast info, so appending rather than
+    replacing leaves the donor's own scripts resolvable. Returns (chunk, base)
+    where base is the 1-based position of our first entry.
+    """
+    out = bytearray(payload)
+    count = struct.unpack_from(BE + "i", out, 8)[0]
+    items_offset = struct.unpack_from(BE + "H", out, 16)[0]
+    entry_size = struct.unpack_from(BE + "H", out, 18)[0] or 12
+    end = items_offset + count * entry_size
+
+    tail = bytes(out[end:])
+    out = bytearray(out[:end])
+    for idx in lscr_indices:
+        out += struct.pack(BE + "I", 0)
+        out += struct.pack(BE + "i", idx)
+        out += struct.pack(BE + "Hh", 0, -1)
+    out += tail
+
+    new_count = count + len(lscr_indices)
+    struct.pack_into(BE + "ii", out, 8, new_count, new_count)
+    struct.pack_into(BE + "h", out, 36, new_count)      # validCount
+    return bytes(out), count + 1

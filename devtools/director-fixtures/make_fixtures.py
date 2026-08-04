@@ -924,3 +924,111 @@ def build_ladder_d6d7(profile):
                                        **kw)
         made.append((f"{n}-{letter}", what, path.name, len(data)))
     return made
+
+
+def build_editable_append(profile):
+    """The D6/D7 editable fixture, built by appending to the donor.
+
+    ladder-d6-0x showed that rebuilding the index space is what Director chokes
+    on, so nothing here moves: our chunks take indices after the donor's last,
+    the name table and script context are extended rather than replaced, and
+    only CAS*, MCsL and VWSC are swapped in place.
+    """
+    donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
+    cast_text, _ = donor_text_member(donor)
+
+    next_index = max(r.index for r in donor.resources) + 1
+    cas = donor.chunk(donor.by_tag("CAS*")[0])
+    donor_members = [struct.unpack(">I", cas[i:i + 4])[0]
+                     for i in range(0, len(cas), 4)]
+
+    lnam_res = donor.by_tag("Lnam")[0]
+    lnam, name_base = bm.extend_lnam(donor.chunk(lnam_res), NAMES)
+    if name_base + len(NAMES) > 255:
+        raise SystemExit("donor's name table is too long for byte operands")
+    n_exit, n_put, n_global = (name_base + i for i in range(3))
+
+    def const_push(i):
+        return lscr_asm.const_push(i, profile.const_entry)
+
+    probe = (lscr_asm.the_sprite_field(SPRITE_CH, lscr_asm.SPRITE_EDITABLETEXT))
+
+    def check(expected, first):
+        tail = (lscr_asm.intpush(expected) + bytes([lscr_asm.OP_EQ]))
+        if first:
+            return probe + tail + lscr_asm.global_assign(n_global) + \
+                bytes([lscr_asm.OP_PROCRET])
+        return (lscr_asm.global_push(n_global) + lscr_asm.intpush(10)
+                + bytes([lscr_asm.OP_MUL]) + probe + tail
+                + bytes([lscr_asm.OP_ADD]) + lscr_asm.global_assign(n_global)
+                + bytes([lscr_asm.OP_PROCRET]))
+
+    result_member = len(donor_members) + 1
+    msg = (const_push(0) + lscr_asm.global_push(n_global)
+           + bytes([lscr_asm.OP_AMPERSAND]))
+    report = (lscr_asm.field_assign_id(result_member, bm.DEFAULT_CAST_LIB) + msg
+              + lscr_asm.the_field_assign(result_member)
+              + msg + lscr_asm.call_command(n_put, 1)
+              + bytes([lscr_asm.OP_PROCRET]))
+
+    scripts = [("checkFrame1", check(1, True), src_first(1), ()),
+               ("checkFrame2", check(0, False), src_append(0), ()),
+               ("checkFrame3", check(1, False), src_append(1), ()),
+               ("reportResult", report, src_report(), (LABEL,))]
+
+    # indices: result field CASt, its STXT, then a CASt and an Lscr per script
+    i_res, i_res_stxt = next_index, next_index + 1
+    script_cast = [next_index + 2 + 2 * i for i in range(len(scripts))]
+    script_lscr = [next_index + 3 + 2 * i for i in range(len(scripts))]
+
+    lctx_res = donor.by_tag("Lctx")[0]
+    lctx, script_base = bm.extend_lctx(donor.chunk(lctx_res), script_lscr)
+
+    extra = [(b"CASt", donor.chunk(cast_text)),
+             (b"STXT", donor.chunk(donor_text_member(donor)[1]))]
+    for i, (nm, code, src, consts) in enumerate(scripts):
+        extra.append((b"CASt", bm.build_script_cast(
+            script_base + i, nm, src, bm.SCRIPT_TYPE_SCORE, d5plus=True)))
+        extra.append((b"Lscr", lscr_asm.build_lscr(
+            [lscr_asm.Handler(n_exit, code)],
+            script_id=script_base + i, assembly_id=script_base + i,
+            event_map=[-1] * 10 + [0],
+            event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
+            consts=consts, global_names=[n_global],
+            const_entry_size=profile.const_entry)))
+
+    members = donor_members + [i_res] + script_cast
+    first_script_member = result_member + 1
+
+    def frame(action_member, editable, back):
+        return {0: bm.main_channel_d6plus(profile.main_size,
+                                          action_id=action_member),
+                SPRITE_CH: profile.sprite(cast_member=1, x=20, y=20, w=200,
+                                          h=40, editable=editable, back=back),
+                RESULT_CH: profile.sprite(cast_member=result_member,
+                                          x=20, y=120, w=200, h=40)}
+
+    vwsc = bm.build_vwsc_d6plus(
+        [frame(first_script_member + 0, True, 0),
+         frame(first_script_member + 1, False, 255),
+         frame(first_script_member + 2, True, 255),
+         frame(first_script_member + 3, True, 255)],
+        main_size=profile.main_size, spr_size=profile.spr_size,
+        frames_version=profile.frames_version)
+
+    replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(members),
+               donor.by_tag("MCsL")[0].index: bm.build_mcsl(
+                   "Internal", 1, len(members), bm.CASTLIB_KEY_PARENT),
+               donor.by_tag("VWSC")[0].index: vwsc,
+               lnam_res.index: lnam,
+               lctx_res.index: lctx}
+
+    key_extra = [(i_res_stxt, i_res, b"STXT")]
+    key_extra += [(l, c, b"Lscr") for c, l in zip(script_cast, script_lscr)]
+
+    data = bm.rebuild_preserving_indices(donor, extra=extra,
+                                         extra_key=key_extra, replace=replace)
+    path = OUT / f"editable-{profile.name}-append.dir"
+    path.write_bytes(data)
+    return path, data
