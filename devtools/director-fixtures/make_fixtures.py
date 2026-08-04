@@ -1335,7 +1335,8 @@ def build_graft_minimal(profile):
     return path, payload
 
 
-def build_score_donor_index(profile, main_channel=False, tag="scoreidx"):
+def build_score_donor_index(profile, main_channel=False, tag="scoreidx",
+                            own_details=False, key_frames=()):
     """Our frame stream, the donor's detail index. The step after graft0.
 
     graft0 renders, so the container, the cast, the sprite record and the detail
@@ -1357,10 +1358,12 @@ def build_score_donor_index(profile, main_channel=False, tag="scoreidx"):
                for i in range(0, len(cas), 4)]
     member = members.index(cast_text.index) + 1
 
+    idx = 1 if own_details else 3
+
     def frame(editable, back):
         chans = {SPRITE_CH: profile.sprite(cast_member=member, x=20, y=20,
                                            w=200, h=40, editable=editable,
-                                           back=back, list_idx=3)}
+                                           back=back, list_idx=idx)}
         if main_channel:
             # graft0's frames all touch the main channel and it renders; ours
             # touch nothing but the sprite. This variant closes that gap so the
@@ -1388,8 +1391,13 @@ def build_score_donor_index(profile, main_channel=False, tag="scoreidx"):
     d_data = d_idx + d_ls * 4
     d_offs = [struct.unpack(">I", b[d_idx + 4 * i:d_idx + 4 * i + 4])[0]
               for i in range(d_ls)]
-    entries = [mine] + [b[d_data + o:d_data + n]
-                        for o, n in zip(d_offs, d_offs[1:])][1:]
+    if own_details:
+        entries = [mine, bm.build_sprite_info(start_frame=1, end_frame=4,
+                                              channel=SPRITE_CH,
+                                              key_frames=key_frames), b"", b""]
+    else:
+        entries = [mine] + [b[d_data + o:d_data + n]
+                            for o, n in zip(d_offs, d_offs[1:])][1:]
 
     positions, pos = [], 0
     for e in entries:
@@ -1440,5 +1448,8 @@ if __name__ == "__main__":
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
         report(*build_score_donor_index(profile))
-        report(*build_score_donor_index(profile, main_channel=True,
-                                        tag="scoremain"))
+        report(*build_score_donor_index(profile, tag="scoredet",
+                                        own_details=True))
+        report(*build_score_donor_index(profile, tag="scorekey",
+                                        own_details=True,
+                                        key_frames=(1,)))
