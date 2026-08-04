@@ -302,9 +302,14 @@ def build_vwsc_d6plus(frames, *, main_size, spr_size, frames_version,
     confirm the layout: the frame stream starts at `frame1Offset` = 20 inside
     entry 0 and runs to `framesStreamSize`.
     """
+    # numOfFrames is version specific, and the archive is unanimous about it:
+    # every score with framesVersion 11 writes 0 and lets the reader count,
+    # every one with 13 writes the real number. Writing the count on a D6 movie
+    # says something no D6 movie says.
     header, body, _ = _score_header_and_frames(
         frames, main_size=main_size, spr_size=spr_size,
-        frames_version=frames_version, num_channels=num_channels)
+        frames_version=frames_version, num_channels=num_channels,
+        declared_frames=len(frames) if frames_version >= 13 else 0)
     if geometry is not None:
         # frames version, sprite record size and channel counts, taken from the
         # donor rather than guessed -- they describe the movie, not our frames
