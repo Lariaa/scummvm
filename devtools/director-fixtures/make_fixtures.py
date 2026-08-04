@@ -112,7 +112,7 @@ def make_lscr(code, script_id, consts=()):
                                consts=consts, global_names=[I_GLOBAL])
 
 
-def build_editable():
+def build_editable(vwsc_override=None, out_name="editable.dir"):
     donor = bm.load_donor()
     keep = {}
     for r in donor.resources:
@@ -191,7 +191,8 @@ def build_editable():
                                     w=200, h=40),
         }
 
-    chunks[i_vwsc - 3] = (b"VWSC", bm.build_vwsc([
+    chunks[i_vwsc - 3] = (b"VWSC", vwsc_override if vwsc_override is not None
+                          else bm.build_vwsc([
         frame(True, 0, script_member[0]),
         frame(False, 255, script_member[1]),
         frame(True, 255, script_member[2]),
@@ -199,7 +200,7 @@ def build_editable():
     ]))
 
     data = bm.build_rifx(chunks)
-    path = OUT / "editable.dir"
+    path = OUT / out_name
     path.write_bytes(data)
     return path, data
 
@@ -760,3 +761,56 @@ if __name__ == "__main__":
         for kind in ("editable", "listoverride"):
             report(*build_variant(profile, kind))
         report(*build_probe(profile))
+
+
+# --------------------------------------------------------------------------
+# Bisection ladder for the empty score in Director
+#
+# probe-d4.dir (our container and cast, the donor's score) renders in Director;
+# editable.dir (the same, our score) leaves the score window empty. Everything
+# outside the VWSC is therefore ruled out. These five movies close that gap one
+# change at a time, keeping cast and container identical throughout, so the
+# first one that comes up empty names the cause.
+# --------------------------------------------------------------------------
+def donor_sprite_record():
+    """The donor's own 16 byte sprite record for channel 1, padded to 20."""
+    donor = bm.load_donor()
+    s = donor.chunk(donor.by_tag("VWSC")[0])
+    frame1 = struct.unpack(">I", s[4:8])[0]
+    size, off = struct.unpack(">HH", s[frame1 + 2:frame1 + 6])
+    return s[frame1 + 6:frame1 + 6 + size] + b"\0" * (20 - size)
+
+
+def build_ladder():
+    donor = bm.load_donor()
+    donor_vwsc = donor.chunk(donor.by_tag("VWSC")[0])
+    rec = donor_sprite_record()
+    mine = bm.sprite_d4(cast_member=TEXT_MEMBER, x=20, y=20, w=200, h=40,
+                        editable=True)
+    made = []
+
+    def emit(letter, what, vwsc):
+        path, data = build_editable(vwsc, "ladder-%s.dir" % letter)
+        made.append((letter, what, path.name, len(data)))
+
+    # a: the donor's score verbatim -- the known good end, now next to our
+    #    full cast rather than the two members probe-d4 carries
+    emit("a", "donor score, unchanged", donor_vwsc)
+
+    # b: our frame writer, but emitting the donor's own sprite bytes
+    emit("b", "our writer, donor's sprite bytes",
+         bm.build_vwsc([{SPRITE_CH: rec}]))
+
+    # c: as b, with our geometry and colours
+    emit("c", "our writer, our sprite bytes", bm.build_vwsc([{SPRITE_CH: mine}]))
+
+    # d: as c, plus the frame script in the main channel
+    emit("d", "plus the frame script",
+         bm.build_vwsc([{0: bm.main_channel_d4(action_id=4), SPRITE_CH: mine}]))
+
+    # e: as d, but four frames instead of one
+    emit("e", "plus four frames", bm.build_vwsc(
+        [{0: bm.main_channel_d4(action_id=4 + i), SPRITE_CH: mine}
+         for i in range(4)]))
+
+    return made
