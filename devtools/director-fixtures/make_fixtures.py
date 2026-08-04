@@ -1131,7 +1131,9 @@ def build_graft_probe(profile):
     list_size = struct.unpack(">I", b[list_start + 4:list_start + 8])[0]
     index_start = list_start + 12
     data = index_start + list_size * 4
-    entry0 = bytearray(b[data + struct.unpack(">I", b[index_start:index_start + 4])[0]:])
+    donor_offsets = [struct.unpack(">I", b[index_start + 4 * i:index_start + 4 * i + 4])[0]
+                     for i in range(list_size)]
+    entry0 = bytearray(b[data + donor_offsets[0]:data + donor_offsets[1]])
     size, frame1 = struct.unpack(">II", entry0[0:8])
 
     # frame 1 keeps everything it had and gains one write at the start of
@@ -1151,13 +1153,26 @@ def build_graft_probe(profile):
     if len(grafted) % 2:
         grafted += b"\0"
 
+    # Keep every detail entry the donor has. Dropping them while its frame
+    # scripts -- and our sprite -- still point into them leaves the score full of
+    # dangling indices, which is what an earlier version of this probe did.
+    tail = [b[data + o:data + n]
+            for o, n in zip(donor_offsets, donor_offsets[1:])][1:]
+    entries = [bytes(grafted)] + tail
+    offsets, pos = [], 0
+    for e in entries:
+        offsets.append(pos)
+        pos += len(e)
+
     out = bytearray()
     out += struct.pack(">I", 0)
     out += struct.pack(">i", -3)
     out += struct.pack(">I", 12)
-    out += struct.pack(">III", 1, 2, len(grafted))
-    out += struct.pack(">II", 0, len(grafted))
-    out += grafted
+    out += struct.pack(">III", len(entries), len(entries) + 1, pos)
+    for off in offsets:
+        out += struct.pack(">I", off)
+    out += struct.pack(">I", pos)
+    out += b"".join(entries)
     struct.pack_into(">I", out, 0, len(out))
 
     extra = [(b"CASt", donor.chunk(cast_text)), (b"STXT", donor.chunk(cast_stxt))]
@@ -1258,6 +1273,68 @@ def build_cast_ladder():
     return made
 
 
+def build_graft_minimal(profile):
+    """The donor, untouched, plus one channel write. Nothing else at all.
+
+    Every other probe still changes the cast: it appends a text member, rewrites
+    CAS* and MCsL, and moves castArrayEnd. This one changes exactly one thing --
+    frame 1 of the score gains a sprite showing a member the donor already has,
+    with the detail index one of its own sprites already uses. If Director shows
+    nothing even here, then writing a channel is what we get wrong, and no part
+    of the cast is involved.
+    """
+    donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
+
+    cast_text, _ = donor_text_member(donor)
+    cas = donor.chunk(donor.by_tag("CAS*")[0])
+    members = [struct.unpack(">I", cas[i:i + 4])[0]
+               for i in range(0, len(cas), 4)]
+    member = members.index(cast_text.index) + 1
+
+    b = donor.chunk(donor.by_tag("VWSC")[0])
+    list_start = struct.unpack(">I", b[8:12])[0]
+    list_size = struct.unpack(">I", b[list_start + 4:list_start + 8])[0]
+    index_start = list_start + 12
+    data = index_start + list_size * 4
+    offs = [struct.unpack(">I", b[index_start + 4 * i:index_start + 4 * i + 4])[0]
+            for i in range(list_size)]
+    entry0 = bytearray(b[data + offs[0]:data + offs[1]])
+    size, frame1 = struct.unpack(">II", entry0[0:8])
+
+    rec = profile.sprite(cast_member=member, x=20, y=20, w=200, h=40,
+                         editable=True, list_idx=3)
+    write = struct.pack(">HH", len(rec), profile.main_size) + rec
+    fsz = struct.unpack(">H", entry0[frame1:frame1 + 2])[0]
+    grafted = (entry0[:frame1] + struct.pack(">H", fsz + len(write))
+               + entry0[frame1 + 2:frame1 + fsz] + write
+               + entry0[frame1 + fsz:size])
+    struct.pack_into(">I", grafted, 0, size + len(write))
+    if len(grafted) % 2:
+        grafted += b"\0"
+
+    entries = [bytes(grafted)] + [b[data + o:data + n]
+                                  for o, n in zip(offs, offs[1:])][1:]
+    positions, pos = [], 0
+    for e in entries:
+        positions.append(pos)
+        pos += len(e)
+    out = bytearray()
+    out += struct.pack(">I", 0) + struct.pack(">i", -3) + struct.pack(">I", 12)
+    out += struct.pack(">III", len(entries), len(entries) + 1, pos)
+    for o in positions:
+        out += struct.pack(">I", o)
+    out += struct.pack(">I", pos)
+    out += b"".join(entries)
+    struct.pack_into(">I", out, 0, len(out))
+
+    payload = bm.rebuild_preserving_indices(
+        donor, replace={donor.by_tag("VWSC")[0].index: bytes(out)})
+    path = OUT / f"graft0-{profile.name}.dir"
+    path.write_bytes(payload)
+    return path, payload
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
@@ -1285,3 +1362,4 @@ if __name__ == "__main__":
         report(*build_editable_append(profile))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
+        report(*build_graft_minimal(profile))
