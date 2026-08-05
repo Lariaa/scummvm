@@ -96,12 +96,20 @@ def src_append(e):
             "end\r" % (SPRITE_CH, e))
 
 
-def src_report():
+def src_report(result_member=RESULT_MEMBER):
+    """The source has to name the same field the bytecode writes to.
+
+    Director keeps this text in the cast info and compiles from it -- the cast
+    window labels a member it has not compiled yet as exactly that -- so a source
+    saying field 3 while the Lscr writes field 7 gives a movie that runs and puts
+    its answer somewhere invisible. In the append fixtures member 3 is one of the
+    donor's scripts, so the assignment lands nowhere at all.
+    """
     return ("on exitFrame\r"
             "  global gEditableResult\r"
             '  set the text of field %d to "%s" & gEditableResult\r'
             '  put "%s" & gEditableResult\r'
-            "end\r" % (RESULT_MEMBER, LABEL, LABEL))
+            "end\r" % (result_member, LABEL, LABEL))
 
 
 def make_lscr(code, script_id, consts=()):
@@ -510,7 +518,8 @@ def build_variant(profile, kind):
         scripts = [("checkFrame1", check(1, True), src_first(1), ()),
                    ("checkFrame2", check(0, False), src_append(0), ()),
                    ("checkFrame3", check(1, False), src_append(1), ()),
-                   ("reportResult", field_report(), src_report(), (label,))]
+                   ("reportResult", field_report(), src_report(result_member),
+                    (label,))]
     else:
         names = B_NAMES
         scripts = None                       # filled in after the factory below
@@ -985,7 +994,7 @@ def build_editable_append(profile):
     scripts = [("checkFrame1", check(1, True), src_first(1), ()),
                ("checkFrame2", check(0, False), src_append(0), ()),
                ("checkFrame3", check(1, False), src_append(1), ()),
-               ("reportResult", report, src_report(), (LABEL,))]
+               ("reportResult", report, src_report(result_member), (LABEL,))]
 
     # indices: the two text members with their STXT, then a CASt and an Lscr
     # per script
