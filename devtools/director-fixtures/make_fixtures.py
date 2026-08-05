@@ -1040,7 +1040,12 @@ def build_editable_append(profile):
         frames_version=profile.frames_version,
         geometry=bm.donor_score_geometry(donor), details=details)
 
-    replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(members),
+    # Raising castArrayEnd is what makes an appended member exist for Director;
+    # ScummVM takes the range from MCsL on D5+ and never reads it.
+    cfg = (donor.by_tag("DRCF") or donor.by_tag("VWCF"))[0]
+    replace = {cfg.index: config.set_cast_array_end(donor.chunk(cfg),
+                                                    len(members)),
+               donor.by_tag("CAS*")[0].index: bm.build_cas(members),
                donor.by_tag("MCsL")[0].index: bm.build_mcsl(
                    "Internal", 1, len(members), bm.CASTLIB_KEY_PARENT),
                donor.by_tag("VWSC")[0].index: vwsc,
@@ -1096,7 +1101,12 @@ def build_score_probe(profile):
         frames_version=profile.frames_version,
         geometry=bm.donor_score_geometry(donor), details=details)
 
-    replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(members),
+    # Raising castArrayEnd is what makes an appended member exist for Director;
+    # ScummVM takes the range from MCsL on D5+ and never reads it.
+    cfg = (donor.by_tag("DRCF") or donor.by_tag("VWCF"))[0]
+    replace = {cfg.index: config.set_cast_array_end(donor.chunk(cfg),
+                                                    len(members)),
+               donor.by_tag("CAS*")[0].index: bm.build_cas(members),
                donor.by_tag("MCsL")[0].index: bm.build_mcsl(
                    "Internal", 1, len(members), bm.CASTLIB_KEY_PARENT),
                donor.by_tag("VWSC")[0].index: vwsc}
@@ -1183,7 +1193,10 @@ def build_graft_probe(profile):
     struct.pack_into(">I", out, 0, len(out))
 
     extra = [(b"CASt", donor.chunk(cast_text)), (b"STXT", donor.chunk(cast_stxt))]
-    replace = {donor.by_tag("CAS*")[0].index: bm.build_cas(donor_members + [next_index]),
+    cfg = (donor.by_tag("DRCF") or donor.by_tag("VWCF"))[0]
+    replace = {cfg.index: config.set_cast_array_end(donor.chunk(cfg),
+                                                    len(donor_members) + 1),
+               donor.by_tag("CAS*")[0].index: bm.build_cas(donor_members + [next_index]),
                donor.by_tag("MCsL")[0].index: bm.build_mcsl(
                    "Internal", 1, len(donor_members) + 1, bm.CASTLIB_KEY_PARENT),
                donor.by_tag("VWSC")[0].index: bytes(out)}
