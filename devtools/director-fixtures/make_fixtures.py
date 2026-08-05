@@ -1480,3 +1480,5 @@ if __name__ == "__main__":
                                         own_details=True))
         report(*build_score_donor_index(profile, tag="scoredet2",
                                         own_details=True, sprites=2))
+        for name, what, out_name, size in build_ladder_d6d7(profile):
+            print(f"wrote {out_name} ({size} bytes)  ladder {name}: {what}")

@@ -159,7 +159,15 @@ def build_cas(cast_indices):
 
 
 def build_key(entries, max_entries=None):
-    """KEY*: (childIndex, parentIndex, tag) triples."""
+    """KEY*: (childIndex, parentIndex, tag) triples, sorted by parent then tag.
+
+    Every one of 25 movies sampled from the archive is sorted that way, and
+    appending an entry instead of inserting it is what makes Director call an
+    added cast member corrupted -- it looks up a member's children in here and
+    does not find them past the point where the order breaks. ScummVM builds a
+    hashmap from the whole table (RIFXArchive::readKeyTable) and does not care.
+    """
+    entries = sorted(entries, key=lambda e: (e[1], e[2]))
     if max_entries is None:
         max_entries = len(entries)
     out = bytearray()

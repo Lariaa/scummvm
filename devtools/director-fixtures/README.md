@@ -193,6 +193,8 @@ incomplete and test in Director before believing it works.
 | sprite fore/back colour | a palette index that is actually visible -- the donor's, not a round number | it renders through `transformColor()` and its own palette handling |
 | **`spriteListIdx`** (D6+, sprites and the frame script) | a real detail index, never 0, and **always a multiple of 3** | `if (sprite->_spriteListIdx)` skips the lookup (`score.cpp:2081`); Director follows it unconditionally, and 0 is entry 0, the score. An index off the multiple of 3 makes it read a behaviour list as a SpriteInfo and die |
 | D6+ `numOfFrames` | 0 on framesVersion 11, the real count on 13 | it recounts the frames itself (`score.cpp:1999`) |
+| **`KEY*` entries** | sorted by parent, then tag -- inserted, not appended | it builds a hashmap of the whole table (`RIFXArchive::readKeyTable`), so order cannot matter |
+| **`castArrayEnd`** (config chunk, offset 14) | raised to cover appended members, with the chunk's checksum recomputed | from D5 on it takes the range from `MCsL` and calls this field "likely to be incorrect" (`cast.cpp:419`), and a wrong checksum is only a warning |
 | **detail entry 1** | a directory: how many indices the score uses, then each of them | it only ever follows an index it finds in a sprite, and never looks for the list |
 | **`SpriteInfo`** | 44 bytes -- the fixed part plus one keyframe -- with `TweenInfo` curvature `0x10000` and flags `0x600d` (`1` for a main channel span) | the keyframe loop reads until end of stream, so 40 bytes parses as "no keyframes" |
 
