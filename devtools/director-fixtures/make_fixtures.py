@@ -962,7 +962,7 @@ def build_editable_append(profile, trivial=False, tag=None):
 
     next_index = max(r.index for r in donor.resources) + 1
     cas = donor.chunk(donor.by_tag("CAS*")[0])
-    donor_members = bm.drop_movie_scripts(
+    donor_members = bm.drop_donor_scripts(
         donor, [struct.unpack(">I", cas[i:i + 4])[0]
                 for i in range(0, len(cas), 4)])
 
@@ -1047,7 +1047,10 @@ def build_editable_append(profile, trivial=False, tag=None):
     script_lscr = [next_index + 5 + 2 * i for i in range(len(scripts))]
 
     lctx_res = donor.by_tag("Lctx")[0]
-    lctx, script_base = bm.extend_lctx(donor.chunk(lctx_res), script_lscr)
+    # The donor's own scripts get unlinked first: a blank CAS* slot does not
+    # stop them, Director reaches their code through this table.
+    lctx, script_base = bm.extend_lctx(
+        bm.unlink_donor_scripts(donor.chunk(lctx_res)), script_lscr)
 
     extra = [(b"CASt", donor.chunk(cast_text)),
              (b"STXT", donor.chunk(cast_stxt)),
@@ -1129,7 +1132,7 @@ def build_score_probe(profile):
 
     next_index = max(r.index for r in donor.resources) + 1
     cas = donor.chunk(donor.by_tag("CAS*")[0])
-    donor_members = bm.drop_movie_scripts(
+    donor_members = bm.drop_donor_scripts(
         donor, [struct.unpack(">I", cas[i:i + 4])[0]
                 for i in range(0, len(cas), 4)])
 
@@ -1192,7 +1195,7 @@ def build_graft_probe(profile):
 
     next_index = max(r.index for r in donor.resources) + 1
     cas = donor.chunk(donor.by_tag("CAS*")[0])
-    donor_members = bm.drop_movie_scripts(
+    donor_members = bm.drop_donor_scripts(
         donor, [struct.unpack(">I", cas[i:i + 4])[0]
                 for i in range(0, len(cas), 4)])
     member = len(donor_members) + 1

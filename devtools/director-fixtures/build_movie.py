@@ -191,19 +191,17 @@ def single_internal_mcsl(blob, max_member, min_member=1):
                       internal_lib_resource_id(blob))
 
 
-def drop_movie_scripts(donor, member_indices):
-    """The donor's member list with its movie scripts blanked out.
+def drop_donor_scripts(donor, member_indices):
+    """The donor's member list with every script member blanked out.
 
-    A movie script runs on its own as soon as the film starts, whether or not
-    anything in our score refers to it, and the donor's do what the donor's game
-    needs: the D7 one opens with `Script error: Movie cast not found` for
-    "highscorer", an external cast we deliberately no longer declare.
+    The films test the scripts we write; the donor's are only in the way. Its D7
+    one references an external cast we deliberately stopped declaring, and the
+    handlers doing so sit in a behavior and a movie script both, so picking off
+    one kind leaves the other. Declaring the library again to keep them quiet
+    would ship a fixture that asks for a file it does not have.
 
-    Suppressing that by declaring the library again would mean shipping a fixture
-    that asks for a file it does not have. These members are not wanted either
-    way -- the fixture tests the scripts we write -- so their CAS* slots go
-    empty, which is what a slot with no member looks like anyway. Behaviors and
-    parent scripts stay: nothing calls them unless a score does.
+    An emptied slot is what a slot with no member holds anyway. Pair this with
+    unlink_donor_scripts: clearing the slot alone leaves the code reachable.
     """
     out = []
     for index in member_indices:
@@ -214,8 +212,7 @@ def drop_movie_scripts(donor, member_indices):
             if len(body) >= 12:
                 cast_type, info_len, data_len = struct.unpack(BE + "III", body[0:12])
                 data = body[12 + info_len:12 + info_len + data_len]
-                if (cast_type == KCAST_LINGO_SCRIPT and len(data) >= 2
-                        and struct.unpack(BE + "H", data[0:2])[0] == SCRIPT_TYPE_MOVIE):
+                if cast_type == KCAST_LINGO_SCRIPT:
                     keep = False
         out.append(index if keep else 0)
     return out
@@ -854,6 +851,28 @@ def extend_lnam(payload, names):
             indices.append(len(table))
             table.append(name)
     return lscr.build_lnam(table, head), indices
+
+
+def unlink_donor_scripts(payload):
+    """Points every context entry the donor brought at nothing.
+
+    Emptying a script's CAS* slot is not enough to stop it running: Director
+    reaches its code through the Lingo context, not through the cast. The D7
+    donor's member 2 carries `on stopMovie`, our films play four frames and then
+    stop, and up it comes -- `Script error: Movie cast not found` for the
+    external cast we no longer declare.
+
+    An unused entry is -1, which is what the donor's own spare slots hold. The
+    Lscr chunks stay in the file with nothing pointing at them, and our scripts
+    keep their positions, so the scriptIds in their cast info still line up.
+    """
+    out = bytearray(payload)
+    count = struct.unpack_from(BE + "i", out, 8)[0]
+    items_offset = struct.unpack_from(BE + "H", out, 16)[0]
+    entry_size = struct.unpack_from(BE + "H", out, 18)[0] or 12
+    for i in range(count):
+        struct.pack_into(BE + "i", out, items_offset + i * entry_size + 4, -1)
+    return bytes(out)
 
 
 def extend_lctx(payload, lscr_indices):
