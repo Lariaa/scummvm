@@ -390,9 +390,10 @@ class Profile:
     """Everything that differs between Director versions."""
 
     def __init__(self, name, *, donor, main_size, spr_size, frames_version,
-                 sprite_writer, const_entry=8, d5plus=True):
+                 sprite_writer, const_entry=8, d5plus=True, version=600):
         self.name = name
         self.donor = donor
+        self.version = version
         self.main_size = main_size
         self.spr_size = spr_size
         self.frames_version = frames_version
@@ -454,9 +455,10 @@ def donor_text_member(donor):
 def make_lscr_for(profile, name_index, code, script_id, consts=(),
                   global_names=()):
     h = lscr_asm.Handler(name_index, code)
+    event_map, event_flags = lscr_asm.exitframe_event_map(profile.version)
     return lscr_asm.build_lscr([h], script_id=script_id, assembly_id=script_id,
-                               event_map=[-1] * 10 + [0],
-                               event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
+                               event_map=event_map,
+                               event_map_flags=event_flags,
                                consts=consts, global_names=global_names,
                                const_entry_size=profile.const_entry)
 
@@ -964,10 +966,10 @@ def build_editable_append(profile, trivial=False, tag=None):
                      for i in range(0, len(cas), 4)]
 
     lnam_res = donor.by_tag("Lnam")[0]
-    lnam, name_base = bm.extend_lnam(donor.chunk(lnam_res), NAMES)
-    if name_base + len(NAMES) > 0xffff:
+    lnam, name_idx = bm.extend_lnam(donor.chunk(lnam_res), NAMES)
+    if max(name_idx) > 0xffff:
         raise SystemExit("donor's name table is too long")
-    n_exit, n_put, n_global = (name_base + i for i in range(3))
+    n_exit, n_put, n_global = name_idx
 
     def const_push(i):
         return lscr_asm.const_push(i, profile.const_entry)
@@ -1050,14 +1052,14 @@ def build_editable_append(profile, trivial=False, tag=None):
              (b"STXT", donor.chunk(cast_stxt)),
              (b"CASt", donor.chunk(cast_text)),
              (b"STXT", donor.chunk(cast_stxt))]
+    event_map, event_flags = lscr_asm.exitframe_event_map(profile.version)
     for i, (nm, code, src, consts) in enumerate(scripts):
         extra.append((b"CASt", bm.build_script_cast(
             script_base + i, nm, src, bm.SCRIPT_TYPE_SCORE, d5plus=True)))
         extra.append((b"Lscr", lscr_asm.build_lscr(
             [lscr_asm.Handler(n_exit, code)],
             script_id=script_base + i, assembly_id=script_base + i,
-            event_map=[-1] * 10 + [0],
-            event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
+            event_map=event_map, event_map_flags=event_flags,
             consts=consts, global_names=[n_global],
             const_entry_size=profile.const_entry)))
 
@@ -1512,10 +1514,12 @@ if __name__ == "__main__":
     profiles = []
     if args.d6:
         profiles.append(Profile("d6", donor=args.d6, main_size=144, spr_size=24,
-                                frames_version=11, sprite_writer=bm.sprite_d6))
+                                frames_version=11, sprite_writer=bm.sprite_d6,
+                                version=600))
     if args.d7:
         profiles.append(Profile("d7", donor=args.d7, main_size=288, spr_size=48,
-                                frames_version=13, sprite_writer=bm.sprite_d7))
+                                frames_version=13, sprite_writer=bm.sprite_d7,
+                                version=700))
     for profile in profiles:
         for kind in ("editable", "listoverride"):
             report(*build_variant(profile, kind))

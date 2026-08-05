@@ -149,12 +149,36 @@ def build_consts(strings, entry_size=CONST_ENTRY_SIZE):
             store += b"\0"
     return bytes(index), bytes(store)
 
-# Event map slot used by a lone exitFrame handler, lifted verbatim from the
-# reference script. ScummVM ignores the map entirely, but real Director writes
-# it and decompilers read it.
-EXITFRAME_EVENT_INDEX = 10
-EXITFRAME_EVENT_COUNT = 11
-EXITFRAME_EVENT_FLAGS = 0x400
+# Event map slot used by a lone exitFrame handler. ScummVM skips the map
+# outright -- "we probably don't need to read this since we already did
+# something similar with _eventHandlers" (lingo-bytecode.cpp:1084) -- but it is
+# how Director finds a handler, and a script filed under the wrong slot simply
+# never runs.
+#
+# The slots move between D4 and D5. Counted over 157115 scripts in 11057 movies,
+# mouseDown, mouseUp, keyDown and keyUp hold 0 to 3 throughout, and everything
+# from idle on shifts by five when timeout, prepareFrame, mouseEnter, mouseLeave
+# and mouseWithin appear:
+#
+#              idle  startMovie  stopMovie  enterFrame  exitFrame
+#   D4            5           6          7           9         10
+#   D5 and later 10          11         12          14         15
+#
+# No version mixes the two: exitFrame has 22574 hits at slot 10 across D4 and
+# over 50000 at slot 15 from D5 to D10.
+EXITFRAME_EVENT_INDEX_D4 = 10
+EXITFRAME_EVENT_INDEX_D5 = 15
+
+# kept for callers that still assume D4
+EXITFRAME_EVENT_INDEX = EXITFRAME_EVENT_INDEX_D4
+EXITFRAME_EVENT_COUNT = EXITFRAME_EVENT_INDEX_D4 + 1
+EXITFRAME_EVENT_FLAGS = 1 << EXITFRAME_EVENT_INDEX_D4
+
+
+def exitframe_event_map(version=400):
+    """(map, flags) for a script whose only handler is `on exitFrame`."""
+    idx = EXITFRAME_EVENT_INDEX_D4 if version < 500 else EXITFRAME_EVENT_INDEX_D5
+    return [-1] * idx + [0], 1 << idx
 
 
 # Every opcode with a byte operand has a twin taking a uint16, and the reader
@@ -299,7 +323,11 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
     head += struct.pack(">HI", len(global_names), globals_offset)
     head += struct.pack(">HI", len(handlers), functions_offset)
     head += struct.pack(">HI", len(consts), consts_offset)
-    head += struct.pack(">II", len(consts), consts_store_offset)
+    # The field after the count is the store's length in bytes, not a second
+    # count: the donor's script with one constant says 12, which is exactly how
+    # far its store runs. ScummVM reads it into a variable it never uses
+    # (lingo-bytecode.cpp:1100), so a count passed unnoticed.
+    head += struct.pack(">II", len(const_store), consts_store_offset)
     assert len(head) == HEADER_SIZE, len(head)
 
     return bytes(head) + bytes(body)

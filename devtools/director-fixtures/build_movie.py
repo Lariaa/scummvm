@@ -756,11 +756,16 @@ def load_donor(path=None):
 
 
 def extend_lnam(payload, names):
-    """Appends names to a name table, keeping the existing ones at their index.
+    """Adds names to a name table, keeping the existing ones at their index.
 
     The Lctx has a single nameTableId, so a movie has one name list; scripts we
-    append have to share the donor's. Returns (chunk, base) where base is the
-    index our first name landed on.
+    append have to share the donor's. Returns (chunk, indices) where indices
+    gives, for each requested name, the index it can be referenced by.
+
+    A name the donor already has is reused rather than appended. Its own scripts
+    reference `exitFrame` as name 0, because that is where it already sits, and
+    writing a second copy further down works but says something no real movie
+    says.
     """
     head = payload[0:8]
     offset = struct.unpack_from(BE + "H", payload, 16)[0]
@@ -770,7 +775,16 @@ def extend_lnam(payload, names):
         n = payload[pos]
         existing.append(payload[pos + 1:pos + 1 + n].decode("latin1"))
         pos += 1 + n
-    return lscr.build_lnam(existing + list(names), head), len(existing)
+
+    table = list(existing)
+    indices = []
+    for name in names:
+        if name in table:
+            indices.append(table.index(name))
+        else:
+            indices.append(len(table))
+            table.append(name)
+    return lscr.build_lnam(table, head), indices
 
 
 def extend_lctx(payload, lscr_indices):
