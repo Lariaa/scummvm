@@ -1343,7 +1343,7 @@ def build_graft_minimal(profile):
 
 
 def build_score_donor_index(profile, main_channel=False, tag="scoreidx",
-                            own_details=False, key_frames=()):
+                            own_details=False, key_frames=(), sprites=1):
     """Our frame stream, the donor's detail index. The step after graft0.
 
     graft0 renders, so the container, the cast, the sprite record and the detail
@@ -1371,6 +1371,11 @@ def build_score_donor_index(profile, main_channel=False, tag="scoreidx",
         chans = {SPRITE_CH: profile.sprite(cast_member=member, x=20, y=20,
                                            w=200, h=40, editable=editable,
                                            back=back, list_idx=idx)}
+        if sprites > 1:
+            # A second channel, still showing a member the donor already has, so
+            # this differs from the one sprite probe in nothing but the sprite.
+            chans[RESULT_CH] = profile.sprite(cast_member=member, x=20, y=120,
+                                              w=200, h=40, list_idx=idx + 3)
         if main_channel:
             # graft0's frames all touch the main channel and it renders; ours
             # touch nothing but the sprite. This variant closes that gap so the
@@ -1399,11 +1404,12 @@ def build_score_donor_index(profile, main_channel=False, tag="scoreidx",
     d_offs = [struct.unpack(">I", b[d_idx + 4 * i:d_idx + 4 * i + 4])[0]
               for i in range(d_ls)]
     if own_details:
-        entries = [mine, bm.build_detail_directory([3]), b"",
-                   bm.build_sprite_info(start_frame=1, end_frame=4,
-                                        channel=SPRITE_CH,
-                                        **({"key_frames": key_frames}
-                                           if key_frames else {})), b"", b""]
+        spans = [(SPRITE_CH, 3)] + ([(RESULT_CH, 6)] if sprites > 1 else [])
+        entries = [mine, bm.build_detail_directory([i for _, i in spans]), b""]
+        for channel, _ in spans:
+            entries += [bm.build_sprite_info(
+                start_frame=1, end_frame=4, channel=channel,
+                **({"key_frames": key_frames} if key_frames else {})), b"", b""]
     else:
         entries = [mine] + [b[d_data + o:d_data + n]
                             for o, n in zip(d_offs, d_offs[1:])][1:]
@@ -1459,6 +1465,5 @@ if __name__ == "__main__":
         report(*build_score_donor_index(profile))
         report(*build_score_donor_index(profile, tag="scoredet",
                                         own_details=True))
-        report(*build_score_donor_index(profile, tag="scorekey",
-                                        own_details=True,
-                                        key_frames=(1,)))
+        report(*build_score_donor_index(profile, tag="scoredet2",
+                                        own_details=True, sprites=2))
