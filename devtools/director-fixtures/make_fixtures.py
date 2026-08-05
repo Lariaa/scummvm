@@ -41,7 +41,8 @@ NAMES = ["exitFrame", "put", "gEditableResult"]
 I_EXITFRAME, I_PUT, I_GLOBAL = 0, 1, 2
 
 LABEL = "editable "
-TRIVIAL_TEXT = "SCRIPT RAN"
+TRIVIAL_FROM_BYTECODE = "FROM BYTECODE"
+TRIVIAL_FROM_SOURCE = "FROM SOURCE"
 
 
 def code_first(expected):
@@ -998,20 +999,28 @@ def build_editable_append(profile, trivial=False, tag=None):
                ("reportResult", report, src_report(result_member), (LABEL,))]
 
     if trivial:
-        # One question only: do our scripts run at all? No sprite property, no
-        # global, no arithmetic -- frame 1 writes a constant into the result
-        # field and the other three frames do nothing. Text appears and the Lscr
-        # executes; nothing appears and Director is not running our bytecode.
-        ran = (lscr_asm.field_assign_id(result_member, bm.DEFAULT_CAST_LIB)
-               + const_push(0)
-               + lscr_asm.the_field_assign(result_member)
-               + bytes([lscr_asm.OP_PROCRET]))
+        # The source and the bytecode deliberately disagree, and each writes its
+        # own name into the result field. Whatever the field ends up saying names
+        # what Director actually executed:
+        #
+        #   FROM BYTECODE   it runs the Lscr we assembled
+        #   FROM SOURCE     it ignores the Lscr and compiles the cast info text
+        #   nothing at all  the frame scripts never run
+        #
+        # Nothing here touches a sprite property, a global or arithmetic, so a
+        # blank field cannot be blamed on the thing under test.
+        write_const = (lscr_asm.field_assign_id(result_member,
+                                                bm.DEFAULT_CAST_LIB)
+                       + const_push(0)
+                       + lscr_asm.the_field_assign(result_member)
+                       + bytes([lscr_asm.OP_PROCRET]))
         nothing = bytes([lscr_asm.OP_PROCRET])
-        src_ran = ('on exitFrame\r'
-                   '  set the text of field %d to "%s"\r'
-                   'end\r' % (result_member, TRIVIAL_TEXT))
+        src_write = ('on exitFrame\r'
+                     '  set the text of field %d to "%s"\r'
+                     'end\r' % (result_member, TRIVIAL_FROM_SOURCE))
         src_nothing = "on exitFrame\rend\r"
-        scripts = [("writeConstant", ran, src_ran, (TRIVIAL_TEXT,)),
+        scripts = [("writeConstant", write_const, src_write,
+                    (TRIVIAL_FROM_BYTECODE,)),
                    ("doNothing2", nothing, src_nothing, ()),
                    ("doNothing3", nothing, src_nothing, ()),
                    ("doNothing4", nothing, src_nothing, ())]
