@@ -919,12 +919,14 @@ def sprite_details(spans):
 
     Every sprite and every frame script points at a detail index, and it may not
     be 0 -- across 577649 records in the archive not one is. Each index claims
-    three entries: the SpriteInfo, the behaviour list and the name. We have no
-    behaviours and no names, so the last two are empty, but they still occupy
-    their slot, or the entry after them is read as theirs.
+    three entries: the SpriteInfo, the behaviour list and the name. Ours carry no
+    names, so that slot stays empty, but it still has to exist or the entry after
+    it is read as its own.
 
-    `spans` is a list of (startFrame, endFrame, channel); index 0 belongs to the
-    score itself, so ours start at 1.
+    `spans` is a list of (startFrame, endFrame, channel) with an optional fourth
+    element, the cast member of a behaviour to attach. A frame script needs it:
+    the main channel's actionId alone gets a script the Score window shows and
+    Director never runs. Index 0 belongs to the score itself, so ours start at 3.
     """
     # Slots 1 and 2 belong to the entry before ours: index 0's SpriteInfo slot is
     # entry 0, which is the score, so its behaviour and name slots sit unused
@@ -933,10 +935,12 @@ def sprite_details(spans):
     # (`int type = i % 3`, score.cpp:2016) and what both donors do: 3 and 6 on
     # D6, 84 and 87 on D7.
     entries, indices, n = [None, b""], [], 3
-    for start, end, channel in spans:
+    for span in spans:
+        start, end, channel = span[:3]
+        behaviors = bm.build_behavior_list(span[3:4]) if len(span) > 3 else b""
         indices.append(n)
         entries += [bm.build_sprite_info(start_frame=start, end_frame=end,
-                                         channel=channel), b"", b""]
+                                         channel=channel), behaviors, b""]
         n += 3
     entries[0] = bm.build_detail_directory(indices)
     return indices, entries
@@ -1057,7 +1061,7 @@ def build_editable_append(profile, trivial=False, tag=None):
     # span in the script channel
     idx, details = sprite_details(
         [(1, 4, SPRITE_CH), (1, 4, RESULT_CH)]
-        + [(i + 1, i + 1, 0) for i in range(4)])
+        + [(i + 1, i + 1, 0, first_script_member + i) for i in range(4)])
 
     def frame(i, editable, back):
         return {0: bm.main_channel_d6plus(profile.main_size,

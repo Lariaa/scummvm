@@ -330,6 +330,21 @@ def build_sprite_info(*, start_frame, end_frame, channel, key_frames=(0,),
     return out
 
 
+def build_behavior_list(members, cast_lib=DEFAULT_CAST_LIB):
+    """Detail entry n+1: the behaviours attached to the span at index n.
+
+    Eight bytes each -- cast lib, member, initializer index (BehaviorElement,
+    spriteinfo.h:87). This is how D6 and later attach a frame script: the donor's
+    script channel points at detail index 3 and entry 4 holds 00 01 00 02, its
+    member 2. Setting the main channel's actionId and leaving this empty gets a
+    script that the Score window draws in the script channel and that never runs.
+    """
+    out = b""
+    for member in members:
+        out += struct.pack(BE + "hhi", cast_lib, member, 0)
+    return out
+
+
 def build_detail_directory(indices):
     """Detail entry 1: how many indices the score uses, then each of them.
 
