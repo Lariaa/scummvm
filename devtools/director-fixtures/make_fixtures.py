@@ -41,6 +41,7 @@ NAMES = ["exitFrame", "put", "gEditableResult"]
 I_EXITFRAME, I_PUT, I_GLOBAL = 0, 1, 2
 
 LABEL = "editable "
+TRIVIAL_TEXT = "SCRIPT RAN"
 
 
 def code_first(expected):
@@ -940,7 +941,7 @@ def sprite_details(spans):
     return indices, entries
 
 
-def build_editable_append(profile):
+def build_editable_append(profile, trivial=False, tag=None):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -995,6 +996,25 @@ def build_editable_append(profile):
                ("checkFrame2", check(0, False), src_append(0), ()),
                ("checkFrame3", check(1, False), src_append(1), ()),
                ("reportResult", report, src_report(result_member), (LABEL,))]
+
+    if trivial:
+        # One question only: do our scripts run at all? No sprite property, no
+        # global, no arithmetic -- frame 1 writes a constant into the result
+        # field and the other three frames do nothing. Text appears and the Lscr
+        # executes; nothing appears and Director is not running our bytecode.
+        ran = (lscr_asm.field_assign_id(result_member, bm.DEFAULT_CAST_LIB)
+               + const_push(0)
+               + lscr_asm.the_field_assign(result_member)
+               + bytes([lscr_asm.OP_PROCRET]))
+        nothing = bytes([lscr_asm.OP_PROCRET])
+        src_ran = ('on exitFrame\r'
+                   '  set the text of field %d to "%s"\r'
+                   'end\r' % (result_member, TRIVIAL_TEXT))
+        src_nothing = "on exitFrame\rend\r"
+        scripts = [("writeConstant", ran, src_ran, (TRIVIAL_TEXT,)),
+                   ("doNothing2", nothing, src_nothing, ()),
+                   ("doNothing3", nothing, src_nothing, ()),
+                   ("doNothing4", nothing, src_nothing, ())]
 
     # indices: the two text members with their STXT, then a CASt and an Lscr
     # per script
@@ -1066,7 +1086,7 @@ def build_editable_append(profile):
 
     data = bm.rebuild_preserving_indices(donor, extra=extra,
                                          extra_key=key_extra, replace=replace)
-    path = OUT / f"editable-{profile.name}-append.dir"
+    path = OUT / f"{tag or ('editable-' + profile.name + '-append')}.dir"
     path.write_bytes(data)
     return path, data
 
@@ -1481,6 +1501,8 @@ if __name__ == "__main__":
             report(*build_variant(profile, kind))
         report(*build_probe(profile))
         report(*build_editable_append(profile))
+        report(*build_editable_append(
+            profile, trivial=True, tag=f'scriptran-{profile.name}'))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
