@@ -191,6 +191,36 @@ def single_internal_mcsl(blob, max_member, min_member=1):
                       internal_lib_resource_id(blob))
 
 
+def drop_movie_scripts(donor, member_indices):
+    """The donor's member list with its movie scripts blanked out.
+
+    A movie script runs on its own as soon as the film starts, whether or not
+    anything in our score refers to it, and the donor's do what the donor's game
+    needs: the D7 one opens with `Script error: Movie cast not found` for
+    "highscorer", an external cast we deliberately no longer declare.
+
+    Suppressing that by declaring the library again would mean shipping a fixture
+    that asks for a file it does not have. These members are not wanted either
+    way -- the fixture tests the scripts we write -- so their CAS* slots go
+    empty, which is what a slot with no member looks like anyway. Behaviors and
+    parent scripts stay: nothing calls them unless a score does.
+    """
+    out = []
+    for index in member_indices:
+        res = next((r for r in donor.resources if r.index == index), None)
+        keep = True
+        if res is not None and res.tag == "CASt":
+            body = donor.chunk(res)
+            if len(body) >= 12:
+                cast_type, info_len, data_len = struct.unpack(BE + "III", body[0:12])
+                data = body[12 + info_len:12 + info_len + data_len]
+                if (cast_type == KCAST_LINGO_SCRIPT and len(data) >= 2
+                        and struct.unpack(BE + "H", data[0:2])[0] == SCRIPT_TYPE_MOVIE):
+                    keep = False
+        out.append(index if keep else 0)
+    return out
+
+
 def build_cas(cast_indices):
     """CAS* is a positional u32 array: slot i holds the mmap index of the CASt
     for cast member i+1, or 0 (RIFXArchive::writeCast)."""

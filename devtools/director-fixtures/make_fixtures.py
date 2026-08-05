@@ -962,8 +962,9 @@ def build_editable_append(profile, trivial=False, tag=None):
 
     next_index = max(r.index for r in donor.resources) + 1
     cas = donor.chunk(donor.by_tag("CAS*")[0])
-    donor_members = [struct.unpack(">I", cas[i:i + 4])[0]
-                     for i in range(0, len(cas), 4)]
+    donor_members = bm.drop_movie_scripts(
+        donor, [struct.unpack(">I", cas[i:i + 4])[0]
+                for i in range(0, len(cas), 4)])
 
     lnam_res = donor.by_tag("Lnam")[0]
     lnam, name_idx = bm.extend_lnam(donor.chunk(lnam_res), NAMES)
@@ -1128,8 +1129,9 @@ def build_score_probe(profile):
 
     next_index = max(r.index for r in donor.resources) + 1
     cas = donor.chunk(donor.by_tag("CAS*")[0])
-    donor_members = [struct.unpack(">I", cas[i:i + 4])[0]
-                     for i in range(0, len(cas), 4)]
+    donor_members = bm.drop_movie_scripts(
+        donor, [struct.unpack(">I", cas[i:i + 4])[0]
+                for i in range(0, len(cas), 4)])
 
     i_a, i_a_stxt, i_b, i_b_stxt = (next_index + n for n in range(4))
     member_a, member_b = len(donor_members) + 1, len(donor_members) + 2
@@ -1190,8 +1192,9 @@ def build_graft_probe(profile):
 
     next_index = max(r.index for r in donor.resources) + 1
     cas = donor.chunk(donor.by_tag("CAS*")[0])
-    donor_members = [struct.unpack(">I", cas[i:i + 4])[0]
-                     for i in range(0, len(cas), 4)]
+    donor_members = bm.drop_movie_scripts(
+        donor, [struct.unpack(">I", cas[i:i + 4])[0]
+                for i in range(0, len(cas), 4)])
     member = len(donor_members) + 1
 
     b = donor.chunk(donor.by_tag("VWSC")[0])
