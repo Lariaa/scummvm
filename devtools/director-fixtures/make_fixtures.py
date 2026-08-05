@@ -1013,15 +1013,22 @@ def build_editable_append(profile, trivial=False, tag=None):
         #
         # Nothing here touches a sprite property, a global or arithmetic, so a
         # blank field cannot be blamed on the thing under test.
+        # Two ways out, because one that stays silent cannot say why: the field
+        # on stage and the message window. If only the message appears, the
+        # script runs and writing a field is what fails.
         write_const = (lscr_asm.field_assign_id(result_member,
                                                 bm.DEFAULT_CAST_LIB)
                        + const_push(0)
                        + lscr_asm.the_field_assign(result_member)
+                       + const_push(0)
+                       + lscr_asm.call_command(n_put, 1)
                        + bytes([lscr_asm.OP_PROCRET]))
         nothing = bytes([lscr_asm.OP_PROCRET])
         src_write = ('on exitFrame\r'
                      '  set the text of field %d to "%s"\r'
-                     'end\r' % (result_member, TRIVIAL_FROM_SOURCE))
+                     '  put "%s"\r'
+                     'end\r' % (result_member, TRIVIAL_FROM_SOURCE,
+                                TRIVIAL_FROM_SOURCE))
         src_nothing = "on exitFrame\rend\r"
         scripts = [("writeConstant", write_const, src_write,
                     (TRIVIAL_FROM_BYTECODE,)),
