@@ -152,18 +152,17 @@ def build_mcsl(name="Internal", min_member=1, max_member=1,
     return bytes(out)
 
 
-def patch_mcsl_member_range(blob, max_member, min_member=1):
-    """The donor's MCsL with library 1's member range widened, nothing else.
+def internal_lib_resource_id(blob):
+    """The resource id of library 1 in a donor's MCsL.
 
-    Rebuilding it from scratch loses two things the donor may depend on. Its
-    internal library carries a resource id that KEY* uses as the parent of the
-    cast-wide chunks, and it is not always 1024 -- the D7 donor's is 0x10400,
-    and claiming 1024 there points Director at a library with no CAS* under it,
-    which it renders as a cast with no members at all. And a movie may have more
-    than one library: that same donor has three, two of them external.
+    KEY* uses it as the parent of the cast-wide chunks, and it is not always
+    1024: the D7 donor's is 0x10400. Claiming 1024 instead points Director at a
+    library with no CAS* under it, which it renders as a cast with no members at
+    all -- not even the donor's.
 
-    Items run as one unused entry followed by four per library -- name, path,
-    preload, range -- so library 1's range is item 4.
+    Items run as one unused entry followed by four per library (name, path,
+    preload, range), so library 1's range is item 4, and the id is its last four
+    bytes.
     """
     nitems = struct.unpack_from(BE + "H", blob, 12)[0]
     offs = [struct.unpack_from(BE + "I", blob, 14 + 4 * i)[0]
@@ -176,10 +175,20 @@ def patch_mcsl_member_range(blob, max_member, min_member=1):
     if end - start != 8:
         raise ValueError("MCsL item %d is %d bytes, expected a range"
                          % (RANGE_ITEM, end - start))
-    out = bytearray(blob)
-    resource_id = struct.unpack_from(BE + "I", blob, start + 4)[0]
-    struct.pack_into(BE + "HHI", out, start, min_member, max_member, resource_id)
-    return bytes(out)
+    return struct.unpack_from(BE + "I", blob, start + 4)[0]
+
+
+def single_internal_mcsl(blob, max_member, min_member=1):
+    """One internal library, with the resource id the donor's already uses.
+
+    Keeping the donor's mapping wholesale is no good either: the D7 donor
+    declares three libraries, two of them external casts on a Macintosh volume,
+    and Director stops on load to ask where highscor.cst went. So we emit a
+    single library, which a fixture needs, but under the donor's own id, which
+    is what its KEY* is filed under.
+    """
+    return build_mcsl("Internal", min_member, max_member,
+                      internal_lib_resource_id(blob))
 
 
 def build_cas(cast_indices):

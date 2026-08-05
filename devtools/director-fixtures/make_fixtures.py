@@ -1097,7 +1097,7 @@ def build_editable_append(profile, trivial=False, tag=None):
     replace = {cfg.index: config.set_cast_array_end(donor.chunk(cfg),
                                                     len(members)),
                donor.by_tag("CAS*")[0].index: bm.build_cas(members),
-               donor.by_tag("MCsL")[0].index: bm.patch_mcsl_member_range(
+               donor.by_tag("MCsL")[0].index: bm.single_internal_mcsl(
                    donor.chunk(donor.by_tag("MCsL")[0]), len(members)),
                donor.by_tag("VWSC")[0].index: vwsc,
                lnam_res.index: lnam,
@@ -1158,7 +1158,7 @@ def build_score_probe(profile):
     replace = {cfg.index: config.set_cast_array_end(donor.chunk(cfg),
                                                     len(members)),
                donor.by_tag("CAS*")[0].index: bm.build_cas(members),
-               donor.by_tag("MCsL")[0].index: bm.patch_mcsl_member_range(
+               donor.by_tag("MCsL")[0].index: bm.single_internal_mcsl(
                    donor.chunk(donor.by_tag("MCsL")[0]), len(members)),
                donor.by_tag("VWSC")[0].index: vwsc}
 
@@ -1248,7 +1248,7 @@ def build_graft_probe(profile):
     replace = {cfg.index: config.set_cast_array_end(donor.chunk(cfg),
                                                     len(donor_members) + 1),
                donor.by_tag("CAS*")[0].index: bm.build_cas(donor_members + [next_index]),
-               donor.by_tag("MCsL")[0].index: bm.patch_mcsl_member_range(
+               donor.by_tag("MCsL")[0].index: bm.single_internal_mcsl(
                    donor.chunk(donor.by_tag("MCsL")[0]), len(donor_members) + 1),
                donor.by_tag("VWSC")[0].index: bytes(out)}
     data_out = bm.rebuild_preserving_indices(
