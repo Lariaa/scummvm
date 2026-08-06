@@ -948,7 +948,8 @@ def sprite_details(spans):
     return indices, entries
 
 
-def build_editable_append(profile, trivial=False, tag=None):
+def build_editable_append(profile, trivial=False, tag=None,
+                          unlink=True):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -962,9 +963,10 @@ def build_editable_append(profile, trivial=False, tag=None):
 
     next_index = max(r.index for r in donor.resources) + 1
     cas = donor.chunk(donor.by_tag("CAS*")[0])
-    donor_members = bm.drop_donor_scripts(
-        donor, [struct.unpack(">I", cas[i:i + 4])[0]
-                for i in range(0, len(cas), 4)])
+    donor_members = [struct.unpack(">I", cas[i:i + 4])[0]
+                     for i in range(0, len(cas), 4)]
+    if unlink:
+        donor_members = bm.drop_donor_scripts(donor, donor_members)
 
     lnam_res = donor.by_tag("Lnam")[0]
     lnam, name_idx = bm.extend_lnam(donor.chunk(lnam_res), NAMES)
@@ -1049,9 +1051,10 @@ def build_editable_append(profile, trivial=False, tag=None):
     lctx_res = donor.by_tag("Lctx")[0]
     # The donor's own scripts get unlinked first: a blank CAS* slot does not
     # stop them, Director reaches their code through this table.
+    base_lctx = donor.chunk(lctx_res)
     lctx, script_base = bm.extend_lctx(
-        bm.unlink_donor_scripts(donor.chunk(lctx_res)), script_lscr,
-        entry_flags=bm.live_lctx_entry_flags(donor.chunk(lctx_res)))
+        bm.unlink_donor_scripts(base_lctx) if unlink else base_lctx, script_lscr,
+        entry_flags=bm.live_lctx_entry_flags(base_lctx))
 
     extra = [(b"CASt", donor.chunk(cast_text)),
              (b"STXT", donor.chunk(cast_stxt)),
@@ -1539,6 +1542,9 @@ if __name__ == "__main__":
         report(*build_editable_append(profile))
         report(*build_editable_append(
             profile, trivial=True, tag=f'scriptran-{profile.name}'))
+        report(*build_editable_append(
+            profile, trivial=True, unlink=False,
+            tag=f'scriptkeep-{profile.name}'))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
