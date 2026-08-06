@@ -953,7 +953,8 @@ def build_editable_append(profile, trivial=False, tag=None,
                           unlink=True, bare=False, donor_code=False,
                           attach=True, cast_scripts=True,
                           ctx_entries=True, keep_libs=False,
-                          clone_ctx=False, reuse_free=False):
+                          clone_ctx=False, reuse_free=False,
+                          n_scripts=None):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -1025,6 +1026,11 @@ def build_editable_append(profile, trivial=False, tag=None,
         nothing = bytes([lscr_asm.OP_PROCRET])
         src = "on exitFrame\rend\r"
         scripts = [("bare%d" % (i + 1), nothing, src, ()) for i in range(4)]
+
+    if n_scripts is not None:
+        # Fewer scripts, everything else the same: does one added script crash
+        # Director as readily as four?
+        scripts = scripts[:n_scripts]
 
     if trivial:
         # The source and the bytecode deliberately disagree, and each writes its
@@ -1694,6 +1700,10 @@ if __name__ == "__main__":
         report(*build_editable_append(
             profile, bare=True, attach=False, unlink=False, reuse_free=True,
             tag=f'castfree-{profile.name}'))
+        # castadd with a single added script instead of four
+        report(*build_editable_append(
+            profile, bare=True, attach=False, unlink=False, n_scripts=1,
+            tag=f'onescript-{profile.name}'))
         report(*build_resource_probe(profile))
         report(*build_ctx_dup_probe(profile))
         report(*build_editable_append(
