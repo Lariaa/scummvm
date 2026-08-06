@@ -633,9 +633,22 @@ def build_vwsc(frames, num_channels=50):
 # --------------------------------------------------------------------------
 # RIFX container
 # --------------------------------------------------------------------------
+def free_slots(donor, n):
+    """The indices `rebuild_preserving_indices(reuse_free=True)` would hand to
+    the next `n` appended chunks: the donor's own empty slots, in order.
+
+    A caller has to know them before the file is built, because KEY* entries and
+    Lingo context entries name them. Returns None when the donor has too few,
+    and the caller should fall back to appending.
+    """
+    free = [r.index for r in sorted(donor.resources, key=lambda x: x.index)
+            if r.tag == "free" and r.size == 0]
+    return free[:n] if len(free) >= n else None
+
+
 def rebuild_preserving_indices(donor, *, imap_version=None, rewrite_key=False,
                                extra=(), extra_key=(), replace=None,
-                               drop_key_parents=()):
+                               drop_key_parents=(), reuse_free=False):
     """Re-emits every resource of `donor` at its original mmap index.
 
     build_rifx() renumbers, which forces KEY* and Lctx to be rewritten -- the
@@ -647,11 +660,21 @@ def rebuild_preserving_indices(donor, *, imap_version=None, rewrite_key=False,
     entries = sorted(donor.resources, key=lambda r: r.index)
     count = entries[-1].index + 1
     replace = dict(replace or {})
-    # appended chunks take the indices after the donor's, so nothing the donor
-    # already references has to move
-    appended = [(3 + 0, tag, payload) for tag, payload in ()]   # placeholder
-    extra_start = count
-    count += len(extra)
+
+    # Where the new chunks go. Appending past the donor's last index is the
+    # simple way and leaves every existing reference untouched. reuse_free puts
+    # them in the donor's own free slots instead, so the index space does not
+    # grow at all -- which is what Director itself does when a movie is edited,
+    # and the D6 donor keeps thirty of them.
+    free_slots = []
+    if reuse_free:
+        free_slots = [r.index for r in entries
+                      if r.tag == "free" and r.size == 0][:len(extra)]
+    if len(free_slots) < len(extra):
+        free_slots = []
+    extra_slots = free_slots or list(range(count, count + len(extra)))
+    if not free_slots:
+        count += len(extra)
     header_size, entry_size = 24, 20
 
     imap_offset = 12
@@ -670,7 +693,7 @@ def rebuild_preserving_indices(donor, *, imap_version=None, rewrite_key=False,
         if pos % 2:
             pos += 1
     for i, (tag, payload) in enumerate(extra):
-        placed[extra_start + i] = (tag, payload, pos)
+        placed[extra_slots[i]] = (tag, payload, pos)
         pos += 8 + len(payload)
         if pos % 2:
             pos += 1
@@ -696,7 +719,7 @@ def rebuild_preserving_indices(donor, *, imap_version=None, rewrite_key=False,
 
     base = mmap_offset + 8 + header_size
     for i in range(len(extra)):
-        idx = extra_start + i
+        idx = extra_slots[i]
         tag, payload, offset = placed[idx]
         e = base + idx * entry_size
         out[e:e + 4] = tag

@@ -953,7 +953,7 @@ def build_editable_append(profile, trivial=False, tag=None,
                           unlink=True, bare=False, donor_code=False,
                           attach=True, cast_scripts=True,
                           ctx_entries=True, keep_libs=False,
-                          clone_ctx=False):
+                          clone_ctx=False, reuse_free=False):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -965,7 +965,9 @@ def build_editable_append(profile, trivial=False, tag=None,
     check_donor_unprotected(donor, profile.donor)
     cast_text, cast_stxt = donor_text_member(donor)
 
-    next_index = max(r.index for r in donor.resources) + 1
+    slots = bm.free_slots(donor, 12) if reuse_free else None
+    next_index = (slots[0] if slots
+                  else max(r.index for r in donor.resources) + 1)
     cas = donor.chunk(donor.by_tag("CAS*")[0])
     donor_members = [struct.unpack(">I", cas[i:i + 4])[0]
                      for i in range(0, len(cas), 4)]
@@ -1060,10 +1062,11 @@ def build_editable_append(profile, trivial=False, tag=None,
 
     # indices: the two text members with their STXT, then a CASt and an Lscr
     # per script
-    i_test, i_test_stxt = next_index, next_index + 1
-    i_res, i_res_stxt = next_index + 2, next_index + 3
-    script_cast = [next_index + 4 + 2 * i for i in range(len(scripts))]
-    script_lscr = [next_index + 5 + 2 * i for i in range(len(scripts))]
+    idxs = slots if slots else [next_index + n for n in range(12)]
+    i_test, i_test_stxt = idxs[0], idxs[1]
+    i_res, i_res_stxt = idxs[2], idxs[3]
+    script_cast = [idxs[4 + 2 * i] for i in range(len(scripts))]
+    script_lscr = [idxs[5 + 2 * i] for i in range(len(scripts))]
 
     lctx_res = donor.by_tag("Lctx")[0]
     # The donor's own scripts get unlinked first: a blank CAS* slot does not
@@ -1158,6 +1161,7 @@ def build_editable_append(profile, trivial=False, tag=None,
 
     data = bm.rebuild_preserving_indices(
         donor, extra=extra, extra_key=key_extra, replace=replace,
+        reuse_free=bool(slots),
         drop_key_parents=() if keep_libs else bm.dropped_lib_key_parents(
             donor.chunk(donor.by_tag("MCsL")[0])))
     path = OUT / f"{tag or ('editable-' + profile.name + '-append')}.dir"
@@ -1686,6 +1690,10 @@ if __name__ == "__main__":
         report(*build_editable_append(
             profile, bare=True, attach=False,
             unlink=False, donor_code=True, tag=f'castborrow-{profile.name}'))
+        # castadd with the new chunks in the donor's own free slots
+        report(*build_editable_append(
+            profile, bare=True, attach=False, unlink=False, reuse_free=True,
+            tag=f'castfree-{profile.name}'))
         report(*build_resource_probe(profile))
         report(*build_ctx_dup_probe(profile))
         report(*build_editable_append(
