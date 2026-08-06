@@ -270,7 +270,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
             starts.append(cur())
             body.extend(h.code)
             body.extend(pad_even(b"", cur()))
-        args, varz = [], []
+        args, varz, lines = [], [], []
         for h in handlers:
             args.append(cur())
             for n in h.arg_names:
@@ -278,12 +278,20 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
             varz.append(cur())
             for n in h.var_names:
                 body.extend(struct.pack(">h", n))
+            # Every real handler carries a line number table here, and the
+            # header's lineCount matches it: the D7 donor's one-liners hold two
+            # bytes with the code length minus one in the first (9 bytes of code
+            # -> 08 00, 11 -> 0a 00), its D6 ones two to eight bytes for two and
+            # three lines. Leaving it out and saying zero lines points lineOffset
+            # at whatever section comes next.
+            lines.append(cur())
+            body.extend(bytes([max(len(h.code) - 1, 0) & 0xff, 0]))
         # opaque filler the reference script carries between the name arrays
         # and the function table; ScummVM addresses both by explicit offset
         body.extend(name_gap)
         if cur() % 2:
             body.extend(b"\0")
-        return starts, args, varz
+        return starts, args, varz, lines
 
     if table_first:
         # The table records offsets the code has not produced yet, so its bytes
@@ -291,10 +299,10 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         properties_offset = globals_offset = functions_offset = cur()
         table_at = len(body)
         body.extend(b"\0" * (FUNC_REC_SIZE * len(handlers)))
-        starts, arg_offsets, var_offsets = emit_code()
+        starts, arg_offsets, var_offsets, line_offsets = emit_code()
         table = bytearray()
     else:
-        starts, arg_offsets, var_offsets = emit_code()
+        starts, arg_offsets, var_offsets, line_offsets = emit_code()
         # The global list is how a script declares which names are globals, the
         # equivalent of writing `global gFoo` in the source. ScummVM creates a
         # global on first use and so never misses it (cb_globalpush), but
@@ -309,7 +317,8 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         functions_offset = cur()
         table = body
 
-    for h, start, ao, vo in zip(handlers, starts, arg_offsets, var_offsets):
+    for h, start, ao, vo, lo in zip(handlers, starts, arg_offsets,
+                                    var_offsets, line_offsets):
         table.extend(struct.pack(">HHII", h.name_index, func_unk0,
                                  len(h.code), start))
         table.extend(struct.pack(">HI", len(h.arg_names), ao))
@@ -320,7 +329,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         table.extend(h.tail if h.tail is not None else (
             struct.pack(">HI", 0, vo)
             + struct.pack(">IH", 12, 1)
-            + struct.pack(">HI", 0, vo)))
+            + struct.pack(">HI", 1, lo)))
     if table_first:
         body[table_at:table_at + len(table)] = table
 
