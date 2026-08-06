@@ -1086,7 +1086,7 @@ def build_editable_append(profile, trivial=False, tag=None,
         extra.append((b"CASt", bm.build_script_cast(
             script_base + i, nm, src, bm.SCRIPT_TYPE_SCORE, d5plus=True)))
         extra.append((b"Lscr", bm.borrow_lscr(
-            donor, script_base + i, script_base + i) if donor_code
+            donor, script_base + i, len(donor_members) + 3 + i) if donor_code
             else lscr_asm.build_lscr(
                 [lscr_asm.Handler(n_exit, code)],
                 script_id=script_base + i,

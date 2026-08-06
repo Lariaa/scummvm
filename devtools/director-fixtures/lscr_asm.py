@@ -223,11 +223,22 @@ def pad_even(blob, at):
 
 
 class Handler:
-    def __init__(self, name_index, code, arg_names=(), var_names=(), tail=None):
+    def __init__(self, name_index, code, arg_names=(), var_names=(), tail=None,
+                 line_table=None, line_count=None):
         self.name_index = name_index
         self.code = code
         self.arg_names = list(arg_names)
         self.var_names = list(var_names)
+        # One byte per source line, padded to an even length: lineCount 1 and 2
+        # both take two bytes, 3 and 4 take four, and so on without exception
+        # over 1300 sampled scripts. A single line covering the whole handler
+        # holds the code length minus one.
+        if line_table is None:
+            line_table = bytes([max(len(code) - 1, 0) & 0xff, 0])
+            line_count = 1 if line_count is None else line_count
+        self.line_table = line_table
+        self.line_count = (line_count if line_count is not None
+                           else len(line_table))
         # The 18 bytes after varOffset, which ScummVM reads and throws away
         # (lingo-bytecode.cpp:1360ff). They are not padding: laid against a real
         # handler they read as globalsCount u16, globalsOffset u32, unknown u32,
@@ -291,7 +302,9 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
             # three lines. Leaving it out and saying zero lines points lineOffset
             # at whatever section comes next.
             lines.append(cur())
-            body.extend(bytes([max(len(h.code) - 1, 0) & 0xff, 0]))
+            body.extend(h.line_table)
+            if len(h.line_table) % 2:
+                body.extend(b"\0")
         # opaque filler the reference script carries between the name arrays
         # and the function table; ScummVM addresses both by explicit offset
         body.extend(name_gap)
@@ -335,7 +348,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         table.extend(h.tail if h.tail is not None else (
             struct.pack(">HI", 0, vo)
             + struct.pack(">IH", 12, 1)
-            + struct.pack(">HI", 1, lo)))
+            + struct.pack(">HI", h.line_count, lo)))
     if table_first:
         body[table_at:table_at + len(table)] = table
 
