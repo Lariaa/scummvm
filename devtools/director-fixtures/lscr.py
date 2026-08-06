@@ -142,11 +142,18 @@ def parse_lnam(data):
     return names, dict(head=data[0:8], size=size, size2=size2, offset=offset, count=count, end=p)
 
 
-def build_lnam(names, head=b"\0" * 8):
-    """Inverse of parse_lnam."""
+def build_lnam(names, head=b"\0" * 8, size_delta=0):
+    """Inverse of parse_lnam.
+
+    `size_delta` is what the source subtracted from the chunk length before
+    storing it: 0 up to D6, where the field is the whole chunk, and 20 -- the
+    header -- on D7, where it counts only the names. ScummVM shrugs the
+    difference off ("D7+ size may not match the stream length",
+    lingo-bytecode.cpp:1758), so it is easy to get wrong and never notice.
+    """
     offset = 0x14
     body = b"".join(bytes([len(n)]) + n.encode("latin1") for n in names)
-    size = offset + len(body)
+    size = offset + len(body) - size_delta
     return (head
             + struct.pack(">II", size, size)
             + struct.pack(">HH", offset, len(names))

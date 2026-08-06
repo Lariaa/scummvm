@@ -872,7 +872,11 @@ def extend_lnam(payload, names):
         else:
             indices.append(len(table))
             table.append(name)
-    return lscr.build_lnam(table, head), indices
+
+    # Keep whatever the donor subtracted from the chunk length before storing
+    # it: nothing up to D6, the 20 byte header on D7.
+    stored = struct.unpack_from(BE + "I", payload, 8)[0]
+    return lscr.build_lnam(table, head, size_delta=len(payload) - stored), indices
 
 
 def unlink_donor_scripts(payload):
