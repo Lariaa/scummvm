@@ -246,7 +246,7 @@ class Handler:
 
 def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
                parent_number=-1, unk_block=None, unk3=0, script_flags=0,
-               unk4=b"\0" * 4, factory_name_id=-1,
+               unk4=None, factory_name_id=-1,
                event_map=None, event_map_flags=0, name_gap=b"",
                func_unk0=10, consts=(), properties=(), global_names=(),
                const_entry_size=CONST_ENTRY_SIZE, table_first=False):
@@ -254,6 +254,12 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
     `consts` a list of strings referenced by const_push()."""
     if unk_block is None:
         unk_block = b"\xff\xff" + b"\0" * 10
+    if unk4 is None:
+        # Never zero in a real script: of 960 sampled across 60 movies,
+        # 882 hold 1, seventy-two hold 3 and six hold 4, and D5 and D6
+        # are unanimous at 1. We were writing four zero bytes, a value
+        # the format does not appear to use at all.
+        unk4 = struct.pack(">I", 1)
 
     body = bytearray()          # everything from HEADER_SIZE onwards
 
