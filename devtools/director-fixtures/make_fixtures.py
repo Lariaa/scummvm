@@ -1073,7 +1073,8 @@ def build_editable_append(profile, trivial=False, tag=None,
     # Lingo context names them.
     lctx, script_base = bm.extend_lctx(
         prepared, script_lscr if ctx_entries else [],
-        entry_flags=bm.live_lctx_entry_flags(base_lctx))
+        entry_flags=bm.live_lctx_entry_flags(base_lctx),
+        marker=bm.live_lctx_marker(base_lctx))
 
     extra = [(b"CASt", donor.chunk(cast_text)),
              (b"STXT", donor.chunk(cast_stxt)),

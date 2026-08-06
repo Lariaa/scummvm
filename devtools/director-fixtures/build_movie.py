@@ -955,12 +955,30 @@ def unlink_donor_scripts(payload):
     entry_size = struct.unpack_from(BE + "H", out, 18)[0] or 12
     for i in range(count):
         off = items_offset + i * entry_size
+        struct.pack_into(BE + "I", out, off, 0)             # live marker
         struct.pack_into(BE + "i", out, off + 4, -1)
         struct.pack_into(BE + "H", out, off + 8, 0)         # entryFlags
         struct.pack_into(BE + "h", out, off + 10, -1)       # nextUnused
     struct.pack_into(BE + "h", out, 36, 0)                  # validCount
     struct.pack_into(BE + "h", out, 40, 1 if count else -1)  # firstUnused
     return bytes(out)
+
+
+def live_lctx_marker(payload):
+    """The four bytes a donor puts at the start of an entry that points at an
+    Lscr. Across 753 entries in 40 archive movies every live one has them set
+    and every unused one has them zero, so a live entry of ours with zeroes
+    there is something no real movie contains."""
+    count = struct.unpack_from(BE + "i", payload, 8)[0]
+    items_offset = struct.unpack_from(BE + "H", payload, 16)[0]
+    entry_size = struct.unpack_from(BE + "H", payload, 18)[0] or 12
+    for i in range(count):
+        off = items_offset + i * entry_size
+        if struct.unpack_from(BE + "i", payload, off + 4)[0] >= 0:
+            marker = struct.unpack_from(BE + "I", payload, off)[0]
+            if marker:
+                return marker
+    return 1
 
 
 def live_lctx_entry_flags(payload):
@@ -979,7 +997,7 @@ def live_lctx_entry_flags(payload):
     return 0
 
 
-def extend_lctx(payload, lscr_indices, entry_flags=0):
+def extend_lctx(payload, lscr_indices, entry_flags=0, marker=None):
     """Appends script context entries, keeping the donor's at their position.
 
     An entry's 1-based position is the lctxIndex handed to addCodeV4 and has to
@@ -996,10 +1014,19 @@ def extend_lctx(payload, lscr_indices, entry_flags=0):
     entry_size = struct.unpack_from(BE + "H", out, 18)[0] or 12
     end = items_offset + count * entry_size
 
+    # The first four bytes of an entry are not spare. Over 753 entries in 40
+    # archive movies the split is absolute: every entry pointing at an Lscr has
+    # them set, every unused one has them zero -- they look like a runtime
+    # pointer Director left behind, and a live entry with zeroes there is a
+    # combination no real movie contains. We reuse whatever one of the donor's
+    # own live entries carries, so ours look like its.
+    if marker is None:
+        marker = live_lctx_marker(payload)
+
     tail = bytes(out[end:])
     out = bytearray(out[:end])
     for idx in lscr_indices:
-        out += struct.pack(BE + "I", 0)
+        out += struct.pack(BE + "I", marker)
         out += struct.pack(BE + "i", idx)
         out += struct.pack(BE + "Hh", entry_flags, -1)
     out += tail
