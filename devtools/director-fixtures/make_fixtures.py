@@ -1574,6 +1574,43 @@ def build_resource_probe(profile, count=4):
     return path, payload
 
 
+def build_ctx_dup_probe(profile, count=4):
+    """The donor plus context entries pointing at its own scripts.
+
+    ctxclone crashes with entries byte identical to one of the donor's, so the
+    entries are not it; lscronly is clean with our Lscr chunks in the file and
+    nothing pointing at them. What is left between the two is what the entries
+    point at. This appends `count` entries that name Lscr chunks the donor
+    already has, and adds no chunk of any kind.
+
+    Crash means growing the table is enough on its own and the fault is in the
+    header, not the entries. Clean close means Director minds our Lscr only once
+    something loads it -- and then the byte for byte reproduction has to be
+    extended to a script with our own code in it, not the donor's.
+    """
+    donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
+    lctx_res = (donor.by_tag("Lctx") or donor.by_tag("LctX"))[0]
+    base = donor.chunk(lctx_res)
+
+    existing = [struct.unpack(">i", base[
+        struct.unpack(">H", base[16:18])[0] + i * 12 + 4:
+        struct.unpack(">H", base[16:18])[0] + i * 12 + 8])[0]
+        for i in range(struct.unpack(">i", base[8:12])[0])]
+    live = [i for i in existing if i >= 0]
+    if not live:
+        raise SystemExit("donor has no live context entry to duplicate")
+
+    lctx, _ = bm.extend_lctx(base, [live[0]] * count,
+                             entry_flags=bm.live_lctx_entry_flags(base),
+                             marker=bm.live_lctx_marker(base))
+    payload = bm.rebuild_preserving_indices(
+        donor, replace={lctx_res.index: lctx})
+    path = OUT / f"ctxdup-{profile.name}.dir"
+    path.write_bytes(payload)
+    return path, payload
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
@@ -1638,6 +1675,7 @@ if __name__ == "__main__":
             profile, bare=True, attach=False, cast_scripts=False,
             unlink=False, clone_ctx=True, tag=f'ctxclone-{profile.name}'))
         report(*build_resource_probe(profile))
+        report(*build_ctx_dup_probe(profile))
         report(*build_editable_append(
             profile, bare=True, keep_libs=True,
             tag=f'keeplibs-{profile.name}'))
