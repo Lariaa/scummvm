@@ -1089,7 +1089,11 @@ def build_editable_append(profile, trivial=False, tag=None,
             donor, script_base + i, script_base + i) if donor_code
             else lscr_asm.build_lscr(
                 [lscr_asm.Handler(n_exit, code)],
-                script_id=script_base + i, assembly_id=script_base + i,
+                script_id=script_base + i,
+                # assemblyId is the cast member the script belongs to, not its
+                # slot in the context: 606 of 606 sampled scripts across 60
+                # movies have the two equal. We were writing the slot.
+                assembly_id=len(donor_members) + 3 + i,
                 event_map=event_map, event_map_flags=event_flags,
                 consts=consts, global_names=[] if bare else [n_global],
                 const_entry_size=profile.const_entry,
