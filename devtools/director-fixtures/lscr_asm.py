@@ -318,6 +318,15 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         properties_offset = globals_offset = functions_offset = cur()
         table_at = len(body)
         body.extend(b"\0" * (FUNC_REC_SIZE * len(handlers)))
+        # D7 follows the table with four bytes per handler, before the code:
+        # 232 of 239 single-handler scripts sampled carry them, and the two and
+        # three handler ones scale to eight and twelve. The value resists every
+        # correlation tried -- args + vars + 2 matches 54 per cent and is also
+        # the modal value -- so it is most likely a stack requirement, and this
+        # is a considered guess rather than something measured.
+        for h in handlers:
+            body.extend(struct.pack(">I",
+                                    len(h.arg_names) + len(h.var_names) + 2))
         starts, arg_offsets, var_offsets, line_offsets = emit_code()
         table = bytearray()
     else:

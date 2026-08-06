@@ -1678,6 +1678,10 @@ if __name__ == "__main__":
         report(*build_editable_append(
             profile, bare=True, attach=False, cast_scripts=False,
             unlink=False, clone_ctx=True, tag=f'ctxclone-{profile.name}'))
+        # ctxadd with the donor's own bytecode in the appended chunks
+        report(*build_editable_append(
+            profile, bare=True, attach=False, cast_scripts=False,
+            unlink=False, donor_code=True, tag=f'ctxborrow-{profile.name}'))
         report(*build_resource_probe(profile))
         report(*build_ctx_dup_probe(profile))
         report(*build_editable_append(
