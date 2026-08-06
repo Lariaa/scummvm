@@ -997,7 +997,8 @@ def live_lctx_entry_flags(payload):
     return 0
 
 
-def extend_lctx(payload, lscr_indices, entry_flags=0, marker=None):
+def extend_lctx(payload, lscr_indices, entry_flags=0, marker=None,
+                clone_live=False):
     """Appends script context entries, keeping the donor's at their position.
 
     An entry's 1-based position is the lctxIndex handed to addCodeV4 and has to
@@ -1023,12 +1024,28 @@ def extend_lctx(payload, lscr_indices, entry_flags=0, marker=None):
     if marker is None:
         marker = live_lctx_marker(payload)
 
+    # clone_live copies a whole live entry of the donor's and swaps only the
+    # Lscr index, so every byte we cannot account for -- the trailing `next`
+    # among them -- comes out exactly as Director wrote it.
+    template = None
+    if clone_live:
+        for i in range(count):
+            off = items_offset + i * entry_size
+            if struct.unpack_from(BE + "i", payload, off + 4)[0] >= 0:
+                template = bytearray(payload[off:off + entry_size])
+                break
+
     tail = bytes(out[end:])
     out = bytearray(out[:end])
     for idx in lscr_indices:
-        out += struct.pack(BE + "I", marker)
-        out += struct.pack(BE + "i", idx)
-        out += struct.pack(BE + "Hh", entry_flags, -1)
+        if template is not None:
+            entry = bytearray(template)
+            struct.pack_into(BE + "i", entry, 4, idx)
+            out += entry
+        else:
+            out += struct.pack(BE + "I", marker)
+            out += struct.pack(BE + "i", idx)
+            out += struct.pack(BE + "Hh", entry_flags, -1)
     out += tail
 
     new_count = count + len(lscr_indices)

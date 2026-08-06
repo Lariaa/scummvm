@@ -952,7 +952,8 @@ def sprite_details(spans):
 def build_editable_append(profile, trivial=False, tag=None,
                           unlink=True, bare=False, donor_code=False,
                           attach=True, cast_scripts=True,
-                          ctx_entries=True, keep_libs=False):
+                          ctx_entries=True, keep_libs=False,
+                          clone_ctx=False):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -1074,7 +1075,7 @@ def build_editable_append(profile, trivial=False, tag=None,
     lctx, script_base = bm.extend_lctx(
         prepared, script_lscr if ctx_entries else [],
         entry_flags=bm.live_lctx_entry_flags(base_lctx),
-        marker=bm.live_lctx_marker(base_lctx))
+        marker=bm.live_lctx_marker(base_lctx), clone_live=clone_ctx)
 
     extra = [(b"CASt", donor.chunk(cast_text)),
              (b"STXT", donor.chunk(cast_stxt)),
@@ -1632,6 +1633,10 @@ if __name__ == "__main__":
         report(*build_editable_append(
             profile, bare=True, attach=False,
             unlink=False, tag=f'castadd-{profile.name}'))
+        # ctxadd with the entries cloned from a live one of the donor's
+        report(*build_editable_append(
+            profile, bare=True, attach=False, cast_scripts=False,
+            unlink=False, clone_ctx=True, tag=f'ctxclone-{profile.name}'))
         report(*build_resource_probe(profile))
         report(*build_editable_append(
             profile, bare=True, keep_libs=True,
