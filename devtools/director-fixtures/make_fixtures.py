@@ -950,7 +950,8 @@ def sprite_details(spans):
 
 def build_editable_append(profile, trivial=False, tag=None,
                           unlink=True, bare=False, donor_code=False,
-                          attach=True, cast_scripts=True):
+                          attach=True, cast_scripts=True,
+                          ctx_entries=True):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -1066,8 +1067,11 @@ def build_editable_append(profile, trivial=False, tag=None,
     # The donor's own scripts get unlinked first: a blank CAS* slot does not
     # stop them, Director reaches their code through this table.
     base_lctx = donor.chunk(lctx_res)
+    prepared = bm.unlink_donor_scripts(base_lctx) if unlink else base_lctx
+    # With ctx_entries off the Lscr chunks are in the file and nothing in the
+    # Lingo context names them.
     lctx, script_base = bm.extend_lctx(
-        bm.unlink_donor_scripts(base_lctx) if unlink else base_lctx, script_lscr,
+        prepared, script_lscr if ctx_entries else [],
         entry_flags=bm.live_lctx_entry_flags(base_lctx))
 
     extra = [(b"CASt", donor.chunk(cast_text)),
@@ -1582,6 +1586,10 @@ if __name__ == "__main__":
         report(*build_editable_append(
             profile, bare=True, attach=False, cast_scripts=False,
             tag=f'ctxonly-{profile.name}'))
+        report(*build_editable_append(
+            profile, bare=True, attach=False, cast_scripts=False,
+            ctx_entries=False, unlink=False,
+            tag=f'lscronly-{profile.name}'))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
