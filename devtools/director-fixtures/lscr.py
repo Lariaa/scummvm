@@ -26,7 +26,11 @@ class Function:
 
 
 class Lscr:
-    def __init__(self, data):
+    def __init__(self, data, const_entry_size=None):
+        """const_entry_size is 6 on D4 and 8 from D5 on (lingo-bytecode.cpp:1454).
+        Left unset it is inferred from the store: the reference table runs from
+        consts_offset up to consts_store_offset, so the stride follows from how
+        many entries fit."""
         if len(data) < HEADER_SIZE:
             raise ValueError("Lscr header too small")
         self.raw = data
@@ -66,9 +70,15 @@ class Lscr:
                           for i in range(self.event_map_count)]
 
         # constants: reference table of (type, value); 6 bytes for D4, 8 for D5+
+        if const_entry_size is None:
+            span = self.consts_store_offset - self.consts_offset
+            const_entry_size = 6
+            if self.consts_count and span // self.consts_count in (6, 8):
+                const_entry_size = span // self.consts_count
+        self.const_entry_size = const_entry_size
         self.consts = []
         for i in range(self.consts_count):
-            o = self.consts_offset + 6 * i
+            o = self.consts_offset + const_entry_size * i
             self.consts.append((u16(data, o), u32(data, o + 2)))
         self.consts_store = data[self.consts_store_offset:]
 
