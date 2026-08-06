@@ -1543,6 +1543,29 @@ def build_score_donor_index(profile, main_channel=False, tag="scoreidx",
     return path, payload
 
 
+def build_resource_probe(profile, count=4):
+    """The donor with a few extra chunks and not one other change.
+
+    lscronly-d7 crashes on close with a byte identical Lingo context and name
+    table, so what is left of it is chunks nothing refers to. This is that alone:
+    no new cast member, no CAS* change, no MCsL, no castArrayEnd, no score --
+    the donor's own bytes with `count` copies of one of its Lscr chunks appended
+    and nothing pointing at them.
+
+    Crash means adding a resource is what Director cannot survive, and the fault
+    is in how we rebuild the container. Clean close means it needs one of the
+    things the other probes add on top.
+    """
+    donor = bm.load_donor(profile.donor)
+    check_donor_unprotected(donor, profile.donor)
+    spare = next(r for r in donor.resources if r.tag == "Lscr")
+    extra = [(b"Lscr", donor.chunk(spare))] * count
+    payload = bm.rebuild_preserving_indices(donor, extra=extra)
+    path = OUT / f"resonly-{profile.name}.dir"
+    path.write_bytes(payload)
+    return path, payload
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
@@ -1590,6 +1613,7 @@ if __name__ == "__main__":
             profile, bare=True, attach=False, cast_scripts=False,
             ctx_entries=False, unlink=False,
             tag=f'lscronly-{profile.name}'))
+        report(*build_resource_probe(profile))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
