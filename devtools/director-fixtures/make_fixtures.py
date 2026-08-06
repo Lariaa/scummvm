@@ -949,7 +949,7 @@ def sprite_details(spans):
 
 
 def build_editable_append(profile, trivial=False, tag=None,
-                          unlink=True):
+                          unlink=True, bare=False):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -969,10 +969,15 @@ def build_editable_append(profile, trivial=False, tag=None,
         donor_members = bm.drop_donor_scripts(donor, donor_members)
 
     lnam_res = donor.by_tag("Lnam")[0]
-    lnam, name_idx = bm.extend_lnam(donor.chunk(lnam_res), NAMES)
+    # `bare` asks for nothing the donor does not already have: only the handler
+    # name, which every donor carries as exitFrame, so the name table comes back
+    # byte identical and the scripts declare no globals.
+    wanted = NAMES[:1] if bare else NAMES
+    lnam, name_idx = bm.extend_lnam(donor.chunk(lnam_res), wanted)
     if max(name_idx) > 0xffff:
         raise SystemExit("donor's name table is too long")
-    n_exit, n_put, n_global = name_idx
+    n_exit = name_idx[0]
+    n_put, n_global = (name_idx[1:] if not bare else (0, 0))
 
     def const_push(i):
         return lscr_asm.const_push(i, profile.const_entry)
@@ -1006,6 +1011,14 @@ def build_editable_append(profile, trivial=False, tag=None,
                ("checkFrame2", check(0, False), src_append(0), ()),
                ("checkFrame3", check(1, False), src_append(1), ()),
                ("reportResult", report, src_report(result_member), (LABEL,))]
+
+    if bare:
+        # Four handlers that return immediately, no globals, no constants. What
+        # is left is the wiring: four script members, four Lscr chunks, four
+        # context entries and the behaviours pointing at them.
+        nothing = bytes([lscr_asm.OP_PROCRET])
+        src = "on exitFrame\rend\r"
+        scripts = [("bare%d" % (i + 1), nothing, src, ()) for i in range(4)]
 
     if trivial:
         # The source and the bytecode deliberately disagree, and each writes its
@@ -1068,8 +1081,9 @@ def build_editable_append(profile, trivial=False, tag=None,
             [lscr_asm.Handler(n_exit, code)],
             script_id=script_base + i, assembly_id=script_base + i,
             event_map=event_map, event_map_flags=event_flags,
-            consts=consts, global_names=[n_global],
-            const_entry_size=profile.const_entry)))
+            consts=consts, global_names=[] if bare else [n_global],
+            const_entry_size=profile.const_entry,
+            **({} if bare else {}))))
 
     members = donor_members + [i_test, i_res] + script_cast
     first_script_member = result_member + 1
@@ -1545,6 +1559,8 @@ if __name__ == "__main__":
         report(*build_editable_append(
             profile, trivial=True, unlink=False,
             tag=f'scriptkeep-{profile.name}'))
+        report(*build_editable_append(
+            profile, bare=True, tag=f'bare-{profile.name}'))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
