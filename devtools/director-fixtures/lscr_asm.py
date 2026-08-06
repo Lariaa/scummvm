@@ -228,9 +228,20 @@ class Handler:
         self.code = code
         self.arg_names = list(arg_names)
         self.var_names = list(var_names)
-        # 9 uint16 ScummVM skips; the reference script's values are reused
-        self.tail = tail if tail is not None else struct.pack(
-            ">9H", 0, 0, 0, 0, 12, 1, 1, 0, 0)
+        # The 18 bytes after varOffset, which ScummVM reads and throws away
+        # (lingo-bytecode.cpp:1360ff). They are not padding: laid against a real
+        # handler they read as globalsCount u16, globalsOffset u32, unknown u32,
+        # unknown u16, lineCount u16, lineOffset u32, and the donor fills both
+        # offsets with the position its empty argument and variable lists share.
+        #
+        # Copying the reference script's values wholesale carried its lineCount
+        # of 1 while leaving both offsets at 0, which claims a line number table
+        # sitting at the start of the chunk. Director follows it and dies when
+        # the movie is closed -- an Lscr like that crashes it just by being in
+        # the file, with nothing referring to it at all. build_lscr fills the
+        # offsets in below, once it knows where they point.
+        self.tail = tail
+
 
 
 def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
@@ -290,7 +301,13 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         body += struct.pack(">HHII", h.name_index, func_unk0, len(h.code), start)
         body += struct.pack(">HI", len(h.arg_names), ao)
         body += struct.pack(">HI", len(h.var_names), vo)
-        body += h.tail
+        # globalsCount, globalsOffset, unknown, unknown, lineCount, lineOffset.
+        # We carry no line numbers, so that count is 0 rather than the reference
+        # script's 1, and both offsets point where the empty lists do.
+        body += h.tail if h.tail is not None else (
+            struct.pack(">HI", 0, vo)
+            + struct.pack(">IH", 12, 1)
+            + struct.pack(">HI", 0, vo))
 
     # 4. constants. With none, the index and store collapse onto the event map,
     #    exactly as the reference script does.
