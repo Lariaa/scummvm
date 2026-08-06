@@ -190,6 +190,25 @@ def dropped_lib_key_parents(blob):
     return tuple(range(CASTLIB_KEY_PARENT + 1, CASTLIB_KEY_PARENT + 1 + count))
 
 
+def patch_mcsl_member_range(blob, max_member, min_member=1):
+    """The donor's MCsL with library 1's range widened and everything else kept.
+
+    Keeps however many libraries it declares, external ones included -- so
+    Director asks for their files on load, which every probe that survives being
+    closed also does.
+    """
+    nitems = struct.unpack_from(BE + "H", blob, 12)[0]
+    offs = [struct.unpack_from(BE + "I", blob, 14 + 4 * i)[0]
+            for i in range(nitems)]
+    items_at = 14 + nitems * 4 + 4
+    RANGE_ITEM = 4
+    start = items_at + offs[RANGE_ITEM]
+    out = bytearray(blob)
+    struct.pack_into(BE + "HHI", out, start, min_member, max_member,
+                     struct.unpack_from(BE + "I", blob, start + 4)[0])
+    return bytes(out)
+
+
 def single_internal_mcsl(blob, max_member, min_member=1):
     """One internal library, with the resource id the donor's already uses.
 

@@ -951,7 +951,7 @@ def sprite_details(spans):
 def build_editable_append(profile, trivial=False, tag=None,
                           unlink=True, bare=False, donor_code=False,
                           attach=True, cast_scripts=True,
-                          ctx_entries=True):
+                          ctx_entries=True, keep_libs=False):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -1132,11 +1132,15 @@ def build_editable_append(profile, trivial=False, tag=None,
     # Raising castArrayEnd is what makes an appended member exist for Director;
     # ScummVM takes the range from MCsL on D5+ and never reads it.
     cfg = (donor.by_tag("DRCF") or donor.by_tag("VWCF"))[0]
+    mcsl_src = donor.chunk(donor.by_tag("MCsL")[0])
+    # keep_libs leaves the donor's library list intact and only widens the
+    # member range, so its external casts stay declared.
+    mcsl = (bm.patch_mcsl_member_range(mcsl_src, len(members)) if keep_libs
+            else bm.single_internal_mcsl(mcsl_src, len(members)))
     replace = {cfg.index: config.set_cast_array_end(donor.chunk(cfg),
                                                     len(members)),
                donor.by_tag("CAS*")[0].index: bm.build_cas(members),
-               donor.by_tag("MCsL")[0].index: bm.single_internal_mcsl(
-                   donor.chunk(donor.by_tag("MCsL")[0]), len(members)),
+               donor.by_tag("MCsL")[0].index: mcsl,
                donor.by_tag("VWSC")[0].index: vwsc,
                lnam_res.index: lnam,
                lctx_res.index: lctx}
@@ -1146,7 +1150,7 @@ def build_editable_append(profile, trivial=False, tag=None,
 
     data = bm.rebuild_preserving_indices(
         donor, extra=extra, extra_key=key_extra, replace=replace,
-        drop_key_parents=bm.dropped_lib_key_parents(
+        drop_key_parents=() if keep_libs else bm.dropped_lib_key_parents(
             donor.chunk(donor.by_tag("MCsL")[0])))
     path = OUT / f"{tag or ('editable-' + profile.name + '-append')}.dir"
     path.write_bytes(data)
@@ -1614,6 +1618,9 @@ if __name__ == "__main__":
             ctx_entries=False, unlink=False,
             tag=f'lscronly-{profile.name}'))
         report(*build_resource_probe(profile))
+        report(*build_editable_append(
+            profile, bare=True, keep_libs=True,
+            tag=f'keeplibs-{profile.name}'))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
