@@ -949,7 +949,8 @@ def sprite_details(spans):
 
 
 def build_editable_append(profile, trivial=False, tag=None,
-                          unlink=True, bare=False, donor_code=False):
+                          unlink=True, bare=False, donor_code=False,
+                          attach=True):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -1091,21 +1092,27 @@ def build_editable_append(profile, trivial=False, tag=None,
 
     # both sprites span all four frames; each frame script is its own one frame
     # span in the script channel
-    idx, details = sprite_details(
-        [(1, 4, SPRITE_CH), (1, 4, RESULT_CH)]
-        + [(i + 1, i + 1, 0, first_script_member + i) for i in range(4)])
+    # With attach off the scripts are in the cast and in the context but nothing
+    # in the score points at them: no behaviour entry, no actionId, no script
+    # channel span at all.
+    spans = [(1, 4, SPRITE_CH), (1, 4, RESULT_CH)]
+    if attach:
+        spans += [(i + 1, i + 1, 0, first_script_member + i) for i in range(4)]
+    idx, details = sprite_details(spans)
 
     def frame(i, editable, back):
-        return {0: bm.main_channel_d6plus(profile.main_size,
-                                          action_id=first_script_member + i,
-                                          script_list_idx=idx[2 + i]),
-                SPRITE_CH: profile.sprite(cast_member=tested_member,
-                                          x=20, y=20, w=200,
-                                          h=40, editable=editable, back=back,
-                                          list_idx=idx[0]),
-                RESULT_CH: profile.sprite(cast_member=result_member,
-                                          x=20, y=120, w=200, h=40,
-                                          list_idx=idx[1])}
+        chans = {SPRITE_CH: profile.sprite(cast_member=tested_member,
+                                           x=20, y=20, w=200,
+                                           h=40, editable=editable, back=back,
+                                           list_idx=idx[0]),
+                 RESULT_CH: profile.sprite(cast_member=result_member,
+                                           x=20, y=120, w=200, h=40,
+                                           list_idx=idx[1])}
+        if attach:
+            chans[0] = bm.main_channel_d6plus(
+                profile.main_size, action_id=first_script_member + i,
+                script_list_idx=idx[2 + i])
+        return chans
 
     vwsc = bm.build_vwsc_d6plus(
         [frame(0, True, 0), frame(1, False, 255),
@@ -1565,6 +1572,9 @@ if __name__ == "__main__":
         report(*build_editable_append(
             profile, bare=True, donor_code=True,
             tag=f'donorcode-{profile.name}'))
+        report(*build_editable_append(
+            profile, bare=True, attach=False,
+            tag=f'unattached-{profile.name}'))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
