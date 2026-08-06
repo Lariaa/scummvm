@@ -949,7 +949,7 @@ def sprite_details(spans):
 
 
 def build_editable_append(profile, trivial=False, tag=None,
-                          unlink=True, bare=False):
+                          unlink=True, bare=False, donor_code=False):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -1077,13 +1077,14 @@ def build_editable_append(profile, trivial=False, tag=None,
     for i, (nm, code, src, consts) in enumerate(scripts):
         extra.append((b"CASt", bm.build_script_cast(
             script_base + i, nm, src, bm.SCRIPT_TYPE_SCORE, d5plus=True)))
-        extra.append((b"Lscr", lscr_asm.build_lscr(
-            [lscr_asm.Handler(n_exit, code)],
-            script_id=script_base + i, assembly_id=script_base + i,
-            event_map=event_map, event_map_flags=event_flags,
-            consts=consts, global_names=[] if bare else [n_global],
-            const_entry_size=profile.const_entry,
-            **({} if bare else {}))))
+        extra.append((b"Lscr", bm.borrow_lscr(
+            donor, script_base + i, script_base + i) if donor_code
+            else lscr_asm.build_lscr(
+                [lscr_asm.Handler(n_exit, code)],
+                script_id=script_base + i, assembly_id=script_base + i,
+                event_map=event_map, event_map_flags=event_flags,
+                consts=consts, global_names=[] if bare else [n_global],
+                const_entry_size=profile.const_entry)))
 
     members = donor_members + [i_test, i_res] + script_cast
     first_script_member = result_member + 1
@@ -1561,6 +1562,9 @@ if __name__ == "__main__":
             tag=f'scriptkeep-{profile.name}'))
         report(*build_editable_append(
             profile, bare=True, tag=f'bare-{profile.name}'))
+        report(*build_editable_append(
+            profile, bare=True, donor_code=True,
+            tag=f'donorcode-{profile.name}'))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))

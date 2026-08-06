@@ -843,6 +843,37 @@ def load_donor(path=None):
     return rifx.RifxFile(gzip.decompress(data))
 
 
+def borrow_lscr(donor, script_id, assembly_id):
+    """One of the donor's own script chunks, refiled under our context slot.
+
+    Takes it apart in no way at all beyond the two ids that say where it belongs:
+    scriptId at 0x12 and assemblyId at 0x2e. Everything else -- header, handler
+    table, event map, name references -- stays exactly as Director wrote it.
+
+    That makes it the control for our assembler: same cast member, same context
+    entry, same behaviour pointing at it, but the code is the donor's. Whatever
+    a probe built this way still does wrong cannot be blamed on lscr_asm.
+
+    Picks the simplest chunk available: one handler, no globals, no constants.
+    """
+    best = None
+    for res in donor.resources:
+        if res.tag != "Lscr":
+            continue
+        body = donor.chunk(res)
+        parsed = lscr.Lscr(body)
+        if (len(parsed.functions) == 1 and not parsed.globals
+                and not parsed.consts):
+            if best is None or len(body) < len(best):
+                best = body
+    if best is None:
+        raise ValueError("donor has no single-handler script to borrow")
+    out = bytearray(best)
+    struct.pack_into(BE + "H", out, 0x12, script_id)
+    struct.pack_into(BE + "H", out, 0x2e, assembly_id)
+    return bytes(out)
+
+
 def extend_lnam(payload, names):
     """Adds names to a name table, keeping the existing ones at their index.
 
