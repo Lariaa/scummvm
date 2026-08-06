@@ -884,26 +884,57 @@ def unlink_donor_scripts(payload):
     stop, and up it comes -- `Script error: Movie cast not found` for the
     external cast we no longer declare.
 
-    An unused entry is -1, which is what the donor's own spare slots hold. The
-    Lscr chunks stay in the file with nothing pointing at them, and our scripts
-    keep their positions, so the scriptIds in their cast info still line up.
+    The Lscr chunks stay in the file with nothing pointing at them, and our
+    scripts keep their positions, so the scriptIds in their cast info still line
+    up.
+
+    An unused entry is not just a -1 where the Lscr index was: in both donors it
+    also carries entryFlags 0 where a live one carries the movie's flag value,
+    the header's validCount counts only the live ones, and firstUnused names the
+    first free slot. Leaving those three saying what they said before is what
+    crashes Director when the film closes -- graft-d7, which touches the cast
+    but not this table, closes cleanly.
     """
     out = bytearray(payload)
     count = struct.unpack_from(BE + "i", out, 8)[0]
     items_offset = struct.unpack_from(BE + "H", out, 16)[0]
     entry_size = struct.unpack_from(BE + "H", out, 18)[0] or 12
     for i in range(count):
-        struct.pack_into(BE + "i", out, items_offset + i * entry_size + 4, -1)
+        off = items_offset + i * entry_size
+        struct.pack_into(BE + "i", out, off + 4, -1)
+        struct.pack_into(BE + "H", out, off + 8, 0)         # entryFlags
+        struct.pack_into(BE + "h", out, off + 10, -1)       # nextUnused
+    struct.pack_into(BE + "h", out, 36, 0)                  # validCount
+    struct.pack_into(BE + "h", out, 40, 1 if count else -1)  # firstUnused
     return bytes(out)
 
 
-def extend_lctx(payload, lscr_indices):
+def live_lctx_entry_flags(payload):
+    """The entryFlags a donor puts on a context entry that points at an Lscr.
+
+    0 on the D6 donor, 4 on the D7 one -- so it is not a constant, and our own
+    entries were going in with 0 either way.
+    """
+    count = struct.unpack_from(BE + "i", payload, 8)[0]
+    items_offset = struct.unpack_from(BE + "H", payload, 16)[0]
+    entry_size = struct.unpack_from(BE + "H", payload, 18)[0] or 12
+    for i in range(count):
+        off = items_offset + i * entry_size
+        if struct.unpack_from(BE + "i", payload, off + 4)[0] >= 0:
+            return struct.unpack_from(BE + "H", payload, off + 8)[0]
+    return 0
+
+
+def extend_lctx(payload, lscr_indices, entry_flags=0):
     """Appends script context entries, keeping the donor's at their position.
 
     An entry's 1-based position is the lctxIndex handed to addCodeV4 and has to
     match the scriptId in the member's cast info, so appending rather than
     replacing leaves the donor's own scripts resolvable. Returns (chunk, base)
     where base is the 1-based position of our first entry.
+   
+    `entry_flags` should be what the donor puts on its own live entries; ours
+    were going in with 0 while the D7 donor uses 4.
     """
     out = bytearray(payload)
     count = struct.unpack_from(BE + "i", out, 8)[0]
@@ -916,10 +947,14 @@ def extend_lctx(payload, lscr_indices):
     for idx in lscr_indices:
         out += struct.pack(BE + "I", 0)
         out += struct.pack(BE + "i", idx)
-        out += struct.pack(BE + "Hh", 0, -1)
+        out += struct.pack(BE + "Hh", entry_flags, -1)
     out += tail
 
     new_count = count + len(lscr_indices)
     struct.pack_into(BE + "ii", out, 8, new_count, new_count)
-    struct.pack_into(BE + "h", out, 36, new_count)      # validCount
+    # validCount counts the entries that point at something, not all of them
+    live = sum(1 for i in range(new_count)
+               if struct.unpack_from(BE + "i", out,
+                                     items_offset + i * entry_size + 4)[0] >= 0)
+    struct.pack_into(BE + "h", out, 36, live)
     return bytes(out), count + 1

@@ -1050,7 +1050,8 @@ def build_editable_append(profile, trivial=False, tag=None):
     # The donor's own scripts get unlinked first: a blank CAS* slot does not
     # stop them, Director reaches their code through this table.
     lctx, script_base = bm.extend_lctx(
-        bm.unlink_donor_scripts(donor.chunk(lctx_res)), script_lscr)
+        bm.unlink_donor_scripts(donor.chunk(lctx_res)), script_lscr,
+        entry_flags=bm.live_lctx_entry_flags(donor.chunk(lctx_res)))
 
     extra = [(b"CASt", donor.chunk(cast_text)),
              (b"STXT", donor.chunk(cast_stxt)),
