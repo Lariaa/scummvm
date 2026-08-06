@@ -950,7 +950,7 @@ def sprite_details(spans):
 
 def build_editable_append(profile, trivial=False, tag=None,
                           unlink=True, bare=False, donor_code=False,
-                          attach=True):
+                          attach=True, cast_scripts=True):
     """The D6/D7 editable fixture, built by appending to the donor.
 
     ladder-d6-0x showed that rebuilding the index space is what Director chokes
@@ -1087,7 +1087,11 @@ def build_editable_append(profile, trivial=False, tag=None,
                 consts=consts, global_names=[] if bare else [n_global],
                 const_entry_size=profile.const_entry)))
 
-    members = donor_members + [i_test, i_res] + script_cast
+    # With cast_scripts off the Lscr chunks and their context entries are there
+    # but no CAS* slot names them, so they are not cast members at all.
+    members = donor_members + [i_test, i_res]
+    if cast_scripts:
+        members += script_cast
     first_script_member = result_member + 1
 
     # both sprites span all four frames; each frame script is its own one frame
@@ -1575,6 +1579,9 @@ if __name__ == "__main__":
         report(*build_editable_append(
             profile, bare=True, attach=False,
             tag=f'unattached-{profile.name}'))
+        report(*build_editable_append(
+            profile, bare=True, attach=False, cast_scripts=False,
+            tag=f'ctxonly-{profile.name}'))
         report(*build_score_probe(profile))
         report(*build_graft_probe(profile))
         report(*build_graft_minimal(profile))
