@@ -1623,6 +1623,14 @@ if __name__ == "__main__":
             profile, bare=True, attach=False, cast_scripts=False,
             ctx_entries=False, unlink=False, donor_code=True,
             tag=f'lscrborrow-{profile.name}'))
+        # one step from lscronly: the context entries, nothing else
+        report(*build_editable_append(
+            profile, bare=True, attach=False, cast_scripts=False,
+            unlink=False, tag=f'ctxadd-{profile.name}'))
+        # one step further: the script cast members as well
+        report(*build_editable_append(
+            profile, bare=True, attach=False,
+            unlink=False, tag=f'castadd-{profile.name}'))
         report(*build_resource_probe(profile))
         report(*build_editable_append(
             profile, bare=True, keep_libs=True,
