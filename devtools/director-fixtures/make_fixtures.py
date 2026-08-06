@@ -1617,6 +1617,10 @@ if __name__ == "__main__":
             profile, bare=True, attach=False, cast_scripts=False,
             ctx_entries=False, unlink=False,
             tag=f'lscronly-{profile.name}'))
+        report(*build_editable_append(
+            profile, bare=True, attach=False, cast_scripts=False,
+            ctx_entries=False, unlink=False, donor_code=True,
+            tag=f'lscrborrow-{profile.name}'))
         report(*build_resource_probe(profile))
         report(*build_editable_append(
             profile, bare=True, keep_libs=True,
