@@ -460,7 +460,8 @@ def make_lscr_for(profile, name_index, code, script_id, consts=(),
                                event_map=event_map,
                                event_map_flags=event_flags,
                                consts=consts, global_names=global_names,
-                               const_entry_size=profile.const_entry)
+                               const_entry_size=profile.const_entry,
+                               table_first=profile.version >= 700)
 
 
 def build_variant(profile, kind):
@@ -1089,7 +1090,8 @@ def build_editable_append(profile, trivial=False, tag=None,
                 script_id=script_base + i, assembly_id=script_base + i,
                 event_map=event_map, event_map_flags=event_flags,
                 consts=consts, global_names=[] if bare else [n_global],
-                const_entry_size=profile.const_entry)))
+                const_entry_size=profile.const_entry,
+                table_first=profile.version >= 700)))
 
     # With cast_scripts off the Lscr chunks and their context entries are there
     # but no CAS* slot names them, so they are not cast members at all.

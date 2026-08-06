@@ -249,7 +249,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
                unk4=b"\0" * 4, factory_name_id=-1,
                event_map=None, event_map_flags=0, name_gap=b"",
                func_unk0=10, consts=(), properties=(), global_names=(),
-               const_entry_size=CONST_ENTRY_SIZE):
+               const_entry_size=CONST_ENTRY_SIZE, table_first=False):
     """Serialises one Lscr chunk. `handlers` is a list of Handler,
     `consts` a list of strings referenced by const_push()."""
     if unk_block is None:
@@ -260,54 +260,69 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
     def cur():
         return HEADER_SIZE + len(body)
 
-    # 1. handler bytecode, each padded so the next section starts even
-    starts = []
-    for h in handlers:
-        starts.append(cur())
-        body += h.code
-        body += pad_even(b"", cur())
+    # Section order is a version thing, and each version is unanimous. Counted
+    # over 60 archive movies: D5 and D6 put the handler bytecode first and the
+    # function table behind it (683 scripts), D7 puts the table first and the
+    # code behind it (274 scripts). Both donors agree with their own version.
+    def emit_code():
+        starts = []
+        for h in handlers:
+            starts.append(cur())
+            body.extend(h.code)
+            body.extend(pad_even(b"", cur()))
+        args, varz = [], []
+        for h in handlers:
+            args.append(cur())
+            for n in h.arg_names:
+                body.extend(struct.pack(">h", n))
+            varz.append(cur())
+            for n in h.var_names:
+                body.extend(struct.pack(">h", n))
+        # opaque filler the reference script carries between the name arrays
+        # and the function table; ScummVM addresses both by explicit offset
+        body.extend(name_gap)
+        if cur() % 2:
+            body.extend(b"\0")
+        return starts, args, varz
 
-    # 2. argument and variable name arrays
-    arg_offsets, var_offsets = [], []
-    for h in handlers:
-        arg_offsets.append(cur())
-        for n in h.arg_names:
-            body += struct.pack(">h", n)
-        var_offsets.append(cur())
-        for n in h.var_names:
-            body += struct.pack(">h", n)
+    if table_first:
+        # The table records offsets the code has not produced yet, so its bytes
+        # are reserved first and filled in once they are known.
+        properties_offset = globals_offset = functions_offset = cur()
+        table_at = len(body)
+        body.extend(b"\0" * (FUNC_REC_SIZE * len(handlers)))
+        starts, arg_offsets, var_offsets = emit_code()
+        table = bytearray()
+    else:
+        starts, arg_offsets, var_offsets = emit_code()
+        # The global list is how a script declares which names are globals, the
+        # equivalent of writing `global gFoo` in the source. ScummVM creates a
+        # global on first use and so never misses it (cb_globalpush), but
+        # Director treats an undeclared name as a local and refuses it with
+        # "Variable used before assigned a value".
+        properties_offset = cur()
+        for p_ in properties:
+            body.extend(struct.pack(">h", p_))
+        globals_offset = cur()
+        for g in global_names:
+            body.extend(struct.pack(">h", g))
+        functions_offset = cur()
+        table = body
 
-    # opaque filler the reference script carries between the name arrays and
-    # the function table; ScummVM addresses both by explicit offset
-    body += name_gap
-    if cur() % 2:
-        body += b"\0"
-
-    # 3. property list, global list, then the function table.
-    #
-    # The global list is how a script declares which names are globals, the
-    # equivalent of writing `global gFoo` in the source. ScummVM creates a
-    # global on first use and so never misses it (cb_globalpush), but Director
-    # treats an undeclared name as a local and refuses it with "Variable used
-    # before assigned a value".
-    properties_offset = cur()
-    for p in properties:
-        body += struct.pack(">h", p)
-    globals_offset = cur()
-    for g in global_names:
-        body += struct.pack(">h", g)
-    functions_offset = cur()
     for h, start, ao, vo in zip(handlers, starts, arg_offsets, var_offsets):
-        body += struct.pack(">HHII", h.name_index, func_unk0, len(h.code), start)
-        body += struct.pack(">HI", len(h.arg_names), ao)
-        body += struct.pack(">HI", len(h.var_names), vo)
+        table.extend(struct.pack(">HHII", h.name_index, func_unk0,
+                                 len(h.code), start))
+        table.extend(struct.pack(">HI", len(h.arg_names), ao))
+        table.extend(struct.pack(">HI", len(h.var_names), vo))
         # globalsCount, globalsOffset, unknown, unknown, lineCount, lineOffset.
         # We carry no line numbers, so that count is 0 rather than the reference
         # script's 1, and both offsets point where the empty lists do.
-        body += h.tail if h.tail is not None else (
+        table.extend(h.tail if h.tail is not None else (
             struct.pack(">HI", 0, vo)
             + struct.pack(">IH", 12, 1)
-            + struct.pack(">HI", 0, vo))
+            + struct.pack(">HI", 0, vo)))
+    if table_first:
+        body[table_at:table_at + len(table)] = table
 
     # 4. constants. With none, the index and store collapse onto the event map,
     #    exactly as the reference script does.
