@@ -178,6 +178,18 @@ def internal_lib_resource_id(blob):
     return struct.unpack_from(BE + "I", blob, start + 4)[0]
 
 
+def dropped_lib_key_parents(blob):
+    """The KEY* parents that stop meaning anything once we emit one library.
+
+    A movie files its own chunks under one id and each cast library under
+    another. The D7 donor uses 1024 for the movie, 0x10400 for the internal cast
+    and 1025 to 1027 for the three libraries it declares; keeping only the
+    internal one leaves the last three describing libraries that are gone.
+    """
+    count = struct.unpack_from(BE + "H", blob, 6)[0]
+    return tuple(range(CASTLIB_KEY_PARENT + 1, CASTLIB_KEY_PARENT + 1 + count))
+
+
 def single_internal_mcsl(blob, max_member, min_member=1):
     """One internal library, with the resource id the donor's already uses.
 
@@ -603,7 +615,8 @@ def build_vwsc(frames, num_channels=50):
 # RIFX container
 # --------------------------------------------------------------------------
 def rebuild_preserving_indices(donor, *, imap_version=None, rewrite_key=False,
-                               extra=(), extra_key=(), replace=None):
+                               extra=(), extra_key=(), replace=None,
+                               drop_key_parents=()):
     """Re-emits every resource of `donor` at its original mmap index.
 
     build_rifx() renumbers, which forces KEY* and Lctx to be rewritten -- the
@@ -687,8 +700,8 @@ def rebuild_preserving_indices(donor, *, imap_version=None, rewrite_key=False,
                              header_size + count * entry_size, mmap_offset)
         elif res.index in placed:
             tag, payload, offset = placed[res.index]
-            if tag == b"KEY*" and (rewrite_key or extra_key):
-                payload = _extend_key(payload, extra_key)
+            if tag == b"KEY*" and (rewrite_key or extra_key or drop_key_parents):
+                payload = _extend_key(payload, extra_key, drop_key_parents)
             out[e:e + 4] = tag
             struct.pack_into(BE + "II", out, e + 4, len(payload), offset)
             out[offset:offset + 4] = tag
@@ -703,16 +716,25 @@ def rebuild_preserving_indices(donor, *, imap_version=None, rewrite_key=False,
     return bytes(out)
 
 
-def _extend_key(payload, extra_key=()):
+def _extend_key(payload, extra_key=(), drop_parents=()):
     """Re-emits a key table through our own encoder without touching a single
     index. Renumbering forces us to rewrite KEY*, so this separates the encoder
-    from the renumbering when bisecting."""
+    from the renumbering when bisecting.
+
+    `drop_parents` removes every entry filed under those parents. Dropping a
+    cast library from MCsL leaves its KEY* entries behind pointing at a library
+    nothing declares any more, and the donor and graft0 -- which keep all three
+    libraries -- close cleanly where the fixtures that keep one do not.
+    """
     used = struct.unpack_from(BE + "I", payload, 8)[0]
     max_entries = struct.unpack_from(BE + "I", payload, 4)[0]
+    drop = set(drop_parents)
     entries = []
     for i in range(used):
         off = 12 + i * 12
         child, parent = struct.unpack_from(BE + "II", payload, off)
+        if parent in drop:
+            continue
         entries.append((child, parent, payload[off + 8:off + 12]))
     entries.extend(extra_key)
     return build_key(entries, max_entries=max(max_entries, len(entries)))

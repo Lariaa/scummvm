@@ -1110,8 +1110,10 @@ def build_editable_append(profile, trivial=False, tag=None):
     key_extra = [(i_test_stxt, i_test, b"STXT"), (i_res_stxt, i_res, b"STXT")]
     key_extra += [(l, c, b"Lscr") for c, l in zip(script_cast, script_lscr)]
 
-    data = bm.rebuild_preserving_indices(donor, extra=extra,
-                                         extra_key=key_extra, replace=replace)
+    data = bm.rebuild_preserving_indices(
+        donor, extra=extra, extra_key=key_extra, replace=replace,
+        drop_key_parents=bm.dropped_lib_key_parents(
+            donor.chunk(donor.by_tag("MCsL")[0])))
     path = OUT / f"{tag or ('editable-' + profile.name + '-append')}.dir"
     path.write_bytes(data)
     return path, data
@@ -1168,8 +1170,10 @@ def build_score_probe(profile):
                donor.by_tag("VWSC")[0].index: vwsc}
 
     key_extra = [(i_a_stxt, i_a, b"STXT"), (i_b_stxt, i_b, b"STXT")]
-    data = bm.rebuild_preserving_indices(donor, extra=extra,
-                                         extra_key=key_extra, replace=replace)
+    data = bm.rebuild_preserving_indices(
+        donor, extra=extra, extra_key=key_extra, replace=replace,
+        drop_key_parents=bm.dropped_lib_key_parents(
+            donor.chunk(donor.by_tag("MCsL")[0])))
     path = OUT / f"score-{profile.name}.dir"
     path.write_bytes(data)
     return path, data
@@ -1259,7 +1263,8 @@ def build_graft_probe(profile):
                donor.by_tag("VWSC")[0].index: bytes(out)}
     data_out = bm.rebuild_preserving_indices(
         donor, extra=extra, extra_key=[(next_index + 1, next_index, b"STXT")],
-        replace=replace)
+        replace=replace, drop_key_parents=bm.dropped_lib_key_parents(
+            donor.chunk(donor.by_tag("MCsL")[0])))
     path = OUT / f"graft-{profile.name}.dir"
     path.write_bytes(data_out)
     return path, data_out
