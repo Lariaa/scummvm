@@ -108,6 +108,7 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0x66, LC::cb_v4theentitynamepush, "bN" },
 	{ 0x67, LC::cb_call,		"bN" }, // D5+ objcall
 	{ 0x6e, LC::c_intpush,		"b" },  // D8.5+ push int
+	{ 0x70, LC::cb_objectfieldpush, "bN" }, // D8.5+ chained property
 
 	{ 0x81, LC::c_intpush,		"W" },
 	{ 0x82, LC::c_argcnoretpush,"w" },
@@ -145,6 +146,7 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0xa6, LC::cb_v4theentitynamepush, "wN" },
 	{ 0xa7, LC::cb_call,		"wN" }, // D5+ objcall
 	{ 0xae, LC::c_intpush,		"W" },  // D8.5+ push int, signed
+	{ 0xb0, LC::cb_objectfieldpush, "wN" }, // D8.5+ chained property
 	{ 0, nullptr, nullptr }
 };
 
