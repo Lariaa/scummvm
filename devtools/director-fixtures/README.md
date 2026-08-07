@@ -5,11 +5,38 @@ The movies use nothing but stock Lingo, so they run in real Director as well as
 in ScummVM, and each one prints its verdict into a field on stage (and via `put`,
 which reaches the ScummVM log and Director's Message window).
 
-Status: the D4 pair is proven -- `editable.dir` reports `editable 101` on an
-upstream build and `editable 111` on one with the fixes, which is exactly what it
-exists to distinguish. The D6 and D7 variants load and render in ScummVM but
-Director still refuses them, and their frame scripts do not run; see the trap
-lists at the end before touching them.
+Status: four movies work and are listed below. The D4 pair is generated here and
+proven -- `editable-d4.dir` reports `editable 101` on an upstream build and
+`editable 111` on one with the fixes, which is exactly what it exists to
+distinguish. The D6 pair is Director's own conversion of those two and reports
+the same verdicts.
+
+What this generator produces for D6 and D7 does not work: ScummVM loads those
+movies and then fails with `Score::loadFrames: could not fetch sprite details
+stream`, printing nothing, and Director crashes when the film is closed. They are
+kept because the hunt for why is where nearly everything in the trap list below
+was learned.
+
+## The four movies meant for upstream
+
+    movies/editable-d4.dir        D4, generated here
+    movies/listoverride-d4.dir    D4, generated here
+    movies/editable-d6.dir        D6, Director's own conversion of editable-d4
+    movies/listoverride-d6.dir    D6, Director's own conversion of listoverride-d4
+
+Every one of them runs: put it in a directory with an empty `lingotests-all`
+marker, give it a name that sorts before that marker, and run
+
+    scummvm -p <directory> --logfile=<log> directortest-all
+
+`--start-movie` is ignored by this target, which picks the first file it finds.
+Verdicts on a build without the fixes are `editable 101` and `list METHOD`; with
+them they should read `editable 111` and `list LINTRANS`.
+
+The two D6 movies were made by opening the D4 ones in Director 7 and saving
+them, not by this generator -- what it produces for D6 and D7 does not work, and
+`movies-d6d7/` is kept for the format research rather than for testing. Being
+conversions of our own files, they carry no game data.
 
 ## Running the movies
 
@@ -24,7 +51,7 @@ In Director, open the `.dir` directly and play it. Do not save: Director 6 and
 later convert the file format on save. Each script cast member also carries its
 Lingo source in the cast info, so the scripts are readable in the script window.
 
-## movies/editable.dir
+## movies/editable-d4.dir
 
 Covers:
 
@@ -49,7 +76,7 @@ The verdict is written into cast member 3, not into the member under test:
 `Channel::isDirty()` also returns true when `Cast::isModified()` is set, so
 writing into the tested member would mask the very bug this checks for.
 
-## movies/listoverride.dir
+## movies/listoverride-d4.dir
 
 Covers:
 
@@ -147,7 +174,7 @@ byte-level specification:
 `lscr_asm.build_lscr()` reproduces a real Director 4 script byte for byte
 (`STRTMAX2.dir` from "Max and Marie Go Shopping", a 164 byte
 `on exitFrame / updateStage / end`), which is what the assembler is checked
-against. ProjectorRays decompiles `editable.dir` back to the intended Lingo.
+against. ProjectorRays decompiles `editable-d4.dir` back to the intended Lingo.
 
 ### Traps ScummVM will tell you about
 
@@ -226,7 +253,7 @@ new failure appears rather than guessing at fields.
 ### Read the ladder before drawing the conclusion
 
 The first ladder was built on a conclusion that turned out to be wrong. Because
-`probe-d4` rendered and `editable.dir` did not, and the two differ in their
+`probe-d4` rendered and `editable-d4.dir` did not, and the two differ in their
 score, the score looked like the only candidate and the rungs walked from the
 donor's score to ours. Running them in Director 5 showed that **rung a is empty
 too** -- and rung a carries the donor's score, byte for byte identical to the one

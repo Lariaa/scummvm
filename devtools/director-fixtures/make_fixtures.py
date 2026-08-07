@@ -3,7 +3,7 @@
 Both movies use nothing but stock Lingo so they run in real Director as well as
 in ScummVM, and both print their verdict on stage.
 
-editable.dir -- covers
+editable-d4.dir -- covers
     616b3d29cd9  DIRECTOR: Mark a channel dirty when the score toggles the editable flag
     5a896cf1c70  DIRECTOR: Follow the score editable flag on the same cast member
 
@@ -122,7 +122,7 @@ def make_lscr(code, script_id, consts=()):
                                consts=consts)
 
 
-def build_editable(vwsc_override=None, out_name="editable.dir"):
+def build_editable(vwsc_override=None, out_name="editable-d4.dir"):
     donor = bm.load_donor()
     keep = {}
     for r in donor.resources:
@@ -216,7 +216,7 @@ def build_editable(vwsc_override=None, out_name="editable.dir"):
 
 
 # --------------------------------------------------------------------------
-# listoverride.dir -- covers
+# listoverride-d4.dir -- covers
 #   83c04ad6fe0  DIRECTOR: Let list builtins override same-named handlers from
 #                          me methods
 #
@@ -363,7 +363,7 @@ def build_listoverride():
         [frame(MEMBER_RUN), frame(MEMBER_REP)]))
 
     data = bm.build_rifx(chunks)
-    path = OUT / "listoverride.dir"
+    path = OUT / "listoverride-d4.dir"
     path.write_bytes(data)
     return path, data
 
