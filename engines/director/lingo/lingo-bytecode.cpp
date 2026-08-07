@@ -1481,7 +1481,28 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 			uint8 opcode = codeStore[pointer];
 			pointer += 1;
 
-			if (opcode == 0x44 || opcode == 0x84) {
+			if (opcode == 0xef || opcode == 0xf1) {
+				// D8.5 pushes 32-bit literals through opcodes that carry a four
+				// byte operand, a width our table cannot describe. 0xef is the
+				// integer, 0xf1 the bit pattern of a float.
+				for (int j = 0; j < 5; j++) {
+					offsetList.push_back(_currentAssembly->size());
+					byteOffsets.push_back(_currentAssembly->size());
+				}
+
+				uint32 raw = READ_BE_UINT32(&codeStore[pointer]);
+				pointer += 4;
+
+				if (opcode == 0xef) {
+					code1(LC::c_intpush);
+					codeInt((int32)raw);
+				} else {
+					float value;
+					memcpy(&value, &raw, sizeof(value));
+					code1(LC::c_floatpush);
+					codeFloat(value);
+				}
+			} else if (opcode == 0x44 || opcode == 0x84) {
 				// Opcode for pushing a value from the constants table.
 				// Rewrite these to inline the constant into our bytecode.
 				offsetList.push_back(_currentAssembly->size());
@@ -1654,7 +1675,7 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 					byteOffsets.push_back(_currentAssembly->size());
 					codeInt((uint)codeStore[pointer]);
 					pointer += 1;
-				} else { // 3 byte instruction
+				} else if (opcode < 0xc0) { // 3 byte instruction
 					debugC(5, kDebugCompile, "Unimplemented opcode: 0x%02x (%d, %d)", opcode, (uint)codeStore[pointer], (uint)codeStore[pointer+1]);
 					offsetList.push_back(_currentAssembly->size());
 					byteOffsets.push_back(_currentAssembly->size());
@@ -1667,6 +1688,20 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 					byteOffsets.push_back(_currentAssembly->size());
 					codeInt((uint)codeStore[pointer+1]);
 					pointer += 2;
+				} else { // 5 byte instruction
+					// Skipping only two of the four operand bytes would leave
+					// the rest of the handler reading garbage.
+					uint32 arg = READ_BE_UINT32(&codeStore[pointer]);
+					debugC(5, kDebugCompile, "Unimplemented opcode: 0x%02x (%u)", opcode, arg);
+					for (int j = 0; j < 5; j++) {
+						offsetList.push_back(_currentAssembly->size());
+						byteOffsets.push_back(_currentAssembly->size());
+					}
+					code1(LC::cb_unk2);
+					codeInt(opcode);
+					codeInt(arg >> 16);
+					codeInt(arg & 0xffff);
+					pointer += 4;
 				}
 			}
 		}
