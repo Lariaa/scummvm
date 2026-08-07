@@ -115,11 +115,11 @@ def src_report(result_member=RESULT_MEMBER):
 
 
 def make_lscr(code, script_id, consts=()):
-    h = lscr_asm.Handler(I_EXITFRAME, code)
+    h = lscr_asm.Handler(I_EXITFRAME, code, global_names=[I_GLOBAL])
     return lscr_asm.build_lscr([h], script_id=script_id, assembly_id=script_id,
                                event_map=[-1] * 10 + [0],
                                event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
-                               consts=consts, global_names=[I_GLOBAL])
+                               consts=consts)
 
 
 def build_editable(vwsc_override=None, out_name="editable.dir"):
@@ -369,11 +369,11 @@ def build_listoverride():
 
 
 def make_lscr_b(code, script_id, consts=()):
-    h = lscr_asm.Handler(B_EXITFRAME, code)
+    h = lscr_asm.Handler(B_EXITFRAME, code, global_names=[B_GLOBAL])
     return lscr_asm.build_lscr([h], script_id=script_id, assembly_id=script_id,
                                event_map=[-1] * 10 + [0],
                                event_map_flags=lscr_asm.EXITFRAME_EVENT_FLAGS,
-                               consts=consts, global_names=[B_GLOBAL])
+                               consts=consts)
 
 
 # --------------------------------------------------------------------------
@@ -454,12 +454,14 @@ def donor_text_member(donor):
 
 def make_lscr_for(profile, name_index, code, script_id, consts=(),
                   global_names=()):
-    h = lscr_asm.Handler(name_index, code)
+    # The globals belong to the handler, not to the script -- that is where
+    # Director puts them, and where its own globalsOffset points.
+    h = lscr_asm.Handler(name_index, code, global_names=global_names)
     event_map, event_flags = lscr_asm.exitframe_event_map(profile.version)
     return lscr_asm.build_lscr([h], script_id=script_id, assembly_id=script_id,
                                event_map=event_map,
                                event_map_flags=event_flags,
-                               consts=consts, global_names=global_names,
+                               consts=consts,
                                const_entry_size=profile.const_entry,
                                table_first=profile.version >= 700)
 
@@ -1097,14 +1099,15 @@ def build_editable_append(profile, trivial=False, tag=None,
         extra.append((b"Lscr", bm.borrow_lscr(
             donor, script_base + i, len(donor_members) + 3 + i) if donor_code
             else lscr_asm.build_lscr(
-                [lscr_asm.Handler(n_exit, code)],
+                [lscr_asm.Handler(n_exit, code,
+                                 global_names=[] if bare else [n_global])],
                 script_id=script_base + i,
                 # assemblyId is the cast member the script belongs to, not its
                 # slot in the context: 606 of 606 sampled scripts across 60
                 # movies have the two equal. We were writing the slot.
                 assembly_id=len(donor_members) + 3 + i,
                 event_map=event_map, event_map_flags=event_flags,
-                consts=consts, global_names=[] if bare else [n_global],
+                consts=consts,
                 const_entry_size=profile.const_entry,
                 table_first=profile.version >= 700)))
 

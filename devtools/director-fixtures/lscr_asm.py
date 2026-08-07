@@ -224,11 +224,18 @@ def pad_even(blob, at):
 
 class Handler:
     def __init__(self, name_index, code, arg_names=(), var_names=(), tail=None,
-                 line_table=None, line_count=None):
+                 line_table=None, line_count=None, global_names=()):
         self.name_index = name_index
         self.code = code
         self.arg_names = list(arg_names)
         self.var_names = list(var_names)
+        # Director declares globals per handler, not per script. In a D6 movie
+        # it made by upgrading one of ours it left the script's own globalsCount
+        # at zero and put the list in the handler's own data, right after the
+        # variable names, with the handler's globalsOffset pointing at it. We had
+        # it the other way round: a script level list, and a handler claiming to
+        # use no globals while its bytecode pushed one.
+        self.global_names = list(global_names)
         # One byte per source line, padded to an even length: lineCount 1 and 2
         # both take two bytes, 3 and 4 take four, and so on without exception
         # over 1300 sampled scripts. A single line covering the whole handler
@@ -259,7 +266,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
                parent_number=-1, unk_block=None, unk3=0, script_flags=0,
                unk4=None, factory_name_id=-1,
                event_map=None, event_map_flags=0, name_gap=b"",
-               func_unk0=10, consts=(), properties=(), global_names=(),
+               func_unk0=15, consts=(), properties=(), global_names=(),
                const_entry_size=CONST_ENTRY_SIZE, table_first=False):
     """Serialises one Lscr chunk. `handlers` is a list of Handler,
     `consts` a list of strings referenced by const_push()."""
@@ -287,7 +294,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
             starts.append(cur())
             body.extend(h.code)
             body.extend(pad_even(b"", cur()))
-        args, varz, lines = [], [], []
+        args, varz, globs, lines = [], [], [], []
         for h in handlers:
             args.append(cur())
             for n in h.arg_names:
@@ -301,6 +308,9 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
             # -> 08 00, 11 -> 0a 00), its D6 ones two to eight bytes for two and
             # three lines. Leaving it out and saying zero lines points lineOffset
             # at whatever section comes next.
+            globs.append(cur())
+            for n in h.global_names:
+                body.extend(struct.pack(">h", n))
             lines.append(cur())
             body.extend(h.line_table)
             if len(h.line_table) % 2:
@@ -310,7 +320,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         body.extend(name_gap)
         if cur() % 2:
             body.extend(b"\0")
-        return starts, args, varz, lines
+        return starts, args, varz, globs, lines
 
     if table_first:
         # The table records offsets the code has not produced yet, so its bytes
@@ -327,10 +337,10 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         for h in handlers:
             body.extend(struct.pack(">I",
                                     len(h.arg_names) + len(h.var_names) + 2))
-        starts, arg_offsets, var_offsets, line_offsets = emit_code()
+        starts, arg_offsets, var_offsets, glob_offsets, line_offsets = emit_code()
         table = bytearray()
     else:
-        starts, arg_offsets, var_offsets, line_offsets = emit_code()
+        starts, arg_offsets, var_offsets, glob_offsets, line_offsets = emit_code()
         # The global list is how a script declares which names are globals, the
         # equivalent of writing `global gFoo` in the source. ScummVM creates a
         # global on first use and so never misses it (cb_globalpush), but
@@ -345,8 +355,9 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         functions_offset = cur()
         table = body
 
-    for h, start, ao, vo, lo in zip(handlers, starts, arg_offsets,
-                                    var_offsets, line_offsets):
+    for h, start, ao, vo, go, lo in zip(handlers, starts, arg_offsets,
+                                        var_offsets, glob_offsets,
+                                        line_offsets):
         table.extend(struct.pack(">HHII", h.name_index, func_unk0,
                                  len(h.code), start))
         table.extend(struct.pack(">HI", len(h.arg_names), ao))
@@ -355,7 +366,7 @@ def build_lscr(handlers, *, script_id, assembly_id, unk1=b"\0" * 8, unk2=2,
         # We carry no line numbers, so that count is 0 rather than the reference
         # script's 1, and both offsets point where the empty lists do.
         table.extend(h.tail if h.tail is not None else (
-            struct.pack(">HI", 0, vo)
+            struct.pack(">HI", len(h.global_names), go)
             + struct.pack(">IH", 12, 1)
             + struct.pack(">HI", h.line_count, lo)))
     if table_first:
