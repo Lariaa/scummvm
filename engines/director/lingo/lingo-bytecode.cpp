@@ -262,6 +262,7 @@ static const LingoV4TheEntity lingoV4TheEntity[] = {
 	{ 0x07, 0x22, kTheTimer,			kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x23, kThePreLoadRAM,		kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x24, kTheVideoForWindowsPresent, kTheNOField,	true, kTEANOArgs }, // D5
+	{ 0x07, 0x27, kTheSoundKeepDevice,	kTheNOField,		true, kTEANOArgs }, // D8.5
 	// netPresent
 	// safePlayer
 	// soundKeepDevice
