@@ -1461,7 +1461,12 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 
 		// Size of an entry in the consts index.
 		int constEntrySize = 0;
-		if (version >= kFileVer500) {
+		// Up to D8 a constant push names its constant by byte offset into that
+		// index, so dividing by the entry size gives the entry. D8.5 passes the
+		// entry number straight up; dividing by one keeps that on one path.
+		if (version >= kFileVer850) {
+			constEntrySize = 1;
+		} else if (version >= kFileVer500) {
 			// For D5 this is uint32 type + uint32 offset
 			constEntrySize = 8;
 		} else {
@@ -1486,12 +1491,20 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 					arg = (uint8)codeStore[pointer];
 					pointer += 1;
 				}
-				// The argument is a byte offset to an entry in the consts index.
-				// As such, it should be an exact multiple of the entry size.
+				// Below D8.5 the argument is a byte offset into the consts
+				// index, so it has to land exactly on an entry.
 				if (arg % constEntrySize) {
 					warning("Opcode 0x%02x arg %d not a multiple of %d", opcode, arg, constEntrySize);
 				}
 				arg /= constEntrySize;
+				if (arg < 0 || arg >= (int)_assemblyContext->_constants.size()) {
+					// Push something rather than nothing: leaving the stack a
+					// value short takes the whole handler down later on.
+					warning("Opcode 0x%02x refers to constant %d of %d, pushing VOID",
+						opcode, arg, _assemblyContext->_constants.size());
+					code1(LC::c_voidpush);
+					continue;
+				}
 				Datum constant = _assemblyContext->_constants[arg];
 				switch (constant.type) {
 				case INT:
