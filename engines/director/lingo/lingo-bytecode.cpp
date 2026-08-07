@@ -1341,11 +1341,16 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	}
 
 	// read each entry in the function table.
+	// D8.5 appended a stack size field, growing the record from 0x2a to 0x2e
+	// bytes. The table is read in one pass, so skipping it would shift every
+	// entry after the first and lose those handlers to the bounds checks below.
+	uint16 functionRecordSize = (version >= kFileVer850) ? 0x2e : 0x2a;
+
 	stream.seek(functionsOffset);
 	for (uint16 i = 0; i < functionsCount; i++) {
 		if (debugChannelSet(5, kDebugLoading)) {
 			debugC(5, kDebugLoading, "Function %d header:", i);
-			stream.hexdump(0x2a);
+			stream.hexdump(functionRecordSize);
 		}
 
 		int16 nameIndex = stream.readUint16();
@@ -1365,6 +1370,8 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		stream.readUint16();
 		stream.readUint16();
 		stream.readUint16();
+		if (version >= kFileVer850)
+			/* uint32 stackHeight = */ stream.readUint32();
 
 		if (startOffset < codeStoreOffset) {
 			warning("Function %d start offset is out of bounds!", i);
