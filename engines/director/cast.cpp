@@ -2084,7 +2084,10 @@ void Cast::loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id) {
 		dumpS = Common::String::format("modifiedBy: '%s', ", ci->modifiedBy.c_str()) + dumpS;
 		// fallthrough
 	case 18:
-		if (castInfo.strings[18].len != 4) {
+		if (castInfo.strings[18].len == 0) {
+			// D8.5 leaves the timestamps empty on most members. An absent
+			// field is not a surprise worth reporting.
+		} else if (castInfo.strings[18].len != 4) {
 			warning("Cast::loadCastInfo(): BUILDBOT: INCORRECT modifiedTime for castid %d", id);
 			Common::hexdump(castInfo.strings[18].data, castInfo.strings[18].len);
 		} else {
@@ -2093,7 +2096,9 @@ void Cast::loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id) {
 		}
 		// fallthrough
 	case 17:
-		if (castInfo.strings[17].len != 4) {
+		if (castInfo.strings[17].len == 0) {
+			// see modifiedTime above
+		} else if (castInfo.strings[17].len != 4) {
 			warning("Cast::loadCastInfo(): BUILDBOT: INCORRECT creationTime for castid %d", id);
 			Common::hexdump(castInfo.strings[17].data, castInfo.strings[17].len);
 		} else {
