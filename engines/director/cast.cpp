@@ -2268,11 +2268,12 @@ void Cast::loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id) {
 		}
 	}
 
-	// Looping = play-once bit (flags & 16) cleared; verified on D7 only
-	if (_version >= kFileVer400 && _version < kFileVer800 && member->_type == kCastSound) {
+	// Looping = play-once bit (flags & 16) cleared. The bit keeps its meaning
+	// through D8.5: across 50 movies that ship in both a pre-D8 and a D8.5
+	// edition of the same game, 336 of 339 sound members at the same cast
+	// position carry it identically.
+	if (_version >= kFileVer400 && member->_type == kCastSound) {
 		((SoundCastMember *)member)->_looping = castInfo.flags & 16 ? 0 : 1;
-	} else if (_version >= kFileVer800 && member->_type == kCastSound) {
-		warning("STUB: Cast::loadCastInfo(): Sound cast member info not yet supported for version v%d (%d)", humanVersion(_version), _version);
 	}
 
 	// For PaletteCastMember, run load() as we need it right now
