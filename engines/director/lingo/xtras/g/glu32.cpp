@@ -76,7 +76,7 @@ static MethodProto xlibMethods[] = {
 };
 
 static BuiltinProto xlibBuiltins[] = {
-	{ "GLURegister", GLU32Xtra::m_GLURegister, 2, 2, 500, HBLTIN },
+	{ "GLURegister", GLU32Xtra::m_GLURegister, 1, 1, 500, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
