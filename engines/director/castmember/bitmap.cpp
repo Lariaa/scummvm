@@ -772,6 +772,42 @@ void BitmapCastMember::load() {
 			}
 		}
 
+		// D8.5 can store a bitmap as embedded media instead of a BITD: the
+		// child is an ediM chunk holding a whole image file. Sounds use ediM
+		// too and name their format in the cast info, but for bitmaps that
+		// string is empty, so go by the signature.
+		if (pic == nullptr) {
+			for (auto &it : _children) {
+				if (it.tag != MKTAG('e', 'd', 'i', 'M'))
+					continue;
+
+				Common::SeekableReadStreamEndian *media = _cast->getResource(it.tag, it.index);
+				if (!media)
+					break;
+
+				uint32 signature = media->readUint32BE();
+				media->seek(0);
+
+				if ((signature & 0xFFFFFF00) == 0xFFD8FF00) {
+					Image::JPEGDecoder decoder;
+					if (decoder.loadStream(*media)) {
+						// The alpha lives in a separate ALFA chunk we do not
+						// read yet, so this comes out opaque.
+						setPicture(decoder, decoder.hasPalette());
+						delete media;
+						_loaded = true;
+						return;
+					}
+					warning("BitmapCastMember::load(): cannot decode the JPEG in ediM %d of cast member %d", it.index, _castId);
+				} else {
+					warning("BitmapCastMember::load(): unhandled ediM format 0x%08x in cast member %d", signature, _castId);
+				}
+
+				delete media;
+				break;
+			}
+		}
+
 		Common::String imageFilename = _cast->getLinkedPath(_castId);
 
 		if ((pic == nullptr || pic->size() == 0)
