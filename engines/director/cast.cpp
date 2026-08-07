@@ -959,7 +959,14 @@ void Cast::loadCast() {
 	if (_version >= kFileVer400 && !debugChannelSet(-1, kDebugNoBytecode)) {
 		// Try to load script context
 		// Even for multiple casts, ID is 1024
-		if ((r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'x'), libResourceId)) != nullptr) {
+		// D8.5 renamed the chunk to 'LctX'. Only the tag changed, so either
+		// name is read the same way; without this a D8.5 or later movie finds
+		// no context at all and runs with none of its Lingo.
+		r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'x'), libResourceId);
+		if (!r)
+			r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'X'), libResourceId);
+
+		if (r != nullptr) {
 			loadLingoContext(*r);
 			delete r;
 		}
