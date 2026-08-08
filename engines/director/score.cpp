@@ -793,13 +793,11 @@ void Score::update() {
 			// The second call from updateSprites is harmless (guarded by _scriptInstanceList.size()).
 			createScriptInstances(_curFrameNumber);
 
-			// prepareFrame must be dispatched like enterFrame/exitFrame via
-			// processEvent(), NOT broadcastEvent(). broadcastEvent() only walks
-			// sprite channels that have behaviors and never reaches the frame
-			// script channel (_scriptChannelScriptInstance). Many D6 titles (e.g.
-			// TKKG2's "SA" audio behavior) put their prepareFrame handler on the
-			// frame script channel, so it must go through the kFrameHandler path.
-			_movie->processEvent(kEventPrepareFrame);
+			// In D6 prepareFrame goes to every sprite behavior and then to the
+			// frame and movie scripts; broadcastEvent() queues both. Many D6
+			// titles (e.g. TKKG2's "SA" audio behavior) put their prepareFrame
+			// handler on the frame script channel.
+			_movie->broadcastEvent(kEventPrepareFrame);
 
 			_disableGoPlayUpdateStage = prevDis;
 		}
