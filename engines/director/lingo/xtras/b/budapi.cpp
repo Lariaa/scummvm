@@ -400,7 +400,28 @@ void BudAPIXtra::m_baFindDrive(int nargs) {
 }
 
 XOBJSTUB(BudAPIXtra::m_baVersion, 0)
-XOBJSTUB(BudAPIXtra::m_baSysFolder, 0)
+
+void BudAPIXtra::m_baSysFolder(int nargs) {
+	Common::String folderType = g_lingo->pop().asString();
+
+	// Games build a file name on top of what they get here, and FileIO keeps
+	// only the last component of a path and stores the file through the save
+	// file manager. So whatever we answer, the bytes land in the savegame
+	// directory -- these names exist to make the concatenation well formed and
+	// to keep the host's own folders out of it.
+	Common::String folder = "C:\\ScummVM\\";
+
+	if (folderType.equalsIgnoreCase("boot")) {
+		folder = "C:\\";
+	} else if (!folderType.equalsIgnoreCase("personal")
+			&& !folderType.equalsIgnoreCase("prefs")
+			&& !folderType.equalsIgnoreCase("control panels")) {
+		warning("BudAPIXtra::m_baSysFolder: unknown folder type '%s'", folderType.c_str());
+	}
+
+	g_lingo->push(Datum(folder));
+}
+
 XOBJSTUB(BudAPIXtra::m_baCpuInfo, 0)
 void BudAPIXtra::m_baDiskInfo(int nargs) {
 	Common::String infoType = g_lingo->pop().asString();
