@@ -742,6 +742,30 @@ void Movie::queueInputEvent(LEvent event, int targetId, Common::Point pos) {
 	queueEvent(_inputEventQueue, event, targetId, pos);
 }
 
+// Run the queued input events as one batch.
+//
+// Lingo::execute() pumps system events every 100 instructions, so an input
+// handler that runs for a while keeps appending to _inputEventQueue while it
+// runs. Handing that queue to processEvents() directly lets it feed itself:
+// the drain loop never empties, so Score::step() never reaches update() and
+// the frame loop stops (TKKG 5's box-pushing puzzle, media/sz140.dir, where
+// every move re-evaluates a 26x20 grid).
+//
+// Take a snapshot instead. Whatever arrives during the batch belongs to the
+// next one. processEvents() stops early when a handler freezes, so put the
+// leftovers back ahead of the newcomers rather than dropping them.
+void Movie::processInputEventQueue() {
+	Common::Queue<LingoEvent> batch;
+	while (!_inputEventQueue.empty())
+		batch.push(_inputEventQueue.pop());
+
+	_lingo->processEvents(batch, true);
+
+	while (!_inputEventQueue.empty())
+		batch.push(_inputEventQueue.pop());
+	_inputEventQueue = batch;
+}
+
 
 bool Movie::processInputEvent(LEvent event, int targetId, Common::Point pos) {
 	// Track whether a script explicitly stops the event (dontPassEvent/stopEvent)
@@ -767,7 +791,7 @@ bool Movie::processInputEvent(LEvent event, int targetId, Common::Point pos) {
 	}
 	// Try and process input events now
 	_vm->setCurrentWindow(this->getWindow());
-	_lingo->processEvents(_inputEventQueue, true);
+	processInputEventQueue();
 	return _lingo->_passEvent;
 }
 
