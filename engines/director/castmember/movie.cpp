@@ -205,7 +205,7 @@ void MovieCastMember::update() {
 	// step() never drains routed input. Drain here so the embedded movie's
 	// mouse handlers (e.g. mouseUp) fire.
 	if (_enableScripts && !_linkedMovie->_inputEventQueue.empty())
-		g_lingo->processEvents(_linkedMovie->_inputEventQueue, true);
+		_linkedMovie->processInputEventQueue();
 
 	score->step();
 

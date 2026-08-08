@@ -332,7 +332,7 @@ void Score::step() {
 
 	if (_haveInteractivity && !hasJump) {
 		if (!_movie->_inputEventQueue.empty() && !_window->frozenLingoStateCount()) {
-			_lingo->processEvents(_movie->_inputEventQueue, true);
+			_movie->processInputEventQueue();
 		}
 		if (_version >= kFileVer300 && !_window->_newMovieStarted && _playState != kPlayStopped) {
 			if (!_skipIdle)
