@@ -148,7 +148,7 @@ bool XtraCastMember::hasProp(const Common::String &propName) {
 	// commonly poll these in an `on exitFrame` wait-loop before advancing, so we
 	// answer them to avoid an "unknown property" Lingo error.
 	if (propName.equalsIgnoreCase("percentPlayed") || propName.equalsIgnoreCase("percentStreamed")
-			|| propName.equalsIgnoreCase("volume"))
+			|| propName.equalsIgnoreCase("volume") || propName.equalsIgnoreCase("duration"))
 		return true;
 	return CastMember::hasProp(propName);
 }
@@ -162,6 +162,11 @@ Datum XtraCastMember::getProp(const Common::String &propName) {
 		return Datum(100);
 	if (propName.equalsIgnoreCase("volume"))
 		return Datum(_volume);
+	// Length of the media in ticks. Nothing is loaded, so it is empty --
+	// consistent with reporting it as fully played above. Loewenzahn 7 reads
+	// this in a video sprite's beginSprite (DATA/login.dir, BHVideoSprite).
+	if (propName.equalsIgnoreCase("duration"))
+		return Datum(0);
 	return CastMember::getProp(propName);
 }
 
