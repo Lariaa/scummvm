@@ -593,10 +593,6 @@ void Lingo::openXLib(Common::String name, ObjectType type, const Common::Path &p
 		(*_xlibOpeners[name])(type, path);
 	} else {
 		warning("Lingo::openXLib: Unimplemented xlib: '%s'", name.c_str());
-		// in strict mode, break if the library is missing
-		if (debugChannelSet(-1, kDebugLingoStrict)) {
-			error("Lingo::openXLib: Unimplemented xlib: '%s'", name.c_str());
-		}
 	}
 }
 
