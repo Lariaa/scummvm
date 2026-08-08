@@ -511,8 +511,15 @@ void Score::updateCurrentFrame() {
 		// This copies in the frame data and updates _curFrameNumber.
 		loadFrame(nextFrameNumberToLoad, true);
 
-		for (uint ch = 0; ch < _channels.size(); ch++)
-			_channels[ch]->_sprite->releaseAutoPuppet(_currentFrame->_sprites[ch]->_copyBackMask);
+		// Only a real delta record says anything about what the score reasserts.
+		// loadFrame() stamps every channel with a blanket kSCBNoMask (all bits) on a
+		// backwards jump, which would release every latch regardless of what the score
+		// actually carries -- see the sprite-span check in updateSprites() below.
+		for (uint ch = 0; ch < _channels.size(); ch++) {
+			uint32 copyBackMask = _currentFrame->_sprites[ch]->_copyBackMask;
+			if (copyBackMask != static_cast<uint32>(kSCBNoMask))
+				_channels[ch]->_sprite->releaseAutoPuppet(copyBackMask);
+		}
 
 		// Finally, update the channels and buffer any dirty rectangles.
 		// This will ignore any channel data that is overridden with the puppet flag.
