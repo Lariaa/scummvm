@@ -411,6 +411,10 @@ void FileIO::m_openFile(int nargs) {
 	}
 	Common::String path = d2.asString();
 	me->_lastError = me->open(path, option);
+
+	// Callers read the error code, and a builtin that returns nothing at all
+	// takes the engine down with it.
+	g_lingo->push(Datum((int)me->_lastError));
 }
 
 void FileIO::m_closeFile(int nargs) {
