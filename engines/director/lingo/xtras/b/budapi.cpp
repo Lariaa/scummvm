@@ -23,6 +23,7 @@
 #include "common/system.h"
 
 #include "director/director.h"
+#include "director/movie.h"
 #include "director/util.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
@@ -40,6 +41,7 @@
  * Physicus / Physikus (l'Espresso, Italian; Ruske & Pühretmaier)
  * Bioscopia / Biolab
  * Der Regenbogenfisch Junior 2: Kraktors Geburtstag
+ * Haeuser bauen mit Willy Werkel
  *
  **************************************************/
 
@@ -52,6 +54,7 @@ new object me
 * baSysFolder string FolderType -- returns Windows special folders location
 * baCpuInfo string InfoType -- returns information about the processor installed
 * baDiskInfo string Disk, string InfoType -- returns information about Disk
+* baDiskList -- returns list of available drives	(Buddy API 3.0)
 * baMemoryInfo string InfoType -- returns memory information
 * baFindApp string Extension -- finds application associated with Extension
 * baReadIni string Section, string Keyname, string Default, string IniFile -- reads ini file entry
@@ -84,6 +87,7 @@ new object me
 * baSetWallpaper string FileName, integer Tile -- sets FileName as the desktop wallpaper
 * baSetPattern string Name, string Pattern -- sets Pattern as the desktop pattern
 * baSetDisplay integer Width, integer Height, integer Depth, string Mode, integer Force -- changes the screen display settings
+* baSetDisplayEx integer Width, integer Height, integer Depth, integer Refresh, string Mode, integer Force -- as baSetDisplay, with a refresh rate
 * baExitWindows string Option -- shuts down Windows
 * baRunProgram string FileName, string State, integer Wait -- runs external program
 * baWinHelp string Command, string FileName, string Data -- shows windows help file
@@ -211,6 +215,7 @@ static BuiltinProto xlibBuiltins[] = {
 	{ "baSysFolder", BudAPIXtra::m_baSysFolder, 1, 1, 500, HBLTIN },
 	{ "baCpuInfo", BudAPIXtra::m_baCpuInfo, 1, 1, 500, HBLTIN },
 	{ "baDiskInfo", BudAPIXtra::m_baDiskInfo, 2, 2, 500, HBLTIN },
+	{ "baDiskList", BudAPIXtra::m_baDiskList, 0, 0, 500, HBLTIN },
 	{ "baMemoryInfo", BudAPIXtra::m_baMemoryInfo, 1, 1, 500, HBLTIN },
 	{ "baFindApp", BudAPIXtra::m_baFindApp, 1, 1, 500, HBLTIN },
 	{ "baReadIni", BudAPIXtra::m_baReadIni, 4, 4, 500, HBLTIN },
@@ -240,6 +245,7 @@ static BuiltinProto xlibBuiltins[] = {
 	{ "baSetWallpaper", BudAPIXtra::m_baSetWallpaper, 2, 2, 500, HBLTIN },
 	{ "baSetPattern", BudAPIXtra::m_baSetPattern, 2, 2, 500, HBLTIN },
 	{ "baSetDisplay", BudAPIXtra::m_baSetDisplay, 5, 5, 500, HBLTIN },
+	{ "baSetDisplayEx", BudAPIXtra::m_baSetDisplayEx, 6, 6, 500, HBLTIN },
 	{ "baExitWindows", BudAPIXtra::m_baExitWindows, 1, 1, 500, HBLTIN },
 	{ "baRunProgram", BudAPIXtra::m_baRunProgram, 3, 3, 500, HBLTIN },
 	{ "baWinHelp", BudAPIXtra::m_baWinHelp, 3, 3, 500, HBLTIN },
@@ -399,8 +405,28 @@ void BudAPIXtra::m_baFindDrive(int nargs) {
 	g_lingo->push(Datum(result));
 }
 
-XOBJSTUB(BudAPIXtra::m_baVersion, 0)
-XOBJSTUB(BudAPIXtra::m_baSysFolder, 0)
+
+void BudAPIXtra::m_baSysFolder(int nargs) {
+	Common::String folderType = g_lingo->pop().asString();
+
+	// Games build a file name on top of what they get here, and FileIO keeps
+	// only the last component of a path and stores the file through the save
+	// file manager. So whatever we answer, the bytes land in the savegame
+	// directory -- these names exist to make the concatenation well formed and
+	// to keep the host's own folders out of it.
+	Common::String folder = "C:\\ScummVM\\";
+
+	if (folderType.equalsIgnoreCase("boot")) {
+		folder = "C:\\";
+	} else if (!folderType.equalsIgnoreCase("personal")
+			&& !folderType.equalsIgnoreCase("prefs")
+			&& !folderType.equalsIgnoreCase("control panels")) {
+		warning("BudAPIXtra::m_baSysFolder: unknown folder type '%s'", folderType.c_str());
+	}
+
+	g_lingo->push(Datum(folder));
+}
+
 XOBJSTUB(BudAPIXtra::m_baCpuInfo, 0)
 void BudAPIXtra::m_baDiskInfo(int nargs) {
 	Common::String infoType = g_lingo->pop().asString();
@@ -424,6 +450,22 @@ void BudAPIXtra::m_baDiskInfo(int nargs) {
 		warning("STUB: BudAPIXtra::m_baDiskInfo: unsupported InfoType '%s'", infoType.c_str());
 		g_lingo->push(Datum());
 	}
+}
+
+void BudAPIXtra::m_baDiskList(int nargs) {
+	// baDiskList() lists the available drives as roots, "C:\" and so on (Buddy
+	// API 3.0). Games look for their CD among them: Haeuser bauen mit Willy
+	// Werkel walks the list from the end, tries `drive & "Director\01m001v0.mov"`
+	// with baFileExists() and starts the game from the drive that has it. Report
+	// the hard disk and the synthetic CD drive E that baFindDrive() and
+	// baDiskInfo() answer for; the drive prefix is stripped when a path is
+	// resolved, so the game tree stands in for the CD.
+	Datum result;
+	result.type = ARRAY;
+	result.u.farr = new FArray;
+	result.u.farr->arr.push_back(Datum(Common::String("C:\\")));
+	result.u.farr->arr.push_back(Datum(Common::String("E:\\")));
+	g_lingo->push(result);
 }
 XOBJSTUB(BudAPIXtra::m_baMemoryInfo, 0)
 XOBJSTUB(BudAPIXtra::m_baFindApp, 0)
@@ -489,7 +531,55 @@ XOBJSTUB(BudAPIXtra::m_baFontList, 0)
 XOBJSTUB(BudAPIXtra::m_baFontStyleList, 0)
 XOBJSTUB(BudAPIXtra::m_baCommandArgs, 0)
 XOBJSTUB(BudAPIXtra::m_baPrevious, 0)
-XOBJSTUB(BudAPIXtra::m_baScreenInfo, 0)
+void BudAPIXtra::m_baVersion(int nargs) {
+	// baVersion(type): a version string. TKKG 11, 13 and 14 ask for "os" and hand the
+	// answer to clsScreen.new(), which branches on `versionOS = "Mac8"` or `"Mac9"`.
+	// As a stub returning 0 that comparison was false, so the Windows branch was taken
+	// by accident -- right answer, wrong reason, and it would flip the moment a game
+	// tested for a Windows string instead.
+	Common::String versionType = (nargs >= 1) ? g_lingo->pop().asString() : Common::String();
+	versionType.toLowercase();
+
+	Datum result(0);
+
+	if (versionType == "os") {
+		// The names the Xtra uses for the host system. Nothing in the corpus asks for
+		// a finer distinction than Mac versus Windows.
+		result = Datum(g_director->getPlatform() == Common::kPlatformMacintosh
+				? Common::String("Mac9") : Common::String("Win2000"));
+	} else {
+		warning("BudAPIXtra::m_baVersion: unhandled version type '%s'", versionType.c_str());
+	}
+
+	debugC(3, kDebugXObj, "BudAPIXtra::m_baVersion: '%s' -> %s", versionType.c_str(), result.asString().c_str());
+	g_lingo->push(result);
+}
+
+void BudAPIXtra::m_baScreenInfo(int nargs) {
+	// baScreenInfo(infoType): one figure about the display. TKKG 13 and 14 ask for
+	// exactly three of them -- "width", "height" and "depth" -- from clsScreen.getInfo(),
+	// which takes this branch on Windows (`the machineType = 256`) and the Mac
+	// desktopRectList otherwise. As a stub returning 0 it offered a screen of 0x0 in
+	// 0 colours, so the "set my monitor to the best resolution?" dialog had nothing to
+	// put on its buttons.
+	Common::String infoType = (nargs >= 1) ? g_lingo->pop().asString() : Common::String();
+	infoType.toLowercase();
+
+	Datum result(0);
+	Movie *movie = g_director->getCurrentMovie();
+
+	if (infoType == "width")
+		result = Datum(movie ? movie->_movieRect.width() : 640);
+	else if (infoType == "height")
+		result = Datum(movie ? movie->_movieRect.height() : 480);
+	else if (infoType == "depth")
+		result = Datum((int)g_director->_colorDepth);
+	else
+		warning("BudAPIXtra::m_baScreenInfo: unhandled info type '%s'", infoType.c_str());
+
+	debugC(3, kDebugXObj, "BudAPIXtra::m_baScreenInfo: '%s' -> %d", infoType.c_str(), result.asInt());
+	g_lingo->push(result);
+}
 XOBJSTUB(BudAPIXtra::m_baDisableDiskErrors, 0)
 XOBJSTUB(BudAPIXtra::m_baDisableKeys, 0)
 XOBJSTUB(BudAPIXtra::m_baDisableMouse, 0)
@@ -500,6 +590,7 @@ XOBJSTUB(BudAPIXtra::m_baSetScreenSaver, 0)
 XOBJSTUB(BudAPIXtra::m_baSetWallpaper, 0)
 XOBJSTUB(BudAPIXtra::m_baSetPattern, 0)
 XOBJSTUB(BudAPIXtra::m_baSetDisplay, 0)
+XOBJSTUB(BudAPIXtra::m_baSetDisplayEx, 0)
 XOBJSTUB(BudAPIXtra::m_baExitWindows, 0)
 XOBJSTUB(BudAPIXtra::m_baRunProgram, 0)
 XOBJSTUB(BudAPIXtra::m_baWinHelp, 0)
