@@ -67,6 +67,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheColorDepth,		"colorDepth",		false, 200, false },// D2 p
 	{ kTheColorQD,			"colorQD",			false, 200, true },	// D2 f
 	{ kTheCommandDown,		"commandDown",		false, 200, true },	// D2 f
+	{ kTheCommandLine,		"commandLine",		false, 600, true },	//					D6 f
 	{ kTheControlDown,		"controlDown",		false, 200, true },	// D2 f
 	{ kTheCpuHogTicks,		"cpuHogTicks",		false, 400, true },	//			D4 p, documented in D6
 	{ kTheCurrentSpriteNum,	"currentSpriteNum",	false, 600, true },	//					D6 p
@@ -596,6 +597,12 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		break;
 	case kTheColorQD:
 		d = 1;
+		break;
+	case kTheCommandLine:
+		// The arguments a projector was started with. ScummVM launches the movie
+		// itself, so there are none. Oscar the Balloonist reads this at startup
+		// and halts when it cannot be resolved at all.
+		d = Datum(Common::String());
 		break;
 	case kTheCommandDown:
 		if (g_director->getPlatform() == Common::kPlatformWindows)
