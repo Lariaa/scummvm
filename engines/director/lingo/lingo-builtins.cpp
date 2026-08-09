@@ -1238,6 +1238,41 @@ void LB::b_getPos(int nargs) {
 }
 
 void LB::b_getProp(int nargs) {
+	// Director also takes the chunk form on a string:
+	//   getProp(str, #char|#word|#item|#line, n)  ==  `the <chunk> n of str`
+	// Kommissar Kugelblitz reads cd_pfad.ini that way in GetCDPath(), with the
+	// itemDelimiter set to "=".
+	if (nargs == 3) {
+		Datum index = g_lingo->pop();
+		Datum chunk = g_lingo->pop();
+		Datum src = g_lingo->pop();
+
+		if (chunk.type == SYMBOL) {
+			ChunkType chunkType = kChunkChar;
+			bool isChunk = true;
+
+			if (chunk.u.s->equalsIgnoreCase("char"))
+				chunkType = kChunkChar;
+			else if (chunk.u.s->equalsIgnoreCase("word"))
+				chunkType = kChunkWord;
+			else if (chunk.u.s->equalsIgnoreCase("item"))
+				chunkType = kChunkItem;
+			else if (chunk.u.s->equalsIgnoreCase("line"))
+				chunkType = kChunkLine;
+			else
+				isChunk = false;
+
+			if (isChunk) {
+				int n = index.asInt();
+				g_lingo->push(LC::chunkRef(chunkType, n, n, src).eval());
+				return;
+			}
+		}
+
+		g_lingo->lingoError("b_getProp: three arguments need a chunk symbol, got %s", chunk.type2str());
+		return;
+	}
+
 	Datum prop = g_lingo->pop();
 	Datum list = g_lingo->pop();
 
