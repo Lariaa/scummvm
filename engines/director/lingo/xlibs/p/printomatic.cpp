@@ -310,6 +310,14 @@ void PrintOMaticXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXtraObj) {
 		g_lingo->_openXtras.push_back(xlibName);
 		g_lingo->_openXtraObjects.push_back(xobj);
+
+		// An Xtra registers under the name in the first line of its msgTable, which is not
+		// the file name. PrintOMatic Lite ships as POMLITE.X32 and registers as
+		// "PrintOMatic_Lite" -- verified in the PE string tables of the copies in TKKG 6 and
+		// FFFM, while every PMATIC.X32 in reach says "PrintOMatic". TKKG 6 looks the Lite one
+		// up that way to print the clue list. Register it as an alias for the same object.
+		g_lingo->_openXtras.push_back("PrintOMatic_Lite");
+		g_lingo->_openXtraObjects.push_back(xobj);
 	}
     g_lingo->exposeXObject(xlibName, xobj);
     g_lingo->initBuiltIns(xlibBuiltins);
