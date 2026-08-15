@@ -94,7 +94,7 @@ static const BuiltinProto builtins[] = {
 	{ "getLast",		LB::b_getLast,		1, 1, 400, FBLTIN_LIST },	//			D4 f
 	{ "getOne",			LB::b_getOne,		2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPos",			LB::b_getPos,		2, 2, 400, FBLTIN_LIST },	//			D4 f
-	{ "getProp",		LB::b_getProp,		2, 2, 400, FBLTIN_LIST },	//			D4 f
+	{ "getProp",		LB::b_getProp,		2, 3, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPropAt",		LB::b_getPropAt,	2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "list",			LB::b_list,			-1,0, 400, FBLTIN_LIST },	//			D4 f
 	{ "listP",			LB::b_listP,		1, 1, 400, FBLTIN_LIST },	//			D4 f
