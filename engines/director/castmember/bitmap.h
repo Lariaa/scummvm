@@ -43,7 +43,7 @@ public:
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
 
 	bool isModified() override;
-	void createMatte(const Common::Rect &bbox);
+	void createMatte();
 	Graphics::Surface *getMatte(const Common::Rect &bbox);
 	Graphics::Surface *getDitherImg();
 
@@ -74,6 +74,9 @@ public:
 
 	Picture *_picture = nullptr;
 	Graphics::Surface *_ditheredImg;
+	// The flood fill only depends on the picture, so it runs once at the image's
+	// own size and _matte is scaled off it for whatever size is being drawn.
+	Graphics::Surface *_matteSource;
 	Graphics::Surface *_matte;
 
 	int _version;
