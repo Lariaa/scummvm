@@ -101,7 +101,9 @@ public:
 	// Offset is relative to the top-left corner of the widget.
 	virtual Common::Point getRegistrationOffset(int16 currentWidth, int16 currentHeight) { return Common::Point(0, 0); }
 
-	virtual CollisionTest isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink) { return bbox.contains(pos) ? kCollisionYes : kCollisionNo; }
+	// flipH/flipV describe how the sprite draws the picture, so a mirrored
+	// sprite is hit-tested against the silhouette actually on screen.
+	virtual CollisionTest isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink, bool flipH, bool flipV) { return bbox.contains(pos) ? kCollisionYes : kCollisionNo; }
 
 	// When writing the 'CASt' resource, the general structure is the same for all the CastMembers
 	// Three parts to a 'CASt' resource (header + _info_, _data_)

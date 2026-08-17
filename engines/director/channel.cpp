@@ -234,7 +234,9 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
                 }
 				return nullptr;
 			}
-			return bitmap->getMatte(bbox);
+			// Same orientation the picture is drawn in, or the mask cuts away the
+			// mirror image of the background.
+			return bitmap->getMatte(bbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 		} else {
 			return nullptr;
 		}
@@ -330,7 +332,12 @@ bool Channel::isDirty(Sprite *nextSprite) {
 			_sprite->_ink != nextSprite->_ink || _sprite->_backColor != nextSprite->_backColor ||
 			_sprite->_foreColor != nextSprite->_foreColor ||
 			_sprite->_blendAmount != nextSprite->_blendAmount ||
-			(_sprite->_thickness & kTThickness) != (nextSprite->_thickness & kTThickness);
+			(_sprite->_thickness & kTThickness) != (nextSprite->_thickness & kTThickness) ||
+			// The line above masks the flip bits out on purpose, so ask for the
+			// flips separately -- a sprite that only turns around still has to be
+			// redrawn, and since D7 the flip can come from the angle fields.
+			_sprite->isFlippedH() != nextSprite->isFlippedH() ||
+			_sprite->isFlippedV() != nextSprite->isFlippedV();
 		if (!_sprite->_moveable)
 			isDirtyFlag |= _sprite->getPosition() != nextSprite->getPosition();
 		if (isStretched() && !hasTextCastMember(_sprite))
@@ -374,7 +381,7 @@ CollisionTest Channel::isMouseIn(const Common::Point &pos) {
 	const Common::Rect bbox = getBbox();
 
 	if (_sprite->_cast) {
-		return _sprite->_cast->isWithin(bbox, pos, _sprite->_ink);
+		return _sprite->_cast->isWithin(bbox, pos, _sprite->_ink, _sprite->isFlippedH(), _sprite->isFlippedV());
 	} else if (!bbox.contains(pos)) {
 		return kCollisionNo;
 	}
@@ -393,9 +400,9 @@ bool Channel::isMatteIntersect(Channel *channel) {
 	Graphics::Surface *yourMatte = nullptr;
 
 	if (_sprite->_cast && _sprite->_cast->_type == kCastBitmap)
-		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox);
+		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 	if (channel->_sprite->_cast && channel->_sprite->_cast->_type == kCastBitmap)
-		yourMatte = ((BitmapCastMember *)channel->_sprite->_cast)->getMatte(yourBbox);
+		yourMatte = ((BitmapCastMember *)channel->_sprite->_cast)->getMatte(yourBbox, channel->_sprite->isFlippedH(), channel->_sprite->isFlippedV());
 
 	if (myMatte && yourMatte) {
 		for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
@@ -421,7 +428,7 @@ bool Channel::isMatteBoxIntersect(Channel *channel) {
 	Graphics::Surface *myMatte = nullptr;
 
 	if (_sprite->_cast && _sprite->_cast->_type == kCastBitmap)
-		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox);
+		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 
 	if (myMatte) {
 		for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
@@ -449,9 +456,9 @@ bool Channel::isMatteWithin(Channel *channel) {
 	Graphics::Surface *yourMatte = nullptr;
 
 	if (_sprite->_cast && _sprite->_cast->_type == kCastBitmap)
-		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox);
+		myMatte = ((BitmapCastMember *)_sprite->_cast)->getMatte(myBbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 	if (channel->_sprite->_cast && channel->_sprite->_cast->_type == kCastBitmap)
-		yourMatte = ((BitmapCastMember *)channel->_sprite->_cast)->getMatte(yourBbox);
+		yourMatte = ((BitmapCastMember *)channel->_sprite->_cast)->getMatte(yourBbox, channel->_sprite->isFlippedH(), channel->_sprite->isFlippedV());
 
 	if (myMatte && yourMatte) {
 		for (int i = intersectRect.top; i < intersectRect.bottom; i++) {
@@ -795,6 +802,11 @@ bool Channel::canKeepWidget(CastMemberID castId) {
 
 bool Channel::canKeepWidget(Sprite *currentSprite, Sprite *nextSprite) {
 	if (_widget && currentSprite && currentSprite->_cast && nextSprite && nextSprite->_cast && !currentSprite->_cast->isModified() && currentSprite->_castId == nextSprite->_castId && currentSprite->_castId.member) {
+		// The widget holds already flipped pixels, so the same cast member drawn
+		// the other way round needs a new one.
+		if (currentSprite->isFlippedH() != nextSprite->isFlippedH() ||
+				currentSprite->isFlippedV() != nextSprite->isFlippedV())
+			return false;
 		return true;
 	}
 	return false;
