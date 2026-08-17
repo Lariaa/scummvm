@@ -239,7 +239,14 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 			return nullptr;
 		}
 	} else if (_sprite->_ink == kInkTypeMask) {
-		CastMemberID maskID(_sprite->_castId.member + 1, _sprite->_castId.castLib);
+		// castLib -1 reaches this lookup and matches no cast, so no mask is found
+		// and the sprite is drawn opaque. Fall back to the cast the sprite's own
+		// member came from, the way filmloop.cpp resolves it for its cells.
+		int maskCastLib = _sprite->_castId.castLib;
+		if (maskCastLib == -1 && _sprite->_cast->getCast())
+			maskCastLib = _sprite->_cast->getCast()->_castLibID;
+
+		CastMemberID maskID(_sprite->_castId.member + 1, maskCastLib);
 		CastMember *member = g_director->getCurrentMovie()->getCastMember(maskID);
 
 		if (member) {
