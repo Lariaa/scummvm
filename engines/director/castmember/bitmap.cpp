@@ -51,6 +51,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 	_type = kCastBitmap;
 	_picture = new Picture();
 	_ditheredImg = nullptr;
+	_matteSource = nullptr;
 	_matte = nullptr;
 	_noMatte = false;
 	_bytes = 0;
@@ -287,6 +288,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Image::ImageDecoder *img, uint8 flags1)
 	: CastMember(cast, castId) {
 	_type = kCastBitmap;
+	_matteSource = nullptr;
 	_matte = nullptr;
 	_noMatte = false;
 	_bytes = 0;
@@ -325,6 +327,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, BitmapCastMember &
 
 	_picture = source._picture ? new Picture(*source._picture) : nullptr;
 	_ditheredImg = nullptr;
+	_matteSource = nullptr;
 	_matte = nullptr;
 
 	_pitch = source._pitch;
@@ -341,6 +344,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, BitmapCastMember &
 	_bitsPerPixel = source._bitsPerPixel;
 
 	_tag = source._tag;
+	_matteSource = nullptr;
 	_matte = nullptr;
 	_noMatte = false;
 	_external = source._external;
@@ -359,10 +363,19 @@ BitmapCastMember::~BitmapCastMember() {
 		_ditheredImg = nullptr;
 	}
 
-	if (_matte) {
+	// _matte is the scaled copy handed out last, except when the drawn size
+	// matched the source -- then it is the source itself, and must not be freed
+	// twice.
+	if (_matte && _matte != _matteSource) {
 		_matte->free();
 		delete _matte;
-		_matte = nullptr;
+	}
+	_matte = nullptr;
+
+	if (_matteSource) {
+		_matteSource->free();
+		delete _matteSource;
+		_matteSource = nullptr;
 	}
 }
 
@@ -601,9 +614,18 @@ bool BitmapCastMember::isModified() {
 	return false;
 }
 
-void BitmapCastMember::createMatte(const Common::Rect &bbox) {
+void BitmapCastMember::createMatte() {
 	// Like background trans, but all white pixels NOT ENCLOSED by coloured pixels
 	// are transparent
+	//
+	// Which pixels are enclosed depends on the picture alone, not on the size it
+	// gets drawn at, so this runs once at the image's own size. getMatte() scales
+	// the result. Doing it per drawn size meant a member asked for two sizes in
+	// turn -- a film loop cell and the sprite around it -- reran the flood fill on
+	// every switch: TKKG 8's intro rebuilt one 654x439 bitmap's matte 2745 times,
+	// alternating between 1503x1423 and 892x991, at seconds per frame.
+	Common::Rect bbox(_initialRect.width(), _initialRect.height());
+
 	Graphics::Surface tmp;
 	tmp.create(bbox.width(), bbox.height(), g_director->_pixelformat);
 
@@ -657,10 +679,10 @@ void BitmapCastMember::createMatte(const Common::Rect &bbox) {
 		debugC(1, kDebugImages, "BitmapCastMember::createMatte(): No white color for matte image cast %d, name %s", _castId, _name.c_str());
 	} else {
 		debugC(1, kDebugImages, "BitmapCastMember::createMatte(): Will create matte for cast %d, name %s, whiteColor: 0x%08x", _castId, _name.c_str(), whiteColor);
-		if (_matte) {
-			_matte->free();
-			delete _matte;
-			_matte = nullptr;
+		if (_matteSource) {
+			_matteSource->free();
+			delete _matteSource;
+			_matteSource = nullptr;
 		}
 
 		Graphics::FloodFill matteFill(&tmp, whiteColor, 0, true);
@@ -679,11 +701,11 @@ void BitmapCastMember::createMatte(const Common::Rect &bbox) {
 		Graphics::Surface *matteSurf = matteFill.getMask();
 		// convert the mask to the same surface format used for 1bpp bitmaps.
 		// this uses the director palette scheme, so white is 0x00 and black is 0xff.
-		_matte = new Graphics::Surface();
-		_matte->create(matteSurf->w, matteSurf->h, Graphics::PixelFormat::createFormatCLUT8());
+		_matteSource = new Graphics::Surface();
+		_matteSource->create(matteSurf->w, matteSurf->h, Graphics::PixelFormat::createFormatCLUT8());
 		for (int y = 0; y < matteSurf->h; y++) {
 			for (int x = 0; x < matteSurf->w; x++) {
-				_matte->setPixel(x, y, matteSurf->getPixel(x, y) ? 0x00 : 0xff);
+				_matteSource->setPixel(x, y, matteSurf->getPixel(x, y) ? 0x00 : 0xff);
 			}
 		}
 		_noMatte = false;
@@ -694,24 +716,45 @@ void BitmapCastMember::createMatte(const Common::Rect &bbox) {
 
 Graphics::Surface *BitmapCastMember::getMatte(const Common::Rect &bbox) {
 	// Lazy loading of mattes
-	if (!_matte && !_noMatte) {
-		createMatte(bbox);
+	if (!_matteSource && !_noMatte) {
+		createMatte();
 
-		if (ConfMan.getBool("dump_scripts") && _matte) {
+		if (ConfMan.getBool("dump_scripts") && _matteSource) {
 			Common::String prepend = _cast->getMacName();
 			Common::String filename = Common::String::format("./dumps/%s-%s-%d-matte.png", encodePathForDump(prepend).c_str(), tag2str(_tag), _castId);
 			Common::DumpFile bitmapFile;
 
 			bitmapFile.open(Common::Path(filename), true);
-			Image::writePNG(bitmapFile, *_matte, Video::quickTimeDefaultPalette256);
+			Image::writePNG(bitmapFile, *_matteSource, Video::quickTimeDefaultPalette256);
 
 			bitmapFile.close();
 		}
 	}
 
-	// check for the scale matte
-	if (_matte && (_matte->w != bbox.width() || _matte->h != bbox.height())) {
-		createMatte(bbox);
+	if (!_matteSource)
+		return nullptr;
+
+	// Hand out the source itself when it is drawn at its own size, which is the
+	// common case; otherwise scale it. Scaling a mask samples one byte per target
+	// pixel, where redoing the flood fill walks the whole image from every edge.
+	if (_matteSource->w == bbox.width() && _matteSource->h == bbox.height()) {
+		if (_matte && _matte != _matteSource) {
+			_matte->free();
+			delete _matte;
+		}
+		_matte = _matteSource;
+		return _matte;
+	}
+
+	if (!_matte || _matte == _matteSource || _matte->w != bbox.width() || _matte->h != bbox.height()) {
+		if (_matte && _matte != _matteSource) {
+			_matte->free();
+			delete _matte;
+		}
+		_matte = new Graphics::Surface();
+		_matte->create(bbox.width(), bbox.height(), Graphics::PixelFormat::createFormatCLUT8());
+		copyStretchImg(_matteSource, _matte,
+			Common::Rect(_matteSource->w, _matteSource->h), Common::Rect(bbox.width(), bbox.height()));
 	}
 
 	return _matte;
