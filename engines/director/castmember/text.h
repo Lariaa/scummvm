@@ -43,7 +43,7 @@ public:
 
 	Graphics::MacText *getWidget();
 
-	CollisionTest isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink) override;
+	CollisionTest isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink, bool flipH, bool flipV) override;
 
 	bool isEditable() override { return _editable; }
 	void setEditable(bool editable) override { _editable = editable; }
