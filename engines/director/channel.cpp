@@ -248,8 +248,14 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				return nullptr;
 			}
 			BitmapCastMember *bitmap = (BitmapCastMember *)member;
-			if (bitmap->_bitsPerPixel != 1) {
-				warning("Channel::getMask(): Requested cast mask %s, but bitmap isn't 1bpp", maskID.asString().c_str());
+			// The docs call for a 1-bit mask, but 8-bit ones ship and Director
+			// takes them: TKKG 9 stores every mask as an 8bpp greyscale twin of
+			// its image, 0 where the image is background and 255 where it is not,
+			// plus a handful of antialiased values along the edge. The blitter
+			// only tests for non-zero, so those come out with hard edges instead
+			// of not at all.
+			if (bitmap->_bitsPerPixel != 1 && bitmap->_bitsPerPixel != 8) {
+				warning("Channel::getMask(): Requested cast mask %s, but bitmap is %dbpp", maskID.asString().c_str(), bitmap->_bitsPerPixel);
 				return nullptr;
 			}
 
