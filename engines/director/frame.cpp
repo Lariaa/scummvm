@@ -2092,16 +2092,31 @@ void readSpriteDataD7(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			sprite._bgColorB = (uint8)stream.readByte();
 			sprite._flags |= kSCBBackColor;
 			break;
+		// A frame delta can start at either half of these 32-bit fields, so each
+		// half needs its own entry point and has to leave the other one alone.
+		// TKKG 8 writes two bytes at 34 when entering the harbour; with only a
+		// case 32 reading all four, that fell through to the error below and
+		// killed the game.
+		//
+		// Nothing reads either field back for drawing -- they are carried so a
+		// rewritten score keeps its bytes -- so splitting them cannot change what
+		// is on screen. They are not empty though: that same harbour scene sets
+		// the low half of both to 0x4650 on 78 sprites, so something is authored
+		// here that we currently ignore.
 		case 28:
-			sprite._angleRot = stream.readUint32();
+			sprite._angleRot = (int32)(((uint32)stream.readUint16() << 16) | ((uint32)sprite._angleRot & 0xffff));
 			sprite._flags |= kSCBAngle;
 			break;
-		case 30:	// half of the field
-			sprite._angleRot = stream.readUint16();
+		case 30:
+			sprite._angleRot = (int32)(((uint32)sprite._angleRot & 0xffff0000) | stream.readUint16());
 			sprite._flags |= kSCBAngle;
 			break;
 		case 32:
-			sprite._angleSkew = stream.readUint32();
+			sprite._angleSkew = (int32)(((uint32)stream.readUint16() << 16) | ((uint32)sprite._angleSkew & 0xffff));
+			sprite._flags |= kSCBAngle;
+			break;
+		case 34:
+			sprite._angleSkew = (int32)(((uint32)sprite._angleSkew & 0xffff0000) | stream.readUint16());
 			sprite._flags |= kSCBAngle;
 			break;
 		case 36:
@@ -2109,6 +2124,15 @@ void readSpriteDataD7(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			hexdumpIfNotZero(unk, 12, "Frame::readSpriteDataD7(): sprite.unk: ");
 			break;
 		default:
+			// The tail is padding, so a delta landing inside it carries nothing we
+			// need; skip it rather than take the game down.
+			if (stream.pos() - startPosition > 36 && stream.pos() - startPosition < 48) {
+				int skip = (int)(finishPosition - stream.pos());
+				debugC(4, kDebugLoading, "Frame::readSpriteDataD7(): delta inside the padding at %" PRId64 ", skipping %d bytes",
+					stream.pos() - startPosition, skip);
+				stream.skip(skip);
+				break;
+			}
 			// This means that a `case` label has to be split at this position
 			error("readSpriteDataD7(): Miscomputed field position: %" PRId64, stream.pos() - startPosition);
 		}
