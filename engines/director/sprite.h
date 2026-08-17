@@ -139,6 +139,9 @@ public:
 	Common::Rect getBbox(bool unstretched);
 	void setBbox(int l, int t, int r, int b);
 
+	bool isFlippedH();
+	bool isFlippedV();
+
 	Common::Point getPosition();
 	void setPosition(int x, int y);
 
