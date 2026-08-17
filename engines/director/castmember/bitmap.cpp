@@ -462,14 +462,22 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 		);
 	}
 
-	if (channel && channel->_sprite && (channel->_sprite->_thickness & kTFlip)) {
-		Graphics::Surface *surface = widget->getSurface()->surfacePtr();
-		Common::Rect whole(surface->w, surface->h);
+	// Sprite::isFlippedH()/isFlippedV() fold the score's flip bits together with
+	// the D7 rotation and skew fields, so this stays in step with the bbox that
+	// Sprite::getBbox() computed for the same sprite.
+	if (channel && channel->_sprite) {
+		bool flipH = channel->_sprite->isFlippedH();
+		bool flipV = channel->_sprite->isFlippedV();
 
-		if (channel->_sprite->_thickness & kTFlipH)
-			surface->flipHorizontal(whole);
-		if (channel->_sprite->_thickness & kTFlipV)
-			surface->flipVertical(whole);
+		if (flipH || flipV) {
+			Graphics::Surface *surface = widget->getSurface()->surfacePtr();
+			Common::Rect whole(surface->w, surface->h);
+
+			if (flipH)
+				surface->flipHorizontal(whole);
+			if (flipV)
+				surface->flipVertical(whole);
+		}
 	}
 
 	return widget;
@@ -714,7 +722,7 @@ void BitmapCastMember::createMatte() {
 	tmp.free();
 }
 
-Graphics::Surface *BitmapCastMember::getMatte(const Common::Rect &bbox) {
+Graphics::Surface *BitmapCastMember::getMatte(const Common::Rect &bbox, bool flipH, bool flipV) {
 	// Lazy loading of mattes
 	if (!_matteSource && !_noMatte) {
 		createMatte();
@@ -734,27 +742,55 @@ Graphics::Surface *BitmapCastMember::getMatte(const Common::Rect &bbox) {
 	if (!_matteSource)
 		return nullptr;
 
-	// Hand out the source itself when it is drawn at its own size, which is the
-	// common case; otherwise scale it. Scaling a mask samples one byte per target
-	// pixel, where redoing the flood fill walks the whole image from every edge.
-	if (_matteSource->w == bbox.width() && _matteSource->h == bbox.height()) {
+	// Hand out the source itself when it is drawn at its own size and the right
+	// way round, which is the common case; otherwise build a copy. Scaling a mask
+	// samples one byte per target pixel, where redoing the flood fill walks the
+	// whole image from every edge.
+	if (!flipH && !flipV && _matteSource->w == bbox.width() && _matteSource->h == bbox.height()) {
 		if (_matte && _matte != _matteSource) {
 			_matte->free();
 			delete _matte;
 		}
 		_matte = _matteSource;
+		_matteFlipH = _matteFlipV = false;
 		return _matte;
 	}
 
-	if (!_matte || _matte == _matteSource || _matte->w != bbox.width() || _matte->h != bbox.height()) {
+	if (!_matte || _matte == _matteSource || _matte->w != bbox.width() || _matte->h != bbox.height()
+			|| _matteFlipH != flipH || _matteFlipV != flipV) {
 		if (_matte && _matte != _matteSource) {
 			_matte->free();
 			delete _matte;
 		}
+		// Deliberately not copyStretchImg(): that converts to the screen format, so
+		// in true-colour mode the 8-bit mask came back 32 bits wide while the
+		// blitter walks it one byte per pixel -- the captain ended up boxed in
+		// striped white. Surface::scale() keeps the format, copyFrom() of a
+		// same-format surface likewise.
 		_matte = new Graphics::Surface();
-		_matte->create(bbox.width(), bbox.height(), Graphics::PixelFormat::createFormatCLUT8());
-		copyStretchImg(_matteSource, _matte,
-			Common::Rect(_matteSource->w, _matteSource->h), Common::Rect(bbox.width(), bbox.height()));
+		if (_matteSource->w == bbox.width() && _matteSource->h == bbox.height()) {
+			_matte->copyFrom(*_matteSource);
+		} else {
+			Graphics::Surface *scaled = _matteSource->scale(bbox.width(), bbox.height(), false);
+			_matte->copyFrom(*scaled);
+			scaled->free();
+			delete scaled;
+		}
+
+		// The sprite's own flip is applied to the picture in createWidget(), and
+		// to the rect in Sprite::getBbox(). The mask has to follow, or it knocks
+		// out the mirror image of the background: TKKG 8's harbour captain is
+		// assembled from film-loop cells that carry a 180 degree rotation and
+		// skew, and his cap and shoes came out ringed in white paper.
+		if (flipH || flipV) {
+			Common::Rect whole(_matte->w, _matte->h);
+			if (flipH)
+				_matte->flipHorizontal(whole);
+			if (flipV)
+				_matte->flipVertical(whole);
+		}
+		_matteFlipH = flipH;
+		_matteFlipV = flipV;
 	}
 
 	return _matte;
@@ -1063,12 +1099,12 @@ Common::Point BitmapCastMember::getRegistrationOffset(int16 width, int16 height)
 }
 
 
-CollisionTest BitmapCastMember::isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink) {
+CollisionTest BitmapCastMember::isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink, bool flipH, bool flipV) {
 	if (!bbox.contains(pos))
 		return kCollisionNo;
 
 	if (ink == kInkTypeMatte) {
-		Graphics::Surface *matte = getMatte(bbox);
+		Graphics::Surface *matte = getMatte(bbox, flipH, flipV);
 		return (matte ? *(byte *)(matte->getBasePtr(pos.x - bbox.left, pos.y - bbox.top)) : true) ? kCollisionYes : kCollisionNo;
 	}
 	return kCollisionYes;
