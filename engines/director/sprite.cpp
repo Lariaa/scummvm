@@ -539,6 +539,47 @@ void Sprite::setHeight(int h) {
 	setAutoPuppet(kAPHeight, true);
 }
 
+// D7 and later store a rotation and a skew per sprite (frame.cpp, sprite record
+// fields 28 and 32) in hundredths of a degree. We cannot draw an arbitrary
+// angle, but the half turns are exactly the axis flips we can already do:
+// rotating by 180 degrees negates both axes, and a skew of 180 degrees turns the
+// sprite's vertical axis around, negating only that one. Combining the two
+// therefore mirrors horizontally.
+//
+// TKKG 8 builds the harbour captain that way: head, mouth and eyes all carry
+// rotation and skew of 180 while the body carries neither, and every part hangs
+// off the same registration point. Ignoring the fields left the face about 80
+// pixels to the right of the body -- the mirrored parts landed on the wrong side
+// of that shared anchor.
+//
+// Any other angle is left alone, as before. Reporting them would be noise: the
+// same corpus has plenty of genuine 45, 60 and 330 degree rotations we still
+// cannot draw.
+static bool isHalfTurn(int32 hundredthsOfADegree) {
+	if (!hundredthsOfADegree)
+		return false;
+
+	int32 angle = hundredthsOfADegree % 36000;
+	if (angle < 0)
+		angle += 36000;
+	return angle == 18000;
+}
+
+// Flipping twice cancels out, so the score's own flip bits and the angles
+// combine with exclusive or rather than stacking.
+bool Sprite::isFlippedH() {
+	// Only a rotation moves the horizontal axis.
+	bool flip = (_thickness & kTFlipH) != 0;
+	return flip != isHalfTurn(_angleRot);
+}
+
+bool Sprite::isFlippedV() {
+	// A half turn flips the vertical axis as well, so a skewed half turn on top
+	// of it cancels out and leaves a plain horizontal mirror.
+	bool flip = (_thickness & kTFlipV) != 0;
+	return flip != (isHalfTurn(_angleRot) != isHalfTurn(_angleSkew));
+}
+
 Common::Rect Sprite::getBbox(bool unstretched) {
 	Common::Rect result(_width, _height);
 	// If this is a cast member, use the cast member's getBbox function
@@ -546,10 +587,10 @@ Common::Rect Sprite::getBbox(bool unstretched) {
 	if (_cast)
 		result = _cast->getBbox(_width, _height);
 
-	if (_cast && _cast->_type == kCastBitmap && (_thickness & kTFlip)) {
-		if (_thickness & kTFlipH)
+	if (_cast && _cast->_type == kCastBitmap) {
+		if (isFlippedH())
 			result.moveTo(-result.right, result.top);
-		if (_thickness & kTFlipV)
+		if (isFlippedV())
 			result.moveTo(result.left, -result.bottom);
 	}
 
@@ -785,6 +826,13 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 		_blendAmount = nextSprite->_blendAmount;
 	if (nextSprite->_copyBackMask & kSCBThickness)
 		_thickness = nextSprite->_thickness;
+	// Rotation and skew have no auto-puppet property of their own, so like the
+	// thickness they simply follow the score. Without this the flips they encode
+	// never reach the channel and the sprite draws unmirrored.
+	if (nextSprite->_copyBackMask & kSCBAngle) {
+		_angleRot = nextSprite->_angleRot;
+		_angleSkew = nextSprite->_angleSkew;
+	}
 	if (nextSprite->_copyBackMask & kSCBPattern)
 		_pattern = nextSprite->_pattern;
 

@@ -392,7 +392,7 @@ Graphics::MacText *TextCastMember::getWidget() {
 	return (Graphics::MacText *)_widget;
 }
 
-CollisionTest TextCastMember::isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink) {
+CollisionTest TextCastMember::isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink, bool flipH, bool flipV) {
 	if (!bbox.contains(pos))
 		return kCollisionNo;
 
