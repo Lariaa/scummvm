@@ -9333,9 +9333,9 @@ static const DirectorGameDescription gameDescriptions[] = {
 	WINGAME1("tkkg5", "", "TKKG5_32.ex_", "t:4e86d530315553774f70ad9ad61e0c52", 1597094, 602),
 
 	// Ein Fall für TKKG: Der Fälscherbande auf der Spur (bilingual DE/EN)
-	MACGAME2("tkkg6", "", "TKKG-Start", "dd58f1859ddab9bf15867a510cf7bfe4", 1033758,
-						  "Score.dxr",  "3b6e459f27a81a5f33c8b2bccefe6888", 26322, 650),
-	WINGAME1t("tkkg6", "", "Tkkg6_32.exe", "52239d8b9852067433fbce14928fe650", 1594089, 602),
+	MACGAME2f("tkkg6", "", "TKKG-Start", "dd58f1859ddab9bf15867a510cf7bfe4", 1033758,
+						  "Score.dxr",  "3b6e459f27a81a5f33c8b2bccefe6888", 26322, 650, GF_TRUECOLOR),
+	WINGAME1tf("tkkg6", "", "Tkkg6_32.exe", "52239d8b9852067433fbce14928fe650", 1594089, 602, GF_TRUECOLOR),
 
 	// Bilingual Japanese/English
 	MACGAME1("tomato", "",  "tomato2", "9c595b98af545997155f2f020ad2ec5f", 1028001, 606),
@@ -9880,9 +9880,9 @@ static const DirectorGameDescription gameDescriptions[] = {
 							   "PUEBLO.DXR", "f:c0fa4a38f797ff6efa454373a9195b01", 10141276, Common::ES_ESP, 700),
 
 	// Ein Fall für TKKG: Wer stoppt den Feuerteufel? (bilingual DE/EN)
-	MACGAME2("tkkg7", "", "TKKG-Start", "0944b962ebb00f4b5d5149d220f8449b", 113458,
-						  "Score.dxr", "c1a18f5a5a71148ef469841ccb253771", 16804, 702),
-	WINGAME1t("tkkg7", "", "TKKG 7.exe", "96593e22c401be8551764b51f6f68c62", 1892382, 702),
+	MACGAME2f("tkkg7", "", "TKKG-Start", "0944b962ebb00f4b5d5149d220f8449b", 113458,
+						  "Score.dxr", "c1a18f5a5a71148ef469841ccb253771", 16804, 702, GF_TRUECOLOR),
+	WINGAME1tf("tkkg7", "", "TKKG 7.exe", "96593e22c401be8551764b51f6f68c62", 1892382, 702, GF_TRUECOLOR),
 
 	// Windows installer is also Director
 	MACGAME1_l("tkkgkit", "", "Phantombild Start", "0944b962ebb00f4b5d5149d220f8449b", 115498, Common::DE_DEU, 702),
@@ -10637,14 +10637,14 @@ static const DirectorGameDescription gameDescriptions[] = {
 									"DATA.CST", "t:5e63fa8c7a77ee41e0a6c294758140c2", 5616, Common ::SV_SWE, 851),
 
 	// Ein Fall für TKKG: Das geheimnisvolle Testament (bilingual DE/EN)
-	MACGAME2("tkkg8", "", "TKKG-Start", "8c1b4ddb1adff89deaba119f7cf8df7b", 197195,
-						  "Score.dxr", "d7300d214a30ec129cb4939aeddc3392", 17770, 800),
-	WINGAME1t("tkkg8", "", "TKKG 8.exe", "3284e5212dee57129a32ba86367ce816", 2324424, 800),
+	MACGAME2f("tkkg8", "", "TKKG-Start", "8c1b4ddb1adff89deaba119f7cf8df7b", 197195,
+						  "Score.dxr", "d7300d214a30ec129cb4939aeddc3392", 17770, 800, GF_TRUECOLOR),
+	WINGAME1tf("tkkg8", "", "TKKG 8.exe", "3284e5212dee57129a32ba86367ce816", 2324424, 800, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Voodoozauber (bilingual DE/EN)
-	MACGAME2("tkkg9", "", "TKKG-Start", "2c64a568bd26944452957a53af85b067", 197167,
-						  "Score.dxr", "d7300d214a30ec129cb4939aeddc3392", 17770, 800),
-	WINGAME1("tkkg9", "", "InData/TKKG 9.exe", "t:3284e5212dee57129a32ba86367ce816", 2329244, 800),
+	MACGAME2f("tkkg9", "", "TKKG-Start", "2c64a568bd26944452957a53af85b067", 197167,
+						  "Score.dxr", "d7300d214a30ec129cb4939aeddc3392", 17770, 800, GF_TRUECOLOR),
+	WINGAME1f("tkkg9", "", "InData/TKKG 9.exe", "t:3284e5212dee57129a32ba86367ce816", 2329244, 800, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Panik im Internat (bilingual DE/EN)
 	MACGAME1("tkkg10", "", "TKKG10", "4ea5fc09f79eee6dded94dc40f303779", 197107, 800),
