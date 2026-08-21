@@ -9334,9 +9334,9 @@ static const DirectorGameDescription gameDescriptions[] = {
 	WINGAME1("tkkg5", "", "TKKG5_32.ex_", "t:4e86d530315553774f70ad9ad61e0c52", 1597094, 602),
 
 	// Ein Fall für TKKG: Der Fälscherbande auf der Spur (bilingual DE/EN)
-	MACGAME2("tkkg6", "", "TKKG-Start", "dd58f1859ddab9bf15867a510cf7bfe4", 1033758,
-						  "Score.dxr",  "3b6e459f27a81a5f33c8b2bccefe6888", 26322, 650),
-	WINGAME1t("tkkg6", "", "Tkkg6_32.exe", "52239d8b9852067433fbce14928fe650", 1594089, 602),
+	MACGAME2f("tkkg6", "", "TKKG-Start", "dd58f1859ddab9bf15867a510cf7bfe4", 1033758,
+						  "Score.dxr",  "3b6e459f27a81a5f33c8b2bccefe6888", 26322, 650, GF_TRUECOLOR),
+	WINGAME1tf("tkkg6", "", "Tkkg6_32.exe", "52239d8b9852067433fbce14928fe650", 1594089, 602, GF_TRUECOLOR),
 
 	// Bilingual Japanese/English
 	MACGAME1("tomato", "",  "tomato2", "9c595b98af545997155f2f020ad2ec5f", 1028001, 606),
@@ -9705,11 +9705,11 @@ static const DirectorGameDescription gameDescriptions[] = {
 								"Child.dxr", "t:57e4acc11a12a483541cfb69eb570810", 387835, 700),
 
 	// Original Mac filename is Löwenzahn 4
-	MACGAME1_l("loewe4", "", "xn--Lwenzahn 4-ecb",		"rt:6f75666ef42bcd1d34bd120d011b42b1",  114029, Common::DE_DEU, 702),
-	WINGAME1_l("loewe4", "", "SETUP/WIN95/LOEWE4.exe",	"t:4766360be9f3067a9f314b3b3a454fa7",  1818036, Common::DE_DEU, 702),
+	MACGAME1f_l("loewe4", "", "xn--Lwenzahn 4-ecb",		"rt:6f75666ef42bcd1d34bd120d011b42b1",  114029, Common::DE_DEU, 702, GF_TRUECOLOR),
+	WINGAME1f_l("loewe4", "", "SETUP/WIN95/LOEWE4.exe",	"t:4766360be9f3067a9f314b3b3a454fa7",  1818036, Common::DE_DEU, 702, GF_TRUECOLOR),
 
-	WINGAME2_l("loewesteinzeit", "","START.EXE",	  "t:13918e51d2093b5cdc92795b36454112", 1960654,
-									"data/131Koch.dxr", "80b7913156e36d8806b2dcdcbcd7d288", 817625, Common::DE_DEU, 702),
+	WINGAME2f_l("loewesteinzeit", "","START.EXE",	  "t:13918e51d2093b5cdc92795b36454112", 1960654,
+									"data/131Koch.dxr", "80b7913156e36d8806b2dcdcbcd7d288", 817625, Common::DE_DEU, 702, GF_TRUECOLOR),
 
 	MACGAME1("maisybday", "", "Maisy BDay",		"r:0944b962ebb00f4b5d5149d220f8449b", 113458,  702),
 	WINGAME1("maisybday", "", "Maisy BDay.exe", "t:26fc28194d1991645a9a42794bcb1b36", 2619122, 702),
@@ -9881,8 +9881,8 @@ static const DirectorGameDescription gameDescriptions[] = {
 							   "PUEBLO.DXR", "f:c0fa4a38f797ff6efa454373a9195b01", 10141276, Common::ES_ESP, 700),
 
 	// Ein Fall für TKKG: Wer stoppt den Feuerteufel? (bilingual DE/EN)
-	MACGAME2("tkkg7", "", "TKKG-Start", "0944b962ebb00f4b5d5149d220f8449b", 113458,
-						  "Score.dxr", "c1a18f5a5a71148ef469841ccb253771", 16804, 702),
+	MACGAME2f("tkkg7", "", "TKKG-Start", "0944b962ebb00f4b5d5149d220f8449b", 113458,
+						  "Score.dxr", "c1a18f5a5a71148ef469841ccb253771", 16804, 702, GF_TRUECOLOR),
 	WINGAME1t("tkkg7", "", "TKKG 7.exe", "96593e22c401be8551764b51f6f68c62", 1892382, 702),
 
 	// Windows installer is also Director
@@ -10324,26 +10324,26 @@ static const DirectorGameDescription gameDescriptions[] = {
 									  "rock.cdq", "d:f1925162f13a34f8445e71374dd87914", 10430, 800),
 
 	// Original Win executable name is Löwenzahn5.exe
-	WINGAME1t_l("loewe5", "", "Setup/WinRoot/Terzio/xn--Lwenzahn 5-ecb/xn--lwenzahn5.exe-imb", "9c59833b332f0b9f8ecc97f0aa47ec99", 2386566, Common::DE_DEU, 800),
+	WINGAME1tf_l("loewe5", "", "Setup/WinRoot/Terzio/xn--Lwenzahn 5-ecb/xn--lwenzahn5.exe-imb", "9c59833b332f0b9f8ecc97f0aa47ec99", 2386566, Common::DE_DEU, 800, GF_TRUECOLOR),
 
 	// Original filenames contain Löwenzahn 7
-	MACGAME1_l("loewe7", "Classic", "xn--Lwenzahn 7 (classic)-39b", "rt:19e9fb7b215165e975ab6c6fcedc07cd", 195151, Common::DE_DEU, 800),
-	MACGAME1_l("loewe7", "OSX",		"xn--Lwenzahn 7 (OS X)-zzb",	"rt:77b66cfdd98d1be9cf2e99f3a8ad8a17", 242617, Common::DE_DEU, 800),
-	WINGAME1_l("loewe7", "",		"Setup/WinRoot/Terzio/xn--Lwenzahn 7-ecb/Loewe_7.exe", "t:e2eebc4104de6c8565295702c5e0b77c", 58572, Common::DE_DEU, 800),
+	MACGAME1f_l("loewe7", "Classic", "xn--Lwenzahn 7 (classic)-39b", "rt:19e9fb7b215165e975ab6c6fcedc07cd", 195151, Common::DE_DEU, 800, GF_TRUECOLOR),
+	MACGAME1f_l("loewe7", "OSX",	"xn--Lwenzahn 7 (OS X)-zzb",	"rt:77b66cfdd98d1be9cf2e99f3a8ad8a17", 242617, Common::DE_DEU, 800, GF_TRUECOLOR),
+	WINGAME1f_l("loewe7", "",		"Setup/WinRoot/Terzio/xn--Lwenzahn 7-ecb/Loewe_7.exe", "t:e2eebc4104de6c8565295702c5e0b77c", 58572, Common::DE_DEU, 800, GF_TRUECOLOR),
 
 	// Original filenames contain Löwenzahn 8
-	MACGAME1_l("loewe8", "",	"xn--Lwenzahn 8-ecb",		"rt:11588cdc1e3eec81c6052dfdb1cbac6e", 190547, Common::DE_DEU, 851),
-	MACGAME1_l("loewe8", "OSX",	"xn--Lwenzahn 8 (OSX)-mwb", "rt:bdb87b75fe7db4ee20d859bd640f5697", 276263, Common::DE_DEU, 851),
-	WINGAME1_l("loewe8", "",	"Setup/WinRoot/Terzio/Loewenzahn 8/Loewe_8.exe", "t:973b650dd2564c20cc1d3501a7498dc1", 71020, Common::DE_DEU, 851),
+	MACGAME1f_l("loewe8", "",	"xn--Lwenzahn 8-ecb",		"rt:11588cdc1e3eec81c6052dfdb1cbac6e", 190547, Common::DE_DEU, 851, GF_TRUECOLOR),
+	MACGAME1f_l("loewe8", "OSX", "xn--Lwenzahn 8 (OSX)-mwb", "rt:bdb87b75fe7db4ee20d859bd640f5697", 276263, Common::DE_DEU, 851, GF_TRUECOLOR),
+	WINGAME1f_l("loewe8", "",	"Setup/WinRoot/Terzio/Loewenzahn 8/Loewe_8.exe", "t:973b650dd2564c20cc1d3501a7498dc1", 71020, Common::DE_DEU, 851, GF_TRUECOLOR),
 
-	MACGAME1_l("loewecalendar", "", "Adventskalender",										 "rt:0e5578cf47954a2c7af8930264791666", 157787, Common::DE_DEU, 850),
-	WINGAME1_l("loewecalendar", "",	"Setup/WinRoot/Terzio/LZ_Adventskalender/LZ_Advent.exe", "t:a08e0377bea127d46b3491db914ef07a",   78516, Common::DE_DEU, 851),
+	MACGAME1f_l("loewecalendar", "", "Adventskalender",										 "rt:0e5578cf47954a2c7af8930264791666", 157787, Common::DE_DEU, 850, GF_TRUECOLOR),
+	WINGAME1f_l("loewecalendar", "",	"Setup/WinRoot/Terzio/LZ_Adventskalender/LZ_Advent.exe", "t:a08e0377bea127d46b3491db914ef07a",   78516, Common::DE_DEU, 851, GF_TRUECOLOR),
 
 	// Windows versions are D9
-	MACGAME1_l("loewespielebox", "OS9",  "xn--Lwenzahn Spielebox (OS9)-loc",  "rt:19e9fb7b215165e975ab6c6fcedc07cd", 195151, Common::DE_DEU, 850),
-	MACGAME1_l("loewespielebox", "OS X", "xn--Lwenzahn Spielebox (OS X)-yrc", "rt:314c3d52b50d730a3e9382273404eea4", 277675, Common::DE_DEU, 850),
-	MACGAME1_l("loewespielebox", "Farbenspiel",		"Farbenspiel",	   "rt:d381da584c1b1a6e4a6b79b2576a15da", 429369, Common::DE_DEU, 850),
-	MACGAME1_l("loewespielebox", "Farbenspiel OSX", "Farbenspiel OSX", "rt:843d35914a24c6b221aff7cc80a4eead", 528991, Common::DE_DEU, 850),
+	MACGAME1f_l("loewespielebox", "OS9",  "xn--Lwenzahn Spielebox (OS9)-loc",  "rt:19e9fb7b215165e975ab6c6fcedc07cd", 195151, Common::DE_DEU, 850, GF_TRUECOLOR),
+	MACGAME1f_l("loewespielebox", "OS X", "xn--Lwenzahn Spielebox (OS X)-yrc", "rt:314c3d52b50d730a3e9382273404eea4", 277675, Common::DE_DEU, 850, GF_TRUECOLOR),
+	MACGAME1f_l("loewespielebox", "Farbenspiel",		"Farbenspiel",	   "rt:d381da584c1b1a6e4a6b79b2576a15da", 429369, Common::DE_DEU, 850, GF_TRUECOLOR),
+	MACGAME1f_l("loewespielebox", "Farbenspiel OSX", "Farbenspiel OSX", "rt:843d35914a24c6b221aff7cc80a4eead", 528991, Common::DE_DEU, 850, GF_TRUECOLOR),
 
 	WINGAME1_l("lunes", "", "Lunes.exe", "9482a4a5f6ae02470ce1863808120f6e", 2258509, Common::IT_ITA, 851),
 
@@ -10407,7 +10407,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 	WINGAME2t("oscarworkshop", "Windows 95",  "InData/Oscar.exe", "t:7b687a3aca980622d7add3bcdd8bbb37", 2253862,
 									 	    "Data/oscarP&P.dxr", "f:d1907801ae871f98837db8520ec61ff5", 774806, 800),
 
-	WINGAME1t_l("janoschpanama", "", "Setup/WinRoot/JanoschPanama/panama.exe", "25d1a9fb6c8067953888719e07dc29bd", 2384444, Common::DE_DEU, 800),
+	WINGAME1tf_l("janoschpanama", "", "Setup/WinRoot/JanoschPanama/panama.exe", "25d1a9fb6c8067953888719e07dc29bd", 2384444, Common::DE_DEU, 800, GF_TRUECOLOR),
 	WINGAME1t_l("janoschverkehr", "", "Setup/WinRoot/JanoschVerkehr/verkehr.exe", "fa749c7798f69f4aa615d35b2b991348", 2294886, Common::DE_DEU, 851),
 
 	WINGAME1("pcformat", "PCF132 CD 02/02", "PCF132.exe", "e24d4bab978b1a5c2326d2c56cf4d781", 4722596, 800),
@@ -10638,31 +10638,31 @@ static const DirectorGameDescription gameDescriptions[] = {
 									"DATA.CST", "t:5e63fa8c7a77ee41e0a6c294758140c2", 5616, Common ::SV_SWE, 851),
 
 	// Ein Fall für TKKG: Das geheimnisvolle Testament (bilingual DE/EN)
-	MACGAME2("tkkg8", "", "TKKG-Start", "8c1b4ddb1adff89deaba119f7cf8df7b", 197195,
-						  "Score.dxr", "d7300d214a30ec129cb4939aeddc3392", 17770, 800),
-	WINGAME1t("tkkg8", "", "TKKG 8.exe", "3284e5212dee57129a32ba86367ce816", 2324424, 800),
+	MACGAME2f("tkkg8", "", "TKKG-Start", "8c1b4ddb1adff89deaba119f7cf8df7b", 197195,
+						  "Score.dxr", "d7300d214a30ec129cb4939aeddc3392", 17770, 800, GF_TRUECOLOR),
+	WINGAME1tf("tkkg8", "", "TKKG 8.exe", "3284e5212dee57129a32ba86367ce816", 2324424, 800, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Voodoozauber (bilingual DE/EN)
-	MACGAME2("tkkg9", "", "TKKG-Start", "2c64a568bd26944452957a53af85b067", 197167,
-						  "Score.dxr", "d7300d214a30ec129cb4939aeddc3392", 17770, 800),
-	WINGAME1("tkkg9", "", "InData/TKKG 9.exe", "t:3284e5212dee57129a32ba86367ce816", 2329244, 800),
+	MACGAME2f("tkkg9", "", "TKKG-Start", "2c64a568bd26944452957a53af85b067", 197167,
+						  "Score.dxr", "d7300d214a30ec129cb4939aeddc3392", 17770, 800, GF_TRUECOLOR),
+	WINGAME1f("tkkg9", "", "InData/TKKG 9.exe", "t:3284e5212dee57129a32ba86367ce816", 2329244, 800, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Panik im Internat (bilingual DE/EN)
-	MACGAME1("tkkg10", "", "TKKG10", "4ea5fc09f79eee6dded94dc40f303779", 197107, 800),
-	WINGAME1t("tkkg10", "", "TKKG10.exe", "d34aacfc572a9f82867aa88be20d32c2", 70628, 800),
+	MACGAME1f("tkkg10", "", "TKKG10", "4ea5fc09f79eee6dded94dc40f303779", 197107, 800, GF_TRUECOLOR),
+	WINGAME1tf("tkkg10", "", "TKKG10.exe", "d34aacfc572a9f82867aa88be20d32c2", 70628, 800, GF_TRUECOLOR),
 
 	// Mac OS X versions of these TKKG games are D9
 	// Ein Fall für TKKG: Film ab! (bilingual DE/EN)
-	MACGAME1("tkkg11", "Classic", "TKKG11", "789536da81694518f494945bb161ace9", 182599, 909),
+	MACGAME1f("tkkg11", "Classic", "TKKG11", "789536da81694518f494945bb161ace9", 182599, 909, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Alarm in der Geisterbahn (bilingual DE/EN)
 	MACGAME1("tkkg12", "Classic", "TKKG12", "789536da81694518f494945bb161ace9", 182599, 909),
 
 	// Ein Fall für TKKG: Zelle 13 (bilingual DE/EN)
-	MACGAME1("tkkg13", "Classic", "TKKG13", "789536da81694518f494945bb161ace9", 180795, 909),
+	MACGAME1f("tkkg13", "Classic", "TKKG13", "789536da81694518f494945bb161ace9", 180795, 909, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Gefährliche Ferien (bilingual DE/EN)
-	MACGAME1("tkkg14", "Classic", "TKKG14", "789536da81694518f494945bb161ace9", 182599, 909),
+	MACGAME1f("tkkg14", "Classic", "TKKG14", "789536da81694518f494945bb161ace9", 182599, 909, GF_TRUECOLOR),
 
 	// Original Mac filename is ときメモタイピング
 	MACGAME1_l("tokimemotype1", "", "Tokimemo Typing", "80b8d1697b18f6f2d8a2813a594cead2", 255114, Common::JA_JPN, 851),
@@ -10813,12 +10813,12 @@ static const DirectorGameDescription gameDescriptions[] = {
 	// Re-releases, released as part of the "Jubiläums-Paket" 25th anniversary bundle
 	WINGAME1t_l("loewe2", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 2/Loewenzahn 2.exe", "861c0ac98a672fc3e537a26b8cc543be", 95970, Common::DE_DEU, 900),
 	WINGAME1t_l("loewe3", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 3/Loewenzahn 3.exe", "46243628b1d79872340993bdc4a156d8", 87791, Common::DE_DEU, 900),
-	WINGAME1t_l("loewe4", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 4/Loewenzahn 4.exe", "fcd7e3e7b9b1080f848c518b6e66d860", 87795, Common::DE_DEU, 900),
-	WINGAME1t_l("loewe6", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 6/Loewenzahn 6.exe", "c4135f262abdbf3f2dc660e341b8a192", 87820, Common::DE_DEU, 900),
+	WINGAME1tf_l("loewe4", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 4/Loewenzahn 4.exe", "fcd7e3e7b9b1080f848c518b6e66d860", 87795, Common::DE_DEU, 900, GF_TRUECOLOR),
+	WINGAME1tf_l("loewe6", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 6/Loewenzahn 6.exe", "c4135f262abdbf3f2dc660e341b8a192", 87820, Common::DE_DEU, 900, GF_TRUECOLOR),
 
 	// Mac versions are D8
-	WINGAME1_l("loewespielebox", "",			"Setup/WinRoot/Terzio/LZ_Spielebox/LZ_Spielebox.exe", "t:2e0749bd71f312abdf445e958f6fd737", 95544, Common::DE_DEU, 900),
-	WINGAME1_l("loewespielebox", "Farbenspiel", "Setup/WinRoot/Terzio/LZ_Spielebox/Farbenspiel.exe",  "t:7fef21c2e52f377d53f2489f25258fae", 95714, Common::DE_DEU, 900),
+	WINGAME1f_l("loewespielebox", "",			"Setup/WinRoot/Terzio/LZ_Spielebox/LZ_Spielebox.exe", "t:2e0749bd71f312abdf445e958f6fd737", 95544, Common::DE_DEU, 900, GF_TRUECOLOR),
+	WINGAME1f_l("loewespielebox", "Farbenspiel", "Setup/WinRoot/Terzio/LZ_Spielebox/Farbenspiel.exe",  "t:7fef21c2e52f377d53f2489f25258fae", 95714, Common::DE_DEU, 900, GF_TRUECOLOR),
 
 	// Original Mac filename is Mats und das rätselhafte Tier
 	// Mac version must be installed. Additional OS X installer runs the game Classic environment.
@@ -10875,20 +10875,20 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	// Classic Mac OS versions of these TKKG games are D8
 	// Ein Fall für TKKG: Film ab! (bilingual DE/EN)
-	MACGAME1("tkkg11", "", "TKKG11", "d483e955df901222145267d2ad729ea2", 232402, 909),
-	WINGAME1t("tkkg11", "", "TKKG11.exe", "96863b7ac45787b41881ab7bc7a39e06", 107935, 900),
+	MACGAME1f("tkkg11", "", "TKKG11", "d483e955df901222145267d2ad729ea2", 232402, 909, GF_TRUECOLOR),
+	WINGAME1tf("tkkg11", "", "TKKG11.exe", "96863b7ac45787b41881ab7bc7a39e06", 107935, 900, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Alarm in der Geisterbahn (bilingual DE/EN)
 	MACGAME1("tkkg12", "", "TKKG12", "d483e955df901222145267d2ad729ea2", 232402, 909),
 	WINGAME1t("tkkg12", "", "TKKG12.exe", "bc9668350bf745cfc843e9cc4ae08e13", 110780, 909),
 
 	// Ein Fall für TKKG: Zelle 13 (bilingual DE/EN)
-	MACGAME1("tkkg13", "", "TKKG13", "d483e955df901222145267d2ad729ea2", 230598, 909),
-	WINGAME1t("tkkg13", "", "TKKG13.exe", "c4f4d41f3260223edbc6e0df93649189", 152784, 900),
+	MACGAME1f("tkkg13", "", "TKKG13", "d483e955df901222145267d2ad729ea2", 230598, 909, GF_TRUECOLOR),
+	WINGAME1tf("tkkg13", "", "TKKG13.exe", "c4f4d41f3260223edbc6e0df93649189", 152784, 900, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Gefährliche Ferien (bilingual DE/EN)
-	MACGAME1("tkkg14", "", "TKKG14", "d483e955df901222145267d2ad729ea2", 298739, 909),
-	WINGAME1t("tkkg14", "", "TKKG14.exe", "cf8679b4408b4a079e498cc42961ab43", 107813, 900),
+	MACGAME1f("tkkg14", "", "TKKG14", "d483e955df901222145267d2ad729ea2", 298739, 909, GF_TRUECOLOR),
+	WINGAME1tf("tkkg14", "", "TKKG14.exe", "cf8679b4408b4a079e498cc42961ab43", 107813, 900, GF_TRUECOLOR),
 
 //////////////////////////////////////////////////
 //
