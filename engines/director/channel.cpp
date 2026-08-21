@@ -218,6 +218,16 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 	if (!_sprite->isQDShape() && _sprite->_ink == kInkTypeCopy && _sprite->_thickness & kTHasBlend)
 		needsMatte = true;
 
+	// Mask ink names its own mask -- the member right after this one -- so it must
+	// not be diverted into the matte path. The blend clause above did exactly
+	// that: TKKG 8's harbour fog (member 213 "Magla7", ink 9) carries blend 102
+	// and thickness 0x91, so needsMatte came out true, "Magla mask" was never
+	// looked up, and a flood-fill matte ate a swathe of the haze instead. The
+	// blend itself is applied by the blitter and does not depend on which of the
+	// two we hand back. forceMatte still wins, since its callers want a matte.
+	if (_sprite->_ink == kInkTypeMask)
+		needsMatte = false;
+
 	Common::Rect bbox(getBbox());
 
 	if (needsMatte || forceMatte) {
