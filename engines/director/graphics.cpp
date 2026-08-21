@@ -793,11 +793,12 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 	// `alpha` is transparency (0 = fully opaque, 255 = invisible), while a mask
 	// value is opacity, so the two have to be combined rather than multiplied.
 	//
-	// Deliberately only when the sprite already carries a blend. Sprites without
-	// one keep the exact yes/no behaviour they have today, which keeps every mask
-	// in every other game byte-identical -- TKKG 9's masks are 0/255 twins with a
-	// handful of antialiased edge values, and those would otherwise start taking
-	// the blend path instead of their ink path.
+	// This holds whether or not the sprite carries a blend of its own: TKKG 8's
+	// golf course draws the same kind of fog ("magla" with "maska na maglata",
+	// a mask whose palette is the built-in greyscale one) at blend 0, and gating
+	// the ramp on the sprite's blend painted the haze flat opaque over the whole
+	// top half of the course. A mask that really is a yes/no stencil is unaffected:
+	// 0 still does not draw and 0xff still yields the sprite's own alpha.
 	const int spriteAlpha = alpha;
 
 	srcPoint.y = abs(srcRect.top - destRect.top);
@@ -835,7 +836,7 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 			}
 
 			if (draw) {
-				alpha = (spriteAlpha && maskValue != 0xff)
+				alpha = (maskValue != 0xff)
 					? 255 - (maskValue * (255 - spriteAlpha)) / 255
 					: spriteAlpha;
 
