@@ -44,7 +44,10 @@ public:
 
 	bool isModified() override;
 	void createMatte();
-	Graphics::Surface *getMatte(const Common::Rect &bbox);
+	// flipH/flipV must match how the sprite draws the picture: createWidget()
+	// mirrors the pixels, so a matte handed back unmirrored would knock out the
+	// wrong side.
+	Graphics::Surface *getMatte(const Common::Rect &bbox, bool flipH = false, bool flipV = false);
 	Graphics::Surface *getDitherImg();
 
 	bool hasField(int field) override;
@@ -63,7 +66,7 @@ public:
 	Common::Point getRegistrationOffset() override;
 	Common::Point getRegistrationOffset(int16 width, int16 height) override;
 
-	CollisionTest isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink) override;
+	CollisionTest isWithin(const Common::Rect &bbox, const Common::Point &pos, InkType ink, bool flipH, bool flipV) override;
 
 	void writeCastData(Common::SeekableWriteStream *writeStream) override;
 	uint32 writeBITDResource(Common::SeekableWriteStream *writeStream, uint32 offset);
@@ -78,6 +81,10 @@ public:
 	// own size and _matte is scaled off it for whatever size is being drawn.
 	Graphics::Surface *_matteSource;
 	Graphics::Surface *_matte;
+	// Which orientation _matte currently holds, so a sprite that turns around
+	// does not keep the previous side's mask.
+	bool _matteFlipH = false;
+	bool _matteFlipV = false;
 
 	int _version;
 
