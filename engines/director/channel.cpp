@@ -288,8 +288,37 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				bbox.translate(-originPos.x, -originPos.y);
 				// create new mask surface, with the exact dimensions of the channel.
 				_mask = new Graphics::ManagedSurface(bbox.width(), bbox.height());
-				// get the bounding box of the mask image (origin at registration offset)
-				Common::Rect destRect = bitmap->getBbox();
+				// The sprite draws its picture stretched to the sprite's size, so the
+				// mask has to follow by the same factor. TKKG 9's hotel stool
+				// (member 37 "HG84_Stuhl Kopie", 136x94, with an equally sized and
+				// equally registered mask) is placed at 125x86; copying the mask 1:1
+				// left it about 8% too large for the shrunk silhouette, so a band of
+				// the picture's white paper showed all around the stool.
+				//
+				// getBbox(w, h) also scales the registration offset, so the mask
+				// lands where the picture does.
+				//
+				// Only for a matching pair, though: where the mask already has a
+				// different native size than the picture it belongs to, the author
+				// meant something we cannot infer -- TKKG 8's harbour fog pairs a
+				// 640x440 mask with a 640x451 picture, TKKG 9's "P-07a" a 207x150
+				// mask with a 158x70 one. Those keep the placement they had.
+				const Graphics::Surface *maskSurface = &bitmap->_picture->_surface;
+				Graphics::Surface *scaledMask = nullptr;
+				bool matchingPair = _sprite->_cast
+					&& _sprite->_cast->_initialRect.width() == bitmap->_initialRect.width()
+					&& _sprite->_cast->_initialRect.height() == bitmap->_initialRect.height();
+
+				Common::Rect destRect = matchingPair
+					? bitmap->getBbox(_sprite->_width, _sprite->_height)
+					: bitmap->getBbox();
+
+				if (matchingPair && (destRect.width() != maskSurface->w || destRect.height() != maskSurface->h)) {
+					// Nearest neighbour: a mask is not interpolated, and Surface::scale()
+					// keeps the 8-bit format the blitter walks one byte at a time.
+					scaledMask = maskSurface->scale(destRect.width(), destRect.height(), false);
+					maskSurface = scaledMask;
+				}
 				// get position of channel's registration offset (origin at top left)
 				Common::Point channelRegOffset(-bbox.left, -bbox.top);
 				// move destination rect to sit at the channel's registration offset
@@ -300,8 +329,13 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				// make a copy of the destination rect with the origin at the top left of the mask bitmap
 				Common::Rect srcRect = destRect;
 				srcRect.translate(-destOrigin.x, -destOrigin.y);
-				debugC(8, kDebugImages, "Channel::getMask(): cast mask %s, orig %dx%d, dest %dx%d, crop %d,%d %dx%d",  maskID.asString().c_str(), bitmap->_picture->_surface.w, bitmap->_picture->_surface.h, bbox.width(), bbox.height(), destRect.left, destRect.top, destRect.width(), destRect.height());
-				_mask->copyRectToSurface(bitmap->_picture->_surface, destRect.left, destRect.top, srcRect);
+				debugC(8, kDebugImages, "Channel::getMask(): cast mask %s, orig %dx%d, scaled %dx%d, dest %dx%d, crop %d,%d %dx%d",  maskID.asString().c_str(), bitmap->_picture->_surface.w, bitmap->_picture->_surface.h, maskSurface->w, maskSurface->h, bbox.width(), bbox.height(), destRect.left, destRect.top, destRect.width(), destRect.height());
+				_mask->copyRectToSurface(*maskSurface, destRect.left, destRect.top, srcRect);
+
+				if (scaledMask) {
+					scaledMask->free();
+					delete scaledMask;
+				}
 				return &_mask->rawSurface();
 			} else {
 				warning("Channel::getMask(): Requested cast mask %s, but no picture found", maskID.asString().c_str());
