@@ -292,6 +292,10 @@ public:
 
 private:
 	typedef Common::HashMap<Common::String, Common::String, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> FileMap;
+
+	// Name of the save file backing this path, empty if there is none.
+	Common::String _findSaveFile(const Common::Path &path) const;
+
 	FileMap _files;
 	Common::String _target;
 };
