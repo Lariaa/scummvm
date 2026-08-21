@@ -781,6 +781,25 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 
 	Graphics::Primitives *primitives = g_director->getInkPrimitives();
 
+	// An 8-bit mask is not necessarily a yes/no stencil. TKKG 8's harbour fog
+	// (member 213 "Magla7" with "Magla mask") carries a linear ramp -- dense at
+	// the top, fading to nothing over the quay -- quantised into a palette that
+	// has no greys, which is why its indices look like a rainbow. Treating any
+	// non-zero value as fully opaque put the whole sprite on screen at the
+	// sprite's full blend: the yellow sign sat under 60% haze where the ramp asks
+	// for about 20%, three times too strong.
+	//
+	// So scale the sprite's blend by the mask's own value. Note the polarity:
+	// `alpha` is transparency (0 = fully opaque, 255 = invisible), while a mask
+	// value is opacity, so the two have to be combined rather than multiplied.
+	//
+	// Deliberately only when the sprite already carries a blend. Sprites without
+	// one keep the exact yes/no behaviour they have today, which keeps every mask
+	// in every other game byte-identical -- TKKG 9's masks are 0/255 twins with a
+	// handful of antialiased edge values, and those would otherwise start taking
+	// the blend path instead of their ink path.
+	const int spriteAlpha = alpha;
+
 	srcPoint.y = abs(srcRect.top - destRect.top);
 	for (int i = 0; i < destRect.height(); i++, srcPoint.y++) {
 		srcPoint.x = abs(srcRect.left - destRect.left);
@@ -803,7 +822,23 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 			if (srfMask && (srcPoint.x >= srfMask->w))
 				continue;
 
-			if (!(mask || srfMask) || (msk && (*msk++))) {
+			// Read the mask value rather than only testing it, and advance the
+			// pointer exactly where the old condition did.
+			byte maskValue = 0xff;
+			bool draw = true;
+			if (mask || srfMask) {
+				draw = false;
+				if (msk) {
+					maskValue = *msk++;
+					draw = maskValue != 0;
+				}
+			}
+
+			if (draw) {
+				alpha = (spriteAlpha && maskValue != 0xff)
+					? 255 - (maskValue * (255 - spriteAlpha)) / 255
+					: spriteAlpha;
+
 				if (d->_wm->_pixelformat.bytesPerPixel == 1) {
 					primitives->drawPoint(destRect.left + j, destRect.top + i,
 										preprocessColor(*((byte *)srf->getBasePtr(srcPoint.x, srcPoint.y))), this);
@@ -817,6 +852,8 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 			}
 		}
 	}
+
+	alpha = spriteAlpha;
 
 	if (failedBoundsCheck) {
 		warning("DirectorPlotData::inkBlitSurface: Out of bounds - srfClip: %d,%d,%d,%d, srcRect: %d,%d,%d,%d, dstRect: %d,%d,%d,%d",
