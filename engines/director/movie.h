@@ -52,10 +52,13 @@ struct InfoEntry {
 
 	InfoEntry() { len = 0; data = nullptr; }
 
+	// An empty entry carries no buffer at all, and memcpy() must not be handed a
+	// null source even for a zero length -- saving a movie trips that.
 	InfoEntry(const InfoEntry &old) {
 		len = old.len;
 		data = (byte *)malloc(len);
-		memcpy(data, old.data, len);
+		if (old.data)
+			memcpy(data, old.data, len);
 	}
 
 	~InfoEntry() {
@@ -67,7 +70,8 @@ struct InfoEntry {
 		free(data);
 		len = old.len;
 		data = (byte *)malloc(len);
-		memcpy(data, old.data, len);
+		if (old.data)
+			memcpy(data, old.data, len);
 		return *this;
 	}
 
