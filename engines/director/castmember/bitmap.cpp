@@ -626,6 +626,19 @@ void BitmapCastMember::createMatte() {
 	// Like background trans, but all white pixels NOT ENCLOSED by coloured pixels
 	// are transparent
 	//
+	// A member is allowed to be 0x0: games park an empty placeholder bitmap in a
+	// channel to blank it, and load() hands those a zero-sized surface. There is
+	// nothing to flood fill, and a zero-sized matte would take getMatte() into
+	// Surface::scale() with a null source. In 8-bit mode the corner search below
+	// never found a colour on such an image and left _noMatte set, so this only
+	// surfaced once TKKG 8 started running in true colour, where the corner search
+	// is skipped: its "dummy" member crashed the golf course scene.
+	if (!_picture || _picture->_surface.w <= 0 || _picture->_surface.h <= 0
+			|| _initialRect.width() <= 0 || _initialRect.height() <= 0) {
+		_noMatte = true;
+		return;
+	}
+
 	// Which pixels are enclosed depends on the picture alone, not on the size it
 	// gets drawn at, so this runs once at the image's own size. getMatte() scales
 	// the result. Doing it per drawn size meant a member asked for two sizes in
@@ -723,6 +736,10 @@ void BitmapCastMember::createMatte() {
 }
 
 Graphics::Surface *BitmapCastMember::getMatte(const Common::Rect &bbox, bool flipH, bool flipV) {
+	// Nothing to mask off, and every path below would build a degenerate surface
+	if (bbox.width() <= 0 || bbox.height() <= 0)
+		return nullptr;
+
 	// Lazy loading of mattes
 	if (!_matteSource && !_noMatte) {
 		createMatte();
@@ -739,7 +756,7 @@ Graphics::Surface *BitmapCastMember::getMatte(const Common::Rect &bbox, bool fli
 		}
 	}
 
-	if (!_matteSource)
+	if (!_matteSource || _matteSource->w <= 0 || _matteSource->h <= 0)
 		return nullptr;
 
 	// Hand out the source itself when it is drawn at its own size and the right
