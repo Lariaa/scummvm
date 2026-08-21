@@ -772,8 +772,43 @@ SavedArchive::SavedArchive(const Common::String &target) {
 	}
 }
 
+// A movie is saved under its bare file name -- writeToFile() above takes it from
+// Movie::getMacName(), which never carries a directory -- but it is looked up by
+// the path the score asks for. Those two only agree for movies that sit in the
+// game's root directory. TKKG 3 keeps its SCORE.DIR there and its progress
+// survives; TKKG 9 has InData\Score.dir, so every lookup missed and the game
+// silently loaded the shipped file, whose "Spielstand" field is empty.
+//
+// Falling back to the bare name makes both sides agree. It introduces no
+// ambiguity that is not there already: because the writer only ever uses bare
+// names, two same-named movies in different directories share a single save file
+// whatever we do here. And _files only ever holds movies this target itself
+// saved, so the fallback cannot claim an unrelated file.
+Common::String SavedArchive::_findSaveFile(const Common::Path &path) const {
+	Common::String name = path.toString();
+
+	FileMap::const_iterator fDesc = _files.find(name);
+	if (fDesc != _files.end())
+		return fDesc->_value;
+
+	// Common::Path::baseName() rather than Director::getFileName(): the latter
+	// splits on _dirSeparator, which is a backslash for Windows games, while the
+	// path arrives here with forward slashes.
+	Common::String baseName = path.baseName();
+	if (baseName != name) {
+		fDesc = _files.find(baseName);
+		if (fDesc != _files.end()) {
+			debugC(3, kDebugLoading, "SavedArchive::_findSaveFile(): serving '%s' from save file '%s'",
+				name.c_str(), fDesc->_value.c_str());
+			return fDesc->_value;
+		}
+	}
+
+	return Common::String();
+}
+
 bool SavedArchive::hasFile(const Common::Path &path) const {
-	return (_files.find(path.toString()) != _files.end());
+	return !_findSaveFile(path).empty();
 }
 
 int SavedArchive::listMembers(Common::ArchiveMemberList &list) const {
@@ -795,8 +830,8 @@ const Common::ArchiveMemberPtr SavedArchive::getMember(const Common::Path &path)
 }
 
 Common::SeekableReadStream *SavedArchive::createReadStreamForMember(const Common::Path &path) const {
-	FileMap::const_iterator fDesc = _files.find(path.toString());
-	if (fDesc == _files.end())
+	Common::String saveFileName = _findSaveFile(path);
+	if (saveFileName.empty())
 		return nullptr;
 
 	// Buffer the save file data into memory.
@@ -804,7 +839,7 @@ Common::SeekableReadStream *SavedArchive::createReadStreamForMember(const Common
 	// FSNode, and subsequently calling openForSaving on the same file will cause
 	// that stream to become completely empty. RIFXArchive::writeToFile needs to
 	// be able to read from that stream while saving!
-	Common::SeekableReadStream *stream = g_engine->getSaveFileManager()->openForLoading(fDesc->_value);
+	Common::SeekableReadStream *stream = g_engine->getSaveFileManager()->openForLoading(saveFileName);
 	if (!stream)
 		return nullptr;
 
