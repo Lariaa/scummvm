@@ -1072,7 +1072,6 @@ void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 			// Only clean out the channel if we're moving to a different frame
 			if (withClean)
 				channel->setClean(nextSprite);
-			bool invalidCastMember = currentSprite ? (currentSprite->_spriteType == kCastMemberSprite && currentSprite->_cast == nullptr) : false;
 			// Check again to see if a video has just been started by setClean.
 			if (channel->isActiveVideo())
 				_movie->_videoPlayback = true;
@@ -1080,19 +1079,31 @@ void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 			// flag channel for drawing
 			channel->setNeedsDraw();
 
-			if (currentSprite) {
-				Common::Rect bbox = channel->getBbox();
-				debugC(5, kDebugImages,
-					"Score::updateSprites(): CH: %-3d castId: %s invalid: %d [ink: %d, puppet: %d, moveable: %d, trails: %d, visible: %d] [bbox: %d,%d,%d,%d] [type: %d fg: %d bg: %d] [blend: %d thickness: 0x%02x hasBlend: %d] [script: %s]",
-					i, currentSprite->_castId.asString().c_str(), invalidCastMember,
-					currentSprite->_ink, currentSprite->_puppet, currentSprite->_moveable,
-					currentSprite->_trails, channel->_visible,
-					PRINT_RECT(bbox), currentSprite->_spriteType, currentSprite->_foreColor, currentSprite->_backColor,
-					currentSprite->_blendAmount, currentSprite->_thickness,
-					(currentSprite->_thickness & kTHasBlend) ? 1 : 0,
-					currentSprite->_scriptId.asString().c_str());
-			} else {
-				debugC(5, kDebugImages, "Score::updateSprites(): CH: %-3d: No sprite", i);
+			// debugC() is an ordinary function, so C++ evaluates its arguments
+			// whether or not the channel is switched on. Everything below is
+			// only ever read by the message: a getBbox() and two
+			// CastMemberID::asString(), each of which formats a Common::String
+			// on the heap. That was paid for every dirty channel of every frame
+			// -- one playthrough of TKKG 9 reaches this 30433 times, so roughly
+			// 120000 string allocations thrown away again immediately.
+			// debugChannelSet() is two comparisons and a hash lookup, so asking
+			// first costs next to nothing.
+			if (debugChannelSet(5, kDebugImages)) {
+				if (currentSprite) {
+					bool invalidCastMember = currentSprite->_spriteType == kCastMemberSprite && currentSprite->_cast == nullptr;
+					Common::Rect bbox = channel->getBbox();
+					debugC(5, kDebugImages,
+						"Score::updateSprites(): CH: %-3d castId: %s invalid: %d [ink: %d, puppet: %d, moveable: %d, trails: %d, visible: %d] [bbox: %d,%d,%d,%d] [type: %d fg: %d bg: %d] [blend: %d thickness: 0x%02x hasBlend: %d] [script: %s]",
+						i, currentSprite->_castId.asString().c_str(), invalidCastMember,
+						currentSprite->_ink, currentSprite->_puppet, currentSprite->_moveable,
+						currentSprite->_trails, channel->_visible,
+						PRINT_RECT(bbox), currentSprite->_spriteType, currentSprite->_foreColor, currentSprite->_backColor,
+						currentSprite->_blendAmount, currentSprite->_thickness,
+						(currentSprite->_thickness & kTHasBlend) ? 1 : 0,
+						currentSprite->_scriptId.asString().c_str());
+				} else {
+					debugC(5, kDebugImages, "Score::updateSprites(): CH: %-3d: No sprite", i);
+				}
 			}
 		} else {
 			channel->setClean(nextSprite, true);
