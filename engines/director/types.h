@@ -372,6 +372,7 @@ enum FileVer {
 	kFileVer700 = 0x4C8,
 	kFileVer800 = 0x582,
 	kFileVer850 = 0x6A4,
+	kFileVer900 = 0x73A,
 	kFileVer1000 = 0x73B,
 	kFileVer1100 = 0x781,
 	kFileVer1150 = 0x782,

@@ -88,7 +88,13 @@ void SoundCastMember::load() {
 			tag = MKTAG('S', 'N', 'D', ' ');
 			sndId = (uint16)(_castId + _cast->_castIDoffset);
 		}
-	} else if (_cast->_version >= kFileVer600 && _cast->_version < kFileVer800) {
+	// The snd /sndH/sndS trio arrived in D6 and is unchanged up to Director 9: a
+	// corpus scan of the TKKG archive found 947 sound members at file version
+	// 1600 (D8) and 1261 at 1850 (D9) carrying exactly those, some with an added
+	// cupt. Stopping at kFileVer800 sent every D8+ sound to the stub below, which
+	// only warns -- load() then carried on with tag 0, found no resource and left
+	// the member silent, 30 of them in a single TKKG 8 session.
+	} else if (_cast->_version >= kFileVer600 && _cast->_version <= kFileVer900) {
 		for (auto &it : _children) {
 			if (it.tag == MKTAG('s', 'n', 'd', ' ')) {
 				sndId = it.index;
