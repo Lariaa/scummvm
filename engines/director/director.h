@@ -378,6 +378,12 @@ struct DirectorPlotData {
 	uint32 foreColor;
 	bool applyColor = false;
 
+	// @@BLIT@@ tally of what inkBlitSurface() actually wrote, so the caller can
+	// tell "the mask threw everything away" apart from "the pixels went down but
+	// are invisible". Counted unconditionally; two adds against a drawPoint call.
+	int drawnPixels = 0;
+	int totalPixels = 0;
+
 	// graphics.cpp
 	void setApplyColor();
 	uint32 preprocessColor(uint32 src);

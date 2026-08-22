@@ -741,6 +741,10 @@ void DirectorPlotData::inkBlitShape(Common::Rect &srcRect) {
 }
 
 void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Surface *mask) {
+	// @@BLIT@@ -1 means "did not reach the per-pixel loop"
+	drawnPixels = -1;
+	totalPixels = -1;
+
 	if (!srf)
 		return;
 
@@ -801,6 +805,10 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 	// 0 still does not draw and 0xff still yields the sprite's own alpha.
 	const int spriteAlpha = alpha;
 
+	// @@BLIT@@ see director.h -- how many pixels this call really wrote
+	drawnPixels = 0;
+	totalPixels = 0;
+
 	srcPoint.y = abs(srcRect.top - destRect.top);
 	for (int i = 0; i < destRect.height(); i++, srcPoint.y++) {
 		srcPoint.x = abs(srcRect.left - destRect.left);
@@ -814,6 +822,7 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 		}
 
 		for (int j = 0; j < destRect.width(); j++, srcPoint.x++) {
+			totalPixels++;
 			if (!srfClip.contains(srcPoint)) {
 				failedBoundsCheck = true;
 				continue;
@@ -836,6 +845,7 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 			}
 
 			if (draw) {
+				drawnPixels++;
 				alpha = (maskValue != 0xff)
 					? 255 - (maskValue * (255 - spriteAlpha)) / 255
 					: spriteAlpha;

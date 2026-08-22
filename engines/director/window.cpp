@@ -481,7 +481,19 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 	if (pd.ms) {
 		pd.inkBlitShape(srcRect);
 	} else if (pd.srf) {
-		pd.inkBlitSurface(srcRect, channel->getMask());
+		const Graphics::Surface *blitMask = channel->getMask();
+		pd.inkBlitSurface(srcRect, blitMask);
+
+		// @@BLIT@@ separates "the mask threw everything away" from "the pixels
+		// went down but are invisible". TKKG 8's inventory bar is composited last
+		// and full size and still does not show up.
+		if (debugChannelSet(8, kDebugImages)) {
+			debugC(8, kDebugImages, "@@BLIT@@ %s: ink %d, alpha %d, applyColor %d, mask %d, srfMask %d, srf %dx%d/%dbpp, drawn %d of %d px",
+				channel->_sprite->_castId.asString().c_str(), channel->_sprite->_ink, pd.alpha, (int)pd.applyColor,
+				blitMask ? 1 : 0, pd.srfMask ? 1 : 0,
+				pd.srf->w, pd.srf->h, (int)pd.srf->format.bytesPerPixel,
+				pd.drawnPixels, pd.totalPixels);
+		}
 	} else {
 		if (debugChannelSet(4, kDebugImages)) {
 			warning("Window::inkBlitFrom(): No source surface: spriteType: %d (%s), castType: %d (%s), castId: %s",
