@@ -469,6 +469,15 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 		renderStartTime = g_system->getMillis();
 	}
 
+	// A zero-sized bitmap draws nothing. createWidget() fills its widget with
+	// white so that background-transparent ink keys it out, but that only covers
+	// the one ink: with matte ink there is no matte to key with, and a blend is
+	// applied ahead of the ink, so both put a white rectangle on the stage.
+	// TKKG 8's golf holes park the shared "dummy" member in a channel to blank it
+	// and hit both cases.
+	if (castType == kCastBitmap && channel->_sprite->_cast->_initialRect.isEmpty())
+		return;
+
 	if (pd.ms) {
 		pd.inkBlitShape(srcRect);
 	} else if (pd.srf) {
