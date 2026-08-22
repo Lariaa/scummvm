@@ -3397,6 +3397,8 @@ void LB::b_puppetSprite(int nargs) {
 			int spriteId = sprite.asInt();
 			Sprite *target = sc->getSpriteById(spriteId);
 			bool val = (bool)state.asInt();
+			bool wasPuppet = target->_puppet;
+			uint32 wasAutoPuppet = target->_autoPuppet;
 			bool refresh = (!val) && (target->_puppet || target->_autoPuppet);
 			target->_puppet = val;
 			if (!val) {
@@ -3408,6 +3410,17 @@ void LB::b_puppetSprite(int nargs) {
 				// are shown by puppeting and hidden with `puppetSprite n, FALSE`).
 				target->_autoPuppet = kAPNone;
 			}
+			// @@AP@@ un-puppeting hands the channel straight back to the score,
+			// which for TKKG 8's inventory channel means the score's 0x0 "dummy"
+			// lands there the moment the game's ausblenden() runs.
+			if (debugChannelSet(1, kDebugImages)) {
+				Channel *chan = sc->getChannelById(spriteId);
+				debugC(1, kDebugImages, "@@AP@@ puppetSprite(%d, %d): was puppet %d, autoPuppet 0x%x, refresh %d, chan %s -> frame %s",
+					spriteId, (int)val, (int)wasPuppet, wasAutoPuppet, (int)refresh,
+					chan ? chan->_sprite->_castId.asString().c_str() : "<none>",
+					sc->_currentFrame ? sc->_currentFrame->_sprites[spriteId]->_castId.asString().c_str() : "<no frame>");
+			}
+
 			if (refresh) {
 				// puppetSprite set to FALSE, copy back sprite data from frame cache
 				Channel *chan = sc->getChannelById(spriteId);
@@ -3541,6 +3554,19 @@ void LB::b_rollOver(int nargs) {
 
 	if (score->checkSpriteRollOver(arg, pos))
 		res.u.i = 1; // TRUE
+
+	// @@RO@@ the three values the answer depends on, in one line: what the channel
+	// holds right now, the rect that is tested, and where the mouse is. TKKG 8's
+	// inventory bar keeps itself up by polling rollOver on its own channel, and
+	// the answer came back false 1366 times out of 1367.
+	if (debugChannelSet(1, kDebugImages)) {
+		Channel *ch = score->getChannelById(arg);
+		Common::Rect rb = ch ? ch->getRollOverBbox() : Common::Rect();
+		debugC(1, kDebugImages, "@@RO@@ rollOver(%d) -> %d, mouse %d,%d, chan %s, rollOverBbox %d,%d,%d,%d, visible %d",
+			arg, (int)res.u.i, pos.x, pos.y,
+			ch ? ch->_sprite->_castId.asString().c_str() : "<none>",
+			rb.left, rb.top, rb.right, rb.bottom, ch ? ch->_visible : -1);
+	}
 
 	g_lingo->push(res);
 }
