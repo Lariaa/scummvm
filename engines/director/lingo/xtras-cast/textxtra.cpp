@@ -152,7 +152,14 @@ void TextXtraCastMember::load() {
 
 		Common::String text;
 		if (TextXtra::decodeXMED(data, text)) {
-			_text = Common::U32String(text, g_director->getPlatformEncoding());
+			// The bytes belong to the file, not to the platform we present as.
+			// TKKG 9 is a Windows game whose movies are Mac containers, so its
+			// credits came out of getPlatformEncoding() as Windows-1252: every
+			// Mac Roman high byte turned into the wrong glyph, "Übersetzung"
+			// into "†bersetzung" and "Geräusche" into a missing character. The
+			// member's own name, which carries the same string, is decoded with
+			// the cast's encoding and has always been correct.
+			_text = Common::U32String(text, _cast->getFileEncoding());
 			debugC(3, kDebugText, "TextXtraCastMember::load(): XMED %d: '%s'", it.index, text.c_str());
 		} else {
 			warning("TextXtraCastMember::load(): XMED %d not decoded", it.index);
