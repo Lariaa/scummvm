@@ -575,8 +575,24 @@ void Channel::setCast(CastMemberID memberID) {
 	// stays at the same visual position regardless of registration offset changes.
 	if (hasChanged && _sprite->_cast && _sprite->_cast->_type == kCastFilmLoop) {
 		Common::Rect newBbox = getBbox();
+		// @@FL@@ the compensation exists because a film loop registers on its own
+		// centre while a bitmap registers on its authored point. TKKG 2 swaps a
+		// bitmap for a loop on rollover and the loop lands hundreds of pixels away,
+		// so log what this actually corrects.
+		Common::Point before = _sprite->_startPoint;
 		_sprite->_startPoint.x += oldBbox.left - newBbox.left;
 		_sprite->_startPoint.y += oldBbox.top - newBbox.top;
+		if (debugChannelSet(1, kDebugImages)) {
+			Common::Rect fixed = getBbox();
+			debugC(1, kDebugImages, "@@FL@@ setCast(): CH %d -> %s, loc %d,%d -> %d,%d, old bbox %d,%d,%d,%d, raw %d,%d,%d,%d, fixed %d,%d,%d,%d, castRect %d,%d,%d,%d",
+				_priority, memberID.asString().c_str(), before.x, before.y,
+				_sprite->_startPoint.x, _sprite->_startPoint.y,
+				oldBbox.left, oldBbox.top, oldBbox.right, oldBbox.bottom,
+				newBbox.left, newBbox.top, newBbox.right, newBbox.bottom,
+				fixed.left, fixed.top, fixed.right, fixed.bottom,
+				_sprite->_cast->_initialRect.left, _sprite->_cast->_initialRect.top,
+				_sprite->_cast->_initialRect.right, _sprite->_cast->_initialRect.bottom);
+		}
 	}
 
 	// Duplicate of the special cases in setClean.
@@ -604,9 +620,13 @@ void Channel::setCast(CastMemberID memberID) {
 	// or version < 600) -- this is what protects a Lingo-set member from the score.
 	// frame 0/1 means the puppet comes from prepareMovie, i.e. scene setup that is
 	// meant to hold for the whole movie; later frames are mid-play interactions.
-	debugC(1, kDebugImages, "@@AP@@ setCast(): CH %d -> %s, puppet %d, autoPuppet now 0x%x, frame %d, span [%d-%d]",
-		_priority, memberID.asString().c_str(), _sprite->_puppet, _sprite->_autoPuppet,
-		_score ? _score->getCurrentFrameNum() : -1, _startFrame, _endFrame);
+	if (debugChannelSet(1, kDebugImages)) {
+		Common::Rect nb = getBbox();
+		debugC(1, kDebugImages, "@@AP@@ setCast(): CH %d -> %s, puppet %d, autoPuppet now 0x%x, frame %d, span [%d-%d], loc %d,%d, bbox %d,%d,%d,%d",
+			_priority, memberID.asString().c_str(), _sprite->_puppet, _sprite->_autoPuppet,
+			_score ? _score->getCurrentFrameNum() : -1, _startFrame, _endFrame,
+			_sprite->_startPoint.x, _sprite->_startPoint.y, nb.left, nb.top, nb.right, nb.bottom);
+	}
 	setNeedsDraw();
 }
 
