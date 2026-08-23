@@ -151,6 +151,20 @@ DirectorPlotData Channel::getPlotData() {
 		pd.applyColor = false;
 	} else {
 		pd.setApplyColor();
+
+		// A sprite's fore/back colours only recolour 1-bit artwork; Director
+		// ignores them for a colour bitmap. Colourising one here writes just the
+		// pixels that happen to be pure black or pure white and leaves every
+		// other pixel untouched -- 82% of TKKG 8's inventory bar, which then
+		// showed up as nothing but its own outline over the scene.
+		//
+		// It bites whenever a sprite never received colours from score data: a
+		// fresh Sprite defaults to foreColor *white* (deliberately, for Meet
+		// MediaBand's white hotspot shapes), and that alone makes setApplyColor()
+		// say yes. Channels that only Lingo ever fills keep that default.
+		if (pd.applyColor && _sprite->_cast && _sprite->_cast->_type == kCastBitmap
+				&& ((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel != 1)
+			pd.applyColor = false;
 	}
 
 	pd.srfMask = nullptr;
