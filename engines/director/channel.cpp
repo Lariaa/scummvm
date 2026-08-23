@@ -562,6 +562,9 @@ void Channel::setCast(CastMemberID memberID) {
 
 	// Save bbox before swapping cast so we can restore visual position afterward.
 	Common::Rect oldBbox = getBbox();
+	// ... but only where the outgoing member registered at its top-left corner,
+	// see the film loop block below.
+	Common::Point oldOffset = _sprite->_cast ? _sprite->_cast->getRegistrationOffset() : Common::Point(0, 0);
 
 	// Replace the cast member in the sprite.
 	// Only change the dimensions if the "stretch" flag is set,
@@ -573,7 +576,16 @@ void Channel::setCast(CastMemberID memberID) {
 
 	// If the new cast member is a film loop, adjust _startPoint so the sprite
 	// stays at the same visual position regardless of registration offset changes.
-	if (hasChanged && _sprite->_cast && _sprite->_cast->_type == kCastFilmLoop) {
+	//
+	// Only when the outgoing member registered at its top-left corner, which is
+	// the case this was written for: Gus Carnival swaps a member that registers
+	// at 0,0 for a film loop that registers on its centre, and without this the
+	// sprite jumps by half its size. Where the outgoing member carries a real
+	// registration point the loop already lands correctly on its own, and
+	// dragging it onto the previous member's rect is what breaks it -- TKKG 2's
+	// rollover cup came out 237 px off stage, its lunch box 81 px beside itself.
+	if (hasChanged && _sprite->_cast && _sprite->_cast->_type == kCastFilmLoop
+			&& oldOffset.x == 0 && oldOffset.y == 0) {
 		Common::Rect newBbox = getBbox();
 		// @@FL@@ the compensation exists because a film loop registers on its own
 		// centre while a bitmap registers on its authored point. TKKG 2 swaps a
