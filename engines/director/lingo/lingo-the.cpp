@@ -1750,6 +1750,21 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 	case kTheLoc:
 		{
 			Common::Point position = channel->getPosition();
+			// @@LOC@@ TKKG 9's boat puzzle asks sprite(70).loc and gets 0,0 while the
+			// score record for that channel carries 298,101. Show what the channel
+			// actually holds next to the two things that can suppress the copy-back
+			// from the frame: the auto-puppet latch and the copy-back mask.
+			if (debugChannelSet(1, kDebugImages)) {
+				Sprite *frameSprite = nullptr;
+				if (score->_currentFrame && id < (int)score->_currentFrame->_sprites.size())
+					frameSprite = score->_currentFrame->_sprites[id];
+				debugC(1, kDebugImages, "@@LOC@@ sprite(%d).loc -> %d,%d, chan %s %dx%d, autoPuppet 0x%x, copyBackMask 0x%x, frame %s loc %d,%d",
+					id, position.x, position.y, sprite->_castId.asString().c_str(),
+					sprite->_width, sprite->_height, sprite->_autoPuppet, sprite->_copyBackMask,
+					frameSprite ? frameSprite->_castId.asString().c_str() : "<none>",
+					frameSprite ? frameSprite->_startPoint.x : -1,
+					frameSprite ? frameSprite->_startPoint.y : -1);
+			}
 			d.type = POINT;
 			d.u.farr = new FArray;
 			d.u.farr->arr.push_back(position.x);
