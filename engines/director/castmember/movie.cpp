@@ -232,14 +232,16 @@ void MovieCastMember::routeInputEvent(LEvent event, Common::Point hostPos, const
 }
 
 // idleHandlerPeriod, paletteMapping, scoreSelection and updateLock used to be
-// listed here too, but those are TheEntityType values -- the global `the
-// updateLock` and friends -- not member fields, and none of them has a
-// kTheCast entry in the field table. They could never match the property they
-// were named after; they only aliased whatever field happened to share their
-// number, so `member(x).immediate` reached the idleHandlerPeriod stub and
-// `member(x).titleVisible` the scoreSelection one. Once the two enums drifted
-// far enough for two of them to land on the same value, the switch stopped
-// compiling.
+// listed here too. 53c936e20d7 moved them out of TheFieldType, where
+// 28a17b245f0 had put them, into TheEntityType -- they are the global `the
+// updateLock` and friends, not member fields -- but left these switches
+// behind. A case label from the other enum can never match the property it is
+// named after; it only aliases whatever field happens to share its number, so
+// `member(x).immediate` reached the idleHandlerPeriod stub and
+// `member(x).titleVisible` the scoreSelection one, until two of them landed on
+// the same value and the switch stopped compiling.
+// Their STUB warnings now live in Lingo::getTheEntity()/setTheEntity(), where
+// the properties actually arrive.
 bool MovieCastMember::hasField(int field) {
 	switch (field) {
 	case kTheCenter:
