@@ -40,6 +40,7 @@ struct Info {
 	uint32 member = 0;		// cursor bitmap cast member
 	uint32 mask = 0;		// mask bitmap cast member
 	uint32 frameCount = 0;
+	bool autoMask = true;	// documented default; the payload field for it is not identified
 };
 
 CastMember *createCastMember(Cast *cast, uint16 castId, XtraCastMember *xtra);
@@ -57,6 +58,10 @@ public:
 	CastMember *duplicate(Cast *cast, uint16 castId) override { return (CastMember *)(new CursorXtraCastMember(cast, castId, *this)); }
 
 	bool getCursorInfo(CastMemberID &image, CastMemberID &mask);
+
+	bool hasField(int field) override;
+	Datum getField(int field) override;
+	void setField(int field, const Datum &d) override;
 
 	Common::String formatInfo() override;
 
