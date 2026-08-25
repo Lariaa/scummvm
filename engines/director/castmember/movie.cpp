@@ -231,15 +231,20 @@ void MovieCastMember::routeInputEvent(LEvent event, Common::Point hostPos, const
 	_linkedMovie->queueInputEvent(event, 0, p);
 }
 
+// idleHandlerPeriod, paletteMapping, scoreSelection and updateLock used to be
+// listed here too, but those are TheEntityType values -- the global `the
+// updateLock` and friends -- not member fields, and none of them has a
+// kTheCast entry in the field table. They could never match the property they
+// were named after; they only aliased whatever field happened to share their
+// number, so `member(x).immediate` reached the idleHandlerPeriod stub and
+// `member(x).titleVisible` the scoreSelection one. Once the two enums drifted
+// far enough for two of them to land on the same value, the switch stopped
+// compiling.
 bool MovieCastMember::hasField(int field) {
 	switch (field) {
 	case kTheCenter:
-	case kTheIdleHandlerPeriod:
-	case kThePaletteMapping:
-	case kTheScoreSelection:
 	case kTheScriptsEnabled:
 	case kTheSound:
-	case kTheUpdateLock:
 		return true;
 	default:
 		break;
@@ -254,23 +259,11 @@ Datum MovieCastMember::getField(int field) {
 	case kTheCenter:
 		d = Datum((int)_center);
 		break;
-	case kTheIdleHandlerPeriod:
-		warning("STUB: MovieCastMember::getField(): idleHandlerPeriod not implemented");
-		break;
-	case kThePaletteMapping:
-		warning("STUB: MovieCastMember::getField(): paletteMapping not implemented");
-		break;
-	case kTheScoreSelection:
-		warning("STUB: MovieCastMember::getField(): scoreSelection not implemented");
-		break;
 	case kTheScriptsEnabled:
 		d = Datum(_enableScripts);
 		break;
 	case kTheSound:
 		d = Datum(_enableSound);
-		break;
-	case kTheUpdateLock:
-		warning("STUB: MovieCastMember::getField(): updateLock not implemented");
 		break;
 	default:
 		d = CastMember::getField(field);
@@ -285,23 +278,11 @@ void MovieCastMember::setField(int field, const Datum &d) {
 	case kTheCenter:
 		_center = (bool)d.asInt();
 		return;
-	case kTheIdleHandlerPeriod:
-		warning("STUB: MovieCastMember::setField(): idleHandlerPeriod not implemented");
-		return;
-	case kThePaletteMapping:
-		warning("STUB: MovieCastMember::setField(): paletteMapping not implemented");
-		return;
-	case kTheScoreSelection:
-		warning("STUB: MovieCastMember::setField(): scoreSelection not implemented");
-		return;
 	case kTheScriptsEnabled:
 		_enableScripts = (bool)d.asInt();
 		return;
 	case kTheSound:
 		_enableSound = (bool)d.asInt();
-		return;
-	case kTheUpdateLock:
-		warning("STUB: MovieCastMember::setField(): updateLock not implemented");
 		return;
 	default:
 		break;
