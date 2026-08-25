@@ -683,6 +683,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 	case kTheImageDirect:
 		d = 1;					// We always allow it in ScummVM
 		break;
+	case kTheIdleHandlerPeriod:
+		warning("STUB: Lingo::getTheEntity(): idleHandlerPeriod not implemented");
+		break;
 	case kTheItemDelimiter:
 		{
 			Common::U32String ch(g_lingo->_itemDelimiter);
@@ -981,6 +984,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 	case kTheOrganizationName:
 		d = Common::String("ScummVM Team");
 		break;
+	case kThePaletteMapping:
+		warning("STUB: Lingo::getTheEntity(): paletteMapping not implemented");
+		break;
 	case kTheParamCount:
 		d = g_lingo->_state->callstack[g_lingo->_state->callstack.size() - 1]->paramCount;
 		break;
@@ -1062,6 +1068,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		else {
 			d = Datum("Projector");
 		}
+		break;
+	case kTheScoreSelection:
+		warning("STUB: Lingo::getTheEntity(): scoreSelection not implemented");
 		break;
 	case kTheScummvmVersion:
 		d = _vm->getVersion();
@@ -1200,6 +1209,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 	case kTheTraceLogFile:
 		d.type = STRING;
 		d.u.s = new Common::String(g_director->_traceLogFile.toString(Common::Path::kNativeSeparator));
+		break;
+	case kTheUpdateLock:
+		warning("STUB: Lingo::getTheEntity(): updateLock not implemented");
 		break;
 	case kTheUpdateMovieEnabled:
 		d = g_lingo->_updateMovieEnabled;
@@ -1360,6 +1372,9 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 	case kTheImageDirect:
 		// No op in ScummVM. We always allow it
 		break;
+	case kTheIdleHandlerPeriod:
+		warning("STUB: Lingo::setTheEntity(): idleHandlerPeriod not implemented");
+		break;
 	case kTheItemDelimiter:
 		if (d.asString().size() == 0)
 			g_lingo->_itemDelimiter = 0;
@@ -1435,6 +1450,9 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 	case kTheNetThrottleTicks:
 		// No op, we always smooth on network operations
 		break;
+	case kThePaletteMapping:
+		warning("STUB: Lingo::setTheEntity(): paletteMapping not implemented");
+		break;
 	case kThePerFrameHook:
 		_perFrameHook = d;
 		break;
@@ -1458,6 +1476,9 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 			warning("BUILDBOT: the romanLingo is set to %d", g_lingo->_romanLingo);
 			setTheEntitySTUB(kTheRomanLingo);
 		}
+		break;
+	case kTheScoreSelection:
+		warning("STUB: Lingo::setTheEntity(): scoreSelection not implemented");
 		break;
 	case kTheScummvmVersion:
 		// Allow director version change: used for testing version differences via the lingo tests.
@@ -1583,6 +1604,9 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 			g_director->_traceLogFile.clear();
 		}
 	}
+		break;
+	case kTheUpdateLock:
+		warning("STUB: Lingo::setTheEntity(): updateLock not implemented");
 		break;
 	case kTheUpdateMovieEnabled:
 		g_lingo->_updateMovieEnabled = bool(d.asInt());
