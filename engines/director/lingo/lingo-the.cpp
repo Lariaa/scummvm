@@ -372,6 +372,13 @@ const TheEntityField fields[] = {
 	{ kTheCast,		"interface",	kTheInterface,	500 },//					D5 p
 	{ kTheCast,		"mediaBusy",	kTheMediaBusy,	600 },//						D6 p
 
+	// Cursor Xtra cast member fields
+	{ kTheCast,		"autoMask",		kTheAutoMask,	700 },//						D7 p
+	{ kTheCast,		"castMemberList",kTheCastMemberList,700 },//					D7 p
+	{ kTheCast,		"cursorSize",	kTheCursorSize,	700 },//						D7 p
+	{ kTheCast,		"hotSpot",		kTheHotSpot,	700 },//						D7 p
+	{ kTheCast,		"interval",		kTheInterval,	700 },//						D7 p
+
 	// Behavior (me) fields
 	{ kTheCast,		"spriteNum",	kTheSpriteNum,	600 },//						D6 p
 
