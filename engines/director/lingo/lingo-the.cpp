@@ -124,6 +124,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheMouseH,			"mouseH",			false, 200, true },	// D2 f
 	{ kTheMouseItem,		"mouseItem",		false, 300, true },	//		D3 f
 	{ kTheMouseLine,		"mouseLine",		false, 300, true },	//		D3 f
+	{ kTheMouseLoc,			"mouseLoc",			false, 700, true },	//					D7 f
 	{ kTheMouseMember,		"mouseMember",		false, 600, true },	//					D6 f
 	{ kTheMouseUp,			"mouseUp",			false, 200, true },	// D2 f
 	{ kTheMouseUpScript,  	"mouseUpScript",	false, 200, false },// D2 p
@@ -913,6 +914,15 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 			uint16 spriteId = score->getSpriteIDFromPos(pos);
 			Channel *ch = score->getChannelById(spriteId);
 			d = ch->getMouseLine(pos.x, pos.y);
+		}
+		break;
+	case kTheMouseLoc:
+		{
+			Common::Point pos = g_director->getCurrentWindow()->getMousePos();
+			d.u.farr = new FArray;
+			d.u.farr->arr.push_back(pos.x);
+			d.u.farr->arr.push_back(pos.y);
+			d.type = POINT;
 		}
 		break;
 	case kTheMouseMember:
