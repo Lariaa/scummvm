@@ -10406,7 +10406,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 	WINGAME2t("oscarworkshop", "Windows 95",  "InData/Oscar.exe", "t:7b687a3aca980622d7add3bcdd8bbb37", 2253862,
 									 	    "Data/oscarP&P.dxr", "f:d1907801ae871f98837db8520ec61ff5", 774806, 800),
 
-	WINGAME1t_l("janoschpanama", "", "Setup/WinRoot/JanoschPanama/panama.exe", "25d1a9fb6c8067953888719e07dc29bd", 2384444, Common::DE_DEU, 800),
+	WINGAME1tf_l("janoschpanama", "", "Setup/WinRoot/JanoschPanama/panama.exe", "25d1a9fb6c8067953888719e07dc29bd", 2384444, Common::DE_DEU, 800, GF_TRUECOLOR),
 	WINGAME1t_l("janoschverkehr", "", "Setup/WinRoot/JanoschVerkehr/verkehr.exe", "fa749c7798f69f4aa615d35b2b991348", 2294886, Common::DE_DEU, 851),
 
 	WINGAME1("pcformat", "PCF132 CD 02/02", "PCF132.exe", "e24d4bab978b1a5c2326d2c56cf4d781", 4722596, 800),
