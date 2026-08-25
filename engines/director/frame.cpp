@@ -311,7 +311,7 @@ void Frame::readSpriteD2(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		stream.hexdump(size);
 	}
 
-	if (spritePosition + 1 >= _sprites.size()) {
+	if (spritePosition + 1 >= (int)_sprites.size()) {
 		warning("Frame::readSpriteD2(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
 			spritePosition + 1, (int)_sprites.size() - 1, size);
 		stream.skip(size);
@@ -641,7 +641,7 @@ void Frame::readSpriteD4(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		stream.hexdump(size);
 	}
 
-	if (spritePosition + 1 >= _sprites.size()) {
+	if (spritePosition + 1 >= (int)_sprites.size()) {
 		warning("Frame::readSpriteD4(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
 			spritePosition + 1, (int)_sprites.size() - 1, size);
 		stream.skip(size);
@@ -1004,7 +1004,7 @@ void Frame::readSpriteD5(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		stream.hexdump(size);
 	}
 
-	if (spritePosition + 1 >= _sprites.size()) {
+	if (spritePosition + 1 >= (int)_sprites.size()) {
 		warning("Frame::readSpriteD5(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
 			spritePosition + 1, (int)_sprites.size() - 1, size);
 		stream.skip(size);
@@ -1481,7 +1481,7 @@ void Frame::readSpriteD6(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		return;
 	}
 
-	if (spritePosition + 1 >= _sprites.size()) {
+	if (spritePosition + 1 >= (int)_sprites.size()) {
 		warning("Frame::readSpriteD6(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
 			spritePosition + 1, (int)_sprites.size() - 1, size);
 		stream.skip(size);
@@ -1963,7 +1963,7 @@ void Frame::readSpriteD7(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		stream.hexdump(size);
 	}
 
-	if (spritePosition + 1 >= _sprites.size()) {
+	if (spritePosition + 1 >= (int)_sprites.size()) {
 		warning("Frame::readSpriteD7(): Channel %d exceeds the %d channels of this score, skipping %d bytes",
 			spritePosition + 1, (int)_sprites.size() - 1, size);
 		stream.skip(size);
