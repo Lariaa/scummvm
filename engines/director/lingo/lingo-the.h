@@ -107,6 +107,7 @@ enum TheEntityType {
 	kTheMouseH,
 	kTheMouseItem,
 	kTheMouseLine,
+	kTheMouseLoc,
 	kTheMouseMember,
 	kTheMouseUp,
 	kTheMouseUpScript,
