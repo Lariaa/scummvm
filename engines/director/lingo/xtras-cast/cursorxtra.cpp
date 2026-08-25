@@ -24,6 +24,7 @@
 #include "director/director.h"
 #include "director/cast.h"
 #include "director/castmember/xtra.h"
+#include "director/lingo/lingo-the.h"
 #include "director/lingo/xtras-cast/cursorxtra.h"
 
 namespace Director {
@@ -102,6 +103,86 @@ bool CursorXtraCastMember::getCursorInfo(CastMemberID &image, CastMemberID &mask
 	image = CastMemberID(_info.member, castLib);
 	mask = _info.mask ? CastMemberID(_info.mask, castLib) : CastMemberID();
 	return true;
+}
+
+// The cursor cast member properties, as documented in the Custom Cursor Xtra
+// manual: autoMask, castMemberList, cursorSize, hotSpot and interval. Without
+// them a plain `member("...").cursorSize = 16` is an uncaught Lingo error,
+// which under lingostrict aborts the whole handler: TKKG 7's photofit program
+// never got past the first line of its CursorObj constructor.
+bool CursorXtraCastMember::hasField(int field) {
+	switch (field) {
+	case kTheAutoMask:
+	case kTheCastMemberList:
+	case kTheCursorSize:
+	case kTheHotSpot:
+	case kTheInterval:
+		return true;
+	default:
+		break;
+	}
+	return CastMember::hasField(field);
+}
+
+Datum CursorXtraCastMember::getField(int field) {
+	Datum d;
+
+	switch (field) {
+	case kTheAutoMask:
+		d = (int)_info.autoMask;
+		break;
+	case kTheCastMemberList:
+		// Only the first frame is parsed out of the payload, so the list has
+		// at most one entry even for an animated cursor.
+		d.type = ARRAY;
+		d.u.farr = new FArray;
+		if (_info.member)
+			d.u.farr->arr.push_back(Datum(CastMemberID(_info.member, _cast->_castLibID)));
+		break;
+	case kTheCursorSize:
+		d = (int)_info.sizePx;
+		break;
+	case kTheHotSpot:
+		d = Datum(_info.hotspot);
+		break;
+	case kTheInterval:
+		d = (int)_info.intervalMs;
+		break;
+	default:
+		d = CastMember::getField(field);
+		break;
+	}
+
+	return d;
+}
+
+void CursorXtraCastMember::setField(int field, const Datum &d) {
+	switch (field) {
+	case kTheAutoMask:
+		_info.autoMask = d.asInt() != 0;
+		return;
+	case kTheCastMemberList:
+		if (d.type == ARRAY && d.u.farr && !d.u.farr->arr.empty())
+			_info.member = d.u.farr->arr[0].asMemberID().member;
+		return;
+	case kTheCursorSize:
+		// "Only two values are permitted: 16 ... and 32".
+		_info.sizePx = (d.asInt() >= 32) ? 32 : 16;
+		return;
+	case kTheHotSpot:
+		_info.hotspot = d.asPoint();
+		return;
+	case kTheInterval:
+		// -1 is documented as "do not animate, show the first frame". Stored
+		// unsigned like the parsed payload; the cast back in getField()
+		// returns it unchanged.
+		_info.intervalMs = d.asInt();
+		return;
+	default:
+		break;
+	}
+
+	CastMember::setField(field, d);
 }
 
 Common::String CursorXtraCastMember::formatInfo() {
