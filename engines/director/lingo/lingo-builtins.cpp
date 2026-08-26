@@ -819,6 +819,66 @@ void LB::b_string(int nargs) {
 	g_lingo->push(res);
 }
 
+// Resolves a plain chain of names like "a.b.c" against the *caller's* scope.
+// Declines anything else -- an operator, a call, a subscript, a leading digit,
+// an empty part -- so the caller can fall back to compiling the expression.
+static bool resolveDottedName(const Common::String &expr, Datum &result) {
+	Common::StringArray parts;
+	Common::String part;
+
+	for (uint i = 0; i < expr.size(); i++) {
+		char c = expr[i];
+
+		if (c == '.') {
+			if (part.empty())
+				return false;
+			parts.push_back(part);
+			part.clear();
+			continue;
+		}
+		if (!Common::isAlnum(c) && c != '_')
+			return false;
+		if (part.empty() && Common::isDigit(c))
+			return false;
+		part += c;
+	}
+
+	// No dot at all, or a trailing one: not our business.
+	if (parts.empty() || part.empty())
+		return false;
+	parts.push_back(part);
+
+	Datum ref(parts[0]);
+	ref.type = VARREF;
+	Datum value = g_lingo->varFetch(ref, true);
+	if (value.type == VOID)
+		return false;
+
+	for (uint i = 1; i < parts.size(); i++) {
+		Datum next;
+
+		if (value.type == PARRAY) {
+			int index = LC::compareArrays(LC::eqData, value, Datum(parts[i]), true).u.i;
+			if (index <= 0)
+				return false;
+			next = value.u.parr->arr[index - 1].v;
+		} else if (value.type == OBJECT) {
+			if (!value.u.obj->hasProp(parts[i]))
+				return false;
+			next = value.u.obj->getProp(parts[i]);
+		} else if (value.type == ARRAY && parts[i].equalsIgnoreCase("count")) {
+			next = (int)value.u.farr->arr.size();
+		} else {
+			return false;
+		}
+
+		value = next;
+	}
+
+	result = value;
+	return true;
+}
+
 void LB::b_value(int nargs) {
 	Datum d = g_lingo->pop();
 	if (d.type != STRING) {
@@ -831,6 +891,25 @@ void LB::b_value(int nargs) {
 	if (expr.empty()) {
 		g_lingo->push(Datum(0));
 		return;
+	}
+
+	// From D5 on a dotted name is a property access, but the compiler has no
+	// '.' rule at all and the lexer folds dots into identifiers on purpose --
+	// pre-D5 games such as C.H.A.O.S. Continuum put them in variable names.
+	// Compiling "a.b" therefore looks up a single variable called "a.b".
+	// Games assemble such names at runtime: TKKG 9's boat puzzle evaluates
+	// value("pTeilPuzzleSpritesListe." & side) and feeds the result to count().
+	//
+	// Resolve a plain name chain here instead of through the compiler. That
+	// also keeps the caller's scope: compileAnonymous() builds a fresh handler
+	// whose frame has neither the caller's locals nor its `me`, so the head of
+	// the chain would be invisible to it even with a '.' rule in place.
+	if (g_director->getVersion() >= 500) {
+		Datum resolved;
+		if (resolveDottedName(expr, resolved)) {
+			g_lingo->push(resolved);
+			return;
+		}
 	}
 
 	Common::String code = "return " + expr;
