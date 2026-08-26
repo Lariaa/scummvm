@@ -1132,8 +1132,24 @@ void LB::b_getaProp(int nargs) {
 
 void LB::b_getAt(int nargs) {
 	Datum indexD = g_lingo->pop();
-	TYPECHECK2(indexD, INT, FLOAT);
+
 	Datum list = g_lingo->pop();
+
+	// A property list subscripted by anything but a number is a key lookup:
+	// `theList[#key]` and `theList["key"]` are how Lingo reads a property, and
+	// `[...]` compiles to getAt(). TKKG 7 addresses its per-character canvas
+	// objects as gCanvasObj[#Mensch] and its XML attributes as
+	// node.attributeValue["X"], both of which used to fail the type check.
+	if (list.type == PARRAY && indexD.type != INT && indexD.type != FLOAT) {
+		Datum d;
+		int found = LC::compareArrays(LC::eqData, list, indexD, true).u.i;
+		if (found > 0)
+			d = list.u.parr->arr[found - 1].v;
+		g_lingo->push(d);
+		return;
+	}
+
+	TYPECHECK2(indexD, INT, FLOAT);
 	int index = indexD.asInt();
 
 	switch (list.type) {
