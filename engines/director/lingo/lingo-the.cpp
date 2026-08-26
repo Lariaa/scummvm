@@ -2597,6 +2597,18 @@ void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
 		g_lingo->push(d);
 		g_debugger->propReadHook(propName);
 		return;
+	} else if (obj.type == ARRAY) {
+		// `theList.count` is the dot-syntax spelling of `count(theList)`.
+		// A linear list has no other readable property, and reaching the
+		// fallthrough below would raise "Invalid object".
+		if (propName.equalsIgnoreCase("count")) {
+			d = (int)obj.u.farr->arr.size();
+		} else {
+			g_lingo->lingoError("Lingo::getObjectProp: List <%s> has no property '%s'", obj.asString(true).c_str(), propName.c_str());
+		}
+		g_lingo->push(d);
+		g_debugger->propReadHook(propName);
+		return;
 	} else if (obj.type == POINT) {
 		if (propName.equalsIgnoreCase("locH")) {
 			d = obj.u.farr->arr[0];
