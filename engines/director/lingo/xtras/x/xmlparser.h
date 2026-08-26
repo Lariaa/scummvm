@@ -30,6 +30,16 @@ public:
 
 	bool hasProp(const Common::String &propName) override;
 	Datum getProp(const Common::String &propName) override;
+
+	// The parsed document, as the same property-list node the Xtra hands to
+	// Lingo: [#name: .., #text: .., #attributeName: .., #attributeValue: ..,
+	// #child: [..]]. The document node's own #child holds the top-level
+	// elements, which is what `parserObj.child` reads.
+	Datum _doc;
+	// Empty means "parsed without error". getError() must return VOID then,
+	// not 0 -- games test it with voidp().
+	Common::String _error;
+	bool _ignoreWhitespace = true;
 };
 
 namespace XMLParserXtra {
