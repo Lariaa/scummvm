@@ -1018,14 +1018,39 @@ void LB::b_append(int nargs) {
 void LB::b_count(int nargs) {
 	Datum list = g_lingo->pop();
 
-	// `obj.prop.count` compiles to count(obj, #prop): fetch the property, then
-	// count what it holds. TKKG 7's photofit program walks its XML document that
-	// way -- `parserObj.child.count` -- and with only the one-argument form the
-	// call took the symbol for the list and gave up.
+	// Two arguments cover two different things, both of which reach this builtin
+	// as `count(x, #name)`.
 	if (nargs == 2) {
 		Datum prop = list;
 		Datum obj = g_lingo->pop();
 
+		// The chunk form on a string: `count(str, #char|#word|#item|#line)` is
+		// how many of those the string holds, the same spelling b_getProp()
+		// already accepts. Janosch Panama measures `the labelList` this way.
+		if (obj.type == STRING && prop.type == SYMBOL) {
+			ChunkType chunkType = kChunkChar;
+			bool isChunk = true;
+
+			if (prop.u.s->equalsIgnoreCase("char"))
+				chunkType = kChunkChar;
+			else if (prop.u.s->equalsIgnoreCase("word"))
+				chunkType = kChunkWord;
+			else if (prop.u.s->equalsIgnoreCase("item"))
+				chunkType = kChunkItem;
+			else if (prop.u.s->equalsIgnoreCase("line"))
+				chunkType = kChunkLine;
+			else
+				isChunk = false;
+
+			if (isChunk) {
+				g_lingo->push(LC::lastChunk(chunkType, obj).u.cref->startChunk);
+				return;
+			}
+		}
+
+		// Otherwise `obj.prop.count`: fetch the property, then count what it
+		// holds. TKKG 7's photofit program walks its XML document that way,
+		// `parserObj.child.count`.
 		if (obj.type == OBJECT && prop.type == SYMBOL && obj.u.obj->hasProp(*prop.u.s))
 			list = obj.u.obj->getProp(*prop.u.s);
 		else
