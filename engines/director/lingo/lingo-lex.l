@@ -157,10 +157,12 @@ static Common::String *readUntilNewline(const char **ptr) {
 %}
 
 identifier [_[:alpha:]][_\.[:alnum:]]*
-constfloat [[:digit:]]*\.[[:digit:]]*
+ /* At least one digit, so that a lone '.' is not a float. It sits ahead of
+  * {operator} in the rules, so without this the dot operator could never win. */
+constfloat ([[:digit:]]+\.[[:digit:]]*|[[:digit:]]*\.[[:digit:]]+)
 constinteger [[:digit:]]+
 conststring \"[^\"\r\n]*\"
-operator [-+*/%^:,()><&\[\]]
+operator [-+*/%^:,()><&\[\].]
 newline (" "|\t|\xC2\xAC)*[\n\r]
 spc (" "|\t|\xC2\xAC)
 eventname (keyDown|keyUp|mouseDown|mouseUp|timeOut)
@@ -290,6 +292,18 @@ xtras		{ count(); return tXTRAS; } // D5
 [=]				{ count(); return tEQ; }
 
 {identifier}		{
+		// The dot is part of the pattern because pre-D5 games put it inside
+		// variable names -- C.H.A.O.S. Continuum has `a.1` and `a2.`, see
+		// tests/varnames.lingo. From D5 on it is the property access operator,
+		// so give everything from the first dot back to the scanner and let it
+		// come round again as its own token. Before count(), so the line and
+		// column counters only see what is actually consumed.
+		if (g_director->getVersion() >= 500) {
+			const char *dot = strchr(yytext, '.');
+			if (dot)
+				yyless(dot - yytext);
+		}
+
 		count();
 		yylval.s = new Common::String(yytext);
 
