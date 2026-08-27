@@ -35,6 +35,7 @@
 #include "director/castmember/movie.h"
 #include "director/castmember/richtext.h"
 #include "director/castmember/text.h"
+#include "director/lingo/xtras-cast/textxtra.h"
 
 #include "graphics/macgui/mactext.h"
 #include "graphics/macgui/macbutton.h"
@@ -168,7 +169,24 @@ DirectorPlotData Channel::getPlotData() {
 	}
 
 	pd.srfMask = nullptr;
-	if (_sprite->_cast && _sprite->_cast->_type == kCastText) {
+
+	// A Text Xtra member builds the same MacText widget a text member does, but
+	// it has to report kCastXtra: the engine casts every kCastText member to
+	// TextCastMember. Without a mask its widget is blitted whole, background and
+	// all -- TKKG 9's credits came out as a black block over the backdrop. The
+	// channel is already holding the widget, so no lookup is needed.
+	bool isTextXtra = _sprite->_cast && dynamic_cast<TextXtraCastMember *>(_sprite->_cast) && _widget;
+
+	if (isTextXtra) {
+		// Always the glyphs, whatever the ink asks for. The widget's background
+		// is ours rather than the author's -- the Paige style runs that carry
+		// the real font and colours are not parsed yet, so
+		// TextXtraCastMember::createWidget() paints white on black -- and a
+		// character box mask drags that invented black onto the stage: TKKG 9's
+		// credits kept a black bar behind every line. Until the authored
+		// colours are actually read, only the letters may be drawn.
+		pd.srfMask = ((Graphics::MacText *)_widget)->getGlyphMask();
+	} else if (_sprite->_cast && _sprite->_cast->_type == kCastText) {
 		// kInkTypeCopy -- no mask, default rendering
 
 		if (_sprite->_ink == kInkTypeMatte || _sprite->_ink == kInkTypeNotCopy
