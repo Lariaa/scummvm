@@ -556,6 +556,15 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 		if (_external || (targetBpp != 1) || (castPaletteId != currentPaletteId && !isColorCycling)) {
 			const auto pals = g_director->getLoadedPalettes();
 			CastMemberID palIndex = pals.contains(castPaletteId) ? castPaletteId : CastMemberID(kClutSystemMac, -1);
+
+			// Unlike getPalette(), this lookup says nothing when it misses -- it
+			// just swaps in the Mac system palette and carries on, which recolours
+			// the whole image. Name it, or a wrong-palette render is invisible in
+			// a log.
+			if (palIndex != castPaletteId)
+				warning("BitmapCastMember::getDitherImg(): cast %d wants palette %s, which is not loaded; falling back to the Mac system palette",
+						_castId, castPaletteId.asString().c_str());
+
 			const PaletteV4 &srcPal = pals.getVal(palIndex);
 
 			// If it is an external image, use the included palette.
