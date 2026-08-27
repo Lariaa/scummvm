@@ -666,6 +666,10 @@ void BitmapCastMember::createMatte() {
 	// and exactly those 17690 are the 0xf0f0f0 paper. The file already says what
 	// is background.
 	const Graphics::Surface &src = _picture->_surface;
+
+	debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d: source %dx%d %s, declared %d bpp",
+			_castId, src.w, src.h, src.format.toString().c_str(), _bitsPerPixel);
+
 	if (src.format.bytesPerPixel == 4 && src.format.aBits() == 8) {
 		Graphics::Surface *fromAlpha = new Graphics::Surface();
 		fromAlpha->create(src.w, src.h, Graphics::PixelFormat::createFormatCLUT8());
@@ -708,6 +712,9 @@ void BitmapCastMember::createMatte() {
 			debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s: matte taken from the alpha channel", _castId, _name.c_str());
 			return;
 		}
+
+		debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d: alpha channel is constant (clear %d, solid %d); using the flood fill",
+				_castId, seenClear ? 1 : 0, seenSolid ? 1 : 0);
 
 		fromAlpha->free();
 		delete fromAlpha;
