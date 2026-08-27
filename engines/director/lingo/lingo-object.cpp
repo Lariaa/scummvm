@@ -774,6 +774,20 @@ Datum ScriptContext::getProp(const Common::String &propName) {
 	if (_disposed) {
 		error("Property '%s' accessed on disposed object <%s>", propName.c_str(), Datum(this).asString(true).c_str());
 	}
+
+	// @@SN@@ Which branch answers `the spriteNum`, and with what.
+	if (propName.equalsIgnoreCase("spriteNum") && debugChannelSet(1, kDebugLingoExec)) {
+		bool stored = _properties.contains(propName);
+		Datum anc = _properties.contains("ancestor") ? _properties["ancestor"] : Datum();
+		bool delegates = anc.type == OBJECT && (anc.u.obj->getObjType() & (kScriptObj | kXtraObj));
+		debugC(1, kDebugLingoExec, "@@SN@@ getProp(spriteNum) on <%s>: objType %d, stored %d (%s), ancestor %s%s, currentSpriteNum %d -> %s",
+			getName().c_str(), (int)_objType,
+			stored ? 1 : 0, stored ? _properties[propName].type2str() : "-",
+			anc.type2str(), delegates ? " DELEGATES" : "",
+			(int)g_director->getCurrentMovie()->_currentSpriteNum,
+			stored ? "stored value" : (delegates ? "ancestor" : (_objType == kScriptObj ? "fallback" : "fresh VOID")));
+	}
+
 	if (_properties.contains(propName)) {
 		return _properties[propName];
 	}

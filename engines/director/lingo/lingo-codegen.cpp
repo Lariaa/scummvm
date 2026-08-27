@@ -407,7 +407,15 @@ void LingoCompiler::registerMethodVar(const Common::String &name, VarType type) 
 		}
 		(*_methodVars)[name] = type;
 		if (type == kVarProperty || type == kVarInstance) {
-			if (!_assemblyContext->hasProp(name))
+			bool had = _assemblyContext->hasProp(name);
+
+			// @@SN@@ Does the declaration create the entry, or does hasProp's
+			// own spriteNum fallback make it skip?
+			if (name.equalsIgnoreCase("spriteNum"))
+				debugC(1, kDebugLingoExec, "@@SN@@ registerMethodVar(spriteNum) in <%s>: hasProp %d -> %s",
+					_assemblyContext->getName().c_str(), had ? 1 : 0, had ? "SKIPPED" : "created as VOID");
+
+			if (!had)
 				_assemblyContext->setProp(name, Datum(), true);
 		} else if (type == kVarGlobal) {
 			if (!g_lingo->_globalvars.contains(name))
