@@ -714,6 +714,12 @@ simpleexpr_nounarymath:
 		$args->insert_at(0, $expr_nounarymath);
 		$args->insert_at(0, $method);
 		$$ = new FuncNode($ID, $args); }
+	| simpleexpr_nounarymath[obj] '.' ID	{
+		// D5 dot syntax. `a.b` is the same thing as `the b of a`, so it builds
+		// the very node that spelling builds and needs no codegen of its own:
+		// visitTheOfNode() already emits c_objectproppush for D4 and up.
+		// Left-recursive, so `a.b.c` nests as `(a.b).c`.
+		$$ = new TheOfNode($ID, $obj); }
 	| '(' expr ')'					{ $$ = $expr; } ;
 	| var
 	| chunk
@@ -837,6 +843,11 @@ inof: tIN | tOF ;
 
 writablethe: tTHE ID					{ $$ = new TheNode($ID); }
 	| tTHE ID tOF writabletheobj		{ $$ = new TheOfNode($ID, $writabletheobj); }
+	| writabletheobj[obj] '.' ID		{
+		// The assignment side of D5 dot syntax: `set a.b to c`. Same node as
+		// the read, which is what visitSetNode() already unpacks to emit
+		// c_objectpropassign.
+		$$ = new TheOfNode($ID, $obj); }
 	;
 
 writabletheobj: simpleexpr

@@ -1,0 +1,52 @@
+-- ============================================================================
+-- Dot syntax: `a.b` is property access from Director 5 on
+-- ============================================================================
+--
+-- Below D5 the lexer folds the dot into the identifier, because pre-D5 games
+-- put dots inside variable names -- C.H.A.O.S. Continuum has `a.1` and `a2.`,
+-- which varnames.lingo pins down. The two spellings can never meet, so the
+-- lexer switches on the version.
+--
+-- The test target runs at Director 4, and each .lingo file is compiled in full
+-- before it runs, so this file's own source cannot use dot syntax: the gate
+-- would still be closed while the file is being read. value() compiles its
+-- argument at run time instead, which is after the version has been switched,
+-- so the whole path -- lexer, grammar, TheOfNode, c_objectproppush -- is
+-- exercised through it.
+--
+-- Note that a bare chain such as "obj.alpha" is short-circuited by
+-- resolveDottedName() in b_value() and never reaches the compiler. The cases
+-- with an operator or a parenthesis are the ones that do, so both mechanisms
+-- are covered below.
+-- ============================================================================
+
+global gObj, gLst
+
+set save to the scummvmVersion
+set the scummvmVersion to 700
+
+set gObj to [#alpha: 42, #beta: [#gamma: 7]]
+set gLst to [10, 20, 30]
+
+-- Read a property, and read one through a nested property list.
+scummvmAssert(value("gObj.alpha") = 42)
+scummvmAssert(value("gObj.beta.gamma") = 7)
+
+-- The same, but reaching the compiler: an operator or a parenthesis makes
+-- b_value() decline its shortcut, so these go through the grammar rule.
+scummvmAssert(value("gObj.alpha + 1") = 43)
+scummvmAssert(value("(gObj.beta).gamma") = 7)
+scummvmAssert(value("gObj.alpha") + value("gObj.beta.gamma") = 49)
+
+-- A linear list answers count.
+scummvmAssert(value("gLst.count") = 3)
+scummvmAssert(value("gLst.count * 2") = 6)
+
+-- A missing key reads as VOID rather than raising.
+scummvmAssert(voidp(value("gObj.nosuchkey")))
+
+-- Below D5 the same string is one variable name, so it cannot resolve.
+set the scummvmVersion to 400
+scummvmAssert(voidp(value("gObj.alpha")))
+
+set the scummvmVersion to save
