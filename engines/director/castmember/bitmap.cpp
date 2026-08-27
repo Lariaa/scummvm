@@ -804,6 +804,18 @@ void BitmapCastMember::createMatte() {
 			_matteSource = nullptr;
 		}
 
+		// Only exact matches. Measured in Director MX 8.5.1 with a 32-bit probe
+		// (matte_probe.ls): a block of rgb(247, 255, 255) laid on white paper and
+		// touching the member's edge stays opaque, and so does one of
+		// rgb(238, 238, 238), so the ink has no tolerance at 8 or at 17. A sheet
+		// dithered between white and rgb(238, 238, 238) stays opaque too -- in a
+		// checkerboard no white pixel touches another white pixel edgewise, and the
+		// fill cannot advance past the border.
+		//
+		// That last one is Janosch Panama's title sign, which an earlier rule here
+		// snapped onto the background to clear. Leaving it opaque is what Director
+		// does, so the rule went.
+
 		Graphics::FloodFill matteFill(&tmp, whiteColor, 0, true);
 
 		for (int yy = 0; yy < tmp.h; yy++) {
