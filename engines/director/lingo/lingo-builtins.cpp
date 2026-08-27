@@ -1642,6 +1642,21 @@ void LB::b_setAt(int nargs) {
 	Datum indexD = g_lingo->pop();
 	Datum list = g_lingo->pop();
 
+	// The write side of the same rule b_getAt() follows: a property list
+	// subscripted by anything but a number is addressed by key, and the key is
+	// added when it is not there yet. TKKG 7 fills its per-character menus with
+	// `gMenueObj[modus] = new(script("MenueObj"), ...)`; the assignment used to
+	// be refused outright, so the list kept the 0 it was initialised with and
+	// the very next line called reset() on it.
+	if (list.type == PARRAY && indexD.type != INT && indexD.type != FLOAT) {
+		int found = LC::compareArrays(LC::eqData, list, indexD, true).u.i;
+		if (found > 0)
+			list.u.parr->arr[found - 1].v = value;
+		else
+			list.u.parr->arr.push_back(PCell(indexD, value));
+		return;
+	}
+
 	TYPECHECK2(indexD, INT, FLOAT);
 	TYPECHECK4(list, ARRAY, PARRAY, POINT, RECT);
 	int index = indexD.asInt();
