@@ -192,7 +192,10 @@ static Common::String decodeEntities(const Common::String &in) {
 }
 
 static Datum makeSymbol(const char *name) {
-	Datum d(Common::String(name));
+	// Not `Datum d(Common::String(name))`: that parses as a function
+	// declaration rather than a variable.
+	Common::String propName(name);
+	Datum d(propName);
 	d.type = SYMBOL;
 	return d;
 }
