@@ -804,6 +804,35 @@ void BitmapCastMember::createMatte() {
 			_matteSource = nullptr;
 		}
 
+		// Scanned artwork often dithers its paper instead of laying it down
+		// flat. Janosch Panama's title sign alternates 0xffffff and 0xeeeeee
+		// across the sheet -- 13707 pixels against 12421 in cast 68 alone -- and
+		// an exact-match fill takes whichever of the two sits in the corner and
+		// is stopped by the other immediately: it cleared 649 pixels out of
+		// 32000 and left the paper opaque. Snap the near misses onto the
+		// background colour first. tmp is a scratch copy, so only the mask is
+		// affected.
+		//
+		// Deliberately narrow. 20 per channel spans that pair, which lie 17
+		// apart, and stops well short of the next entry down in the game's
+		// palette at 0xdddddd. Every game drawing with matte ink comes through
+		// here, so this errs towards changing nothing. The paletted branch is
+		// left alone: comparing indices says nothing about colour distance.
+		if (!tmp.format.isCLUT8()) {
+			byte wr, wg, wb;
+			tmp.format.colorToRGB(whiteColor, wr, wg, wb);
+
+			for (int y = 0; y < tmp.h; y++) {
+				for (int x = 0; x < tmp.w; x++) {
+					byte r, g, b;
+					tmp.format.colorToRGB(tmp.getPixel(x, y), r, g, b);
+
+					if (ABS(r - wr) <= 20 && ABS(g - wg) <= 20 && ABS(b - wb) <= 20)
+						tmp.setPixel(x, y, whiteColor);
+				}
+			}
+		}
+
 		Graphics::FloodFill matteFill(&tmp, whiteColor, 0, true);
 
 		for (int yy = 0; yy < tmp.h; yy++) {
