@@ -680,6 +680,29 @@ void BitmapCastMember::createMatte() {
 	} else {
 		whiteColor = tmp.format.RGBToColor(0xff, 0xff, 0xff);
 		colorFound = true;
+
+		// Truecolor used to assume pure white unconditionally, so artwork with
+		// an off-white paper background had nothing to knock out and stayed
+		// fully opaque -- Janosch Panama's walking bear and tiger were drawn as
+		// solid boxes over the meadow that way, their corners sitting at
+		// 0xf0f0f0 rather than 0xffffff.
+		//
+		// Only near-white counts. Keying whatever happens to sit in the corner,
+		// the way the paletted branch above does, is far too eager here: TKKG 8's
+		// scenery is full-bleed, and corners of 0xd0e2b6 and 0x733121 had the
+		// flood fill eat a wedge out of the middle of the picture. A colour this
+		// close to white is paper the artist meant to disappear; anything else is
+		// the picture itself.
+		if (tmp.w > 0 && tmp.h > 0) {
+			uint32 corner = tmp.getPixel(0, 0);
+			byte r, g, b;
+			tmp.format.colorToRGB(corner, r, g, b);
+
+			if (corner != whiteColor && r >= 0xe0 && g >= 0xe0 && b >= 0xe0) {
+				whiteColor = corner;
+				debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s has off-white paper in the corner; using 0x%08x as background", _castId, _name.c_str(), whiteColor);
+			}
+		}
 	}
 
 	// Matte ink knocks out the background that is connected to the image's edges --
