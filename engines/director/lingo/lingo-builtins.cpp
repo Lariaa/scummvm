@@ -83,6 +83,7 @@ static const BuiltinProto builtins[] = {
 	{ "addProp",		LB::b_addProp,		3, 3, 400, HBLTIN_LIST },	//			D4 h
 	{ "append",			LB::b_append,		2, 2, 400, HBLTIN_LIST },	//			D4 h
 	{ "count",			LB::b_count,		1, 1, 400, FBLTIN_LIST },	//			D4 f
+	{ "deleteAll",		LB::b_deleteAll,	1, 1, 400, HBLTIN_LIST },	//			D4 h
 	{ "deleteAt",		LB::b_deleteAt,		2, 2, 400, HBLTIN_LIST },	//			D4 h
 	{ "deleteOne",		LB::b_deleteOne,	2, 2, 400, HBLTIN_LIST },	//			D4 h, documented in D5
 	{ "deleteProp",		LB::b_deleteProp,	2, 2, 400, HBLTIN_LIST },	//			D4 h
@@ -1035,6 +1036,24 @@ void LB::b_count(int nargs) {
 	}
 
 	g_lingo->push(result);
+}
+
+void LB::b_deleteAll(int nargs) {
+	Datum list = g_lingo->pop();
+	TYPECHECK2(list, ARRAY, PARRAY);
+
+	// "deletes all values from a linear or property list while keeping the list
+	// type definition" -- the list stays whichever kind it was.
+	switch (list.type) {
+	case ARRAY:
+		list.u.farr->arr.clear();
+		break;
+	case PARRAY:
+		list.u.parr->arr.clear();
+		break;
+	default:
+		break;
+	}
 }
 
 void LB::b_deleteAt(int nargs) {
