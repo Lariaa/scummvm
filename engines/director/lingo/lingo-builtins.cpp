@@ -82,7 +82,7 @@ static const BuiltinProto builtins[] = {
 	{ "addAt",			LB::b_addAt,		3, 3, 400, HBLTIN_LIST },	//			D4 h
 	{ "addProp",		LB::b_addProp,		3, 3, 400, HBLTIN_LIST },	//			D4 h
 	{ "append",			LB::b_append,		2, 2, 400, HBLTIN_LIST },	//			D4 h
-	{ "count",			LB::b_count,		1, 1, 400, FBLTIN_LIST },	//			D4 f
+	{ "count",			LB::b_count,		1, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "deleteAll",		LB::b_deleteAll,	1, 1, 400, HBLTIN_LIST },	//			D4 h
 	{ "deleteAt",		LB::b_deleteAt,		2, 2, 400, HBLTIN_LIST },	//			D4 h
 	{ "deleteOne",		LB::b_deleteOne,	2, 2, 400, HBLTIN_LIST },	//			D4 h, documented in D5
@@ -1016,6 +1016,21 @@ void LB::b_append(int nargs) {
 
 void LB::b_count(int nargs) {
 	Datum list = g_lingo->pop();
+
+	// `obj.prop.count` compiles to count(obj, #prop): fetch the property, then
+	// count what it holds. TKKG 7's photofit program walks its XML document that
+	// way -- `parserObj.child.count` -- and with only the one-argument form the
+	// call took the symbol for the list and gave up.
+	if (nargs == 2) {
+		Datum prop = list;
+		Datum obj = g_lingo->pop();
+
+		if (obj.type == OBJECT && prop.type == SYMBOL && obj.u.obj->hasProp(*prop.u.s))
+			list = obj.u.obj->getProp(*prop.u.s);
+		else
+			list = obj;
+	}
+
 	Datum result;
 	result.type = INT;
 
