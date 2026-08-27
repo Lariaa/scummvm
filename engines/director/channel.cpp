@@ -177,7 +177,16 @@ DirectorPlotData Channel::getPlotData() {
 	// channel is already holding the widget, so no lookup is needed.
 	bool isTextXtra = _sprite->_cast && dynamic_cast<TextXtraCastMember *>(_sprite->_cast) && _widget;
 
-	if (_sprite->_cast && (_sprite->_cast->_type == kCastText || isTextXtra)) {
+	if (isTextXtra) {
+		// Always the glyphs, whatever the ink asks for. The widget's background
+		// is ours rather than the author's -- the Paige style runs that carry
+		// the real font and colours are not parsed yet, so
+		// TextXtraCastMember::createWidget() paints white on black -- and a
+		// character box mask drags that invented black onto the stage: TKKG 9's
+		// credits kept a black bar behind every line. Until the authored
+		// colours are actually read, only the letters may be drawn.
+		pd.srfMask = ((Graphics::MacText *)_widget)->getGlyphMask();
+	} else if (_sprite->_cast && _sprite->_cast->_type == kCastText) {
 		// kInkTypeCopy -- no mask, default rendering
 
 		if (_sprite->_ink == kInkTypeMatte || _sprite->_ink == kInkTypeNotCopy
@@ -186,17 +195,13 @@ DirectorPlotData Channel::getPlotData() {
 			|| _sprite->_ink == kInkTypeAddPin || _sprite->_ink == kInkTypeSub
 			|| _sprite->_ink == kInkTypeSubPin || _sprite->_ink == kInkTypeLight
 			|| _sprite->_ink == kInkTypeBlend) {
-			Graphics::MacText *widget = isTextXtra
-				? (Graphics::MacText *)_widget
-				: ((TextCastMember *)_sprite->_cast)->getWidget();
+			Graphics::MacText *widget = ((TextCastMember *)_sprite->_cast)->getWidget();
 			if (widget)
 				pd.srfMask = widget->getCharBoxMask();
 		} else if (_sprite->_ink == kInkTypeTransparent || _sprite->_ink == kInkTypeBackgndTrans
 				|| _sprite->_ink == kInkTypeReverse || _sprite->_ink == kInkTypeGhost
 				|| _sprite->_ink == kInkTypeMask || _sprite->_ink == kInkTypeDark) {
-			Graphics::MacText *widget = isTextXtra
-				? (Graphics::MacText *)_widget
-				: ((TextCastMember *)_sprite->_cast)->getWidget();
+			Graphics::MacText *widget = ((TextCastMember *)_sprite->_cast)->getWidget();
 			if (widget)
 				pd.srfMask = widget->getGlyphMask();
 		}
