@@ -35,6 +35,7 @@
 #include "director/castmember/movie.h"
 #include "director/castmember/richtext.h"
 #include "director/castmember/text.h"
+#include "director/lingo/xtras-cast/textxtra.h"
 
 #include "graphics/macgui/mactext.h"
 #include "graphics/macgui/macbutton.h"
@@ -168,7 +169,15 @@ DirectorPlotData Channel::getPlotData() {
 	}
 
 	pd.srfMask = nullptr;
-	if (_sprite->_cast && _sprite->_cast->_type == kCastText) {
+
+	// A Text Xtra member builds the same MacText widget a text member does, but
+	// it has to report kCastXtra: the engine casts every kCastText member to
+	// TextCastMember. Without a mask its widget is blitted whole, background and
+	// all -- TKKG 9's credits came out as a black block over the backdrop. The
+	// channel is already holding the widget, so no lookup is needed.
+	bool isTextXtra = _sprite->_cast && dynamic_cast<TextXtraCastMember *>(_sprite->_cast) && _widget;
+
+	if (_sprite->_cast && (_sprite->_cast->_type == kCastText || isTextXtra)) {
 		// kInkTypeCopy -- no mask, default rendering
 
 		if (_sprite->_ink == kInkTypeMatte || _sprite->_ink == kInkTypeNotCopy
@@ -177,13 +186,17 @@ DirectorPlotData Channel::getPlotData() {
 			|| _sprite->_ink == kInkTypeAddPin || _sprite->_ink == kInkTypeSub
 			|| _sprite->_ink == kInkTypeSubPin || _sprite->_ink == kInkTypeLight
 			|| _sprite->_ink == kInkTypeBlend) {
-			Graphics::MacText *widget = ((TextCastMember *)_sprite->_cast)->getWidget();
+			Graphics::MacText *widget = isTextXtra
+				? (Graphics::MacText *)_widget
+				: ((TextCastMember *)_sprite->_cast)->getWidget();
 			if (widget)
 				pd.srfMask = widget->getCharBoxMask();
 		} else if (_sprite->_ink == kInkTypeTransparent || _sprite->_ink == kInkTypeBackgndTrans
 				|| _sprite->_ink == kInkTypeReverse || _sprite->_ink == kInkTypeGhost
 				|| _sprite->_ink == kInkTypeMask || _sprite->_ink == kInkTypeDark) {
-			Graphics::MacText *widget = ((TextCastMember *)_sprite->_cast)->getWidget();
+			Graphics::MacText *widget = isTextXtra
+				? (Graphics::MacText *)_widget
+				: ((TextCastMember *)_sprite->_cast)->getWidget();
 			if (widget)
 				pd.srfMask = widget->getGlyphMask();
 		}
