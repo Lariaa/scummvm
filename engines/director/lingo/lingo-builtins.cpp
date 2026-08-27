@@ -96,6 +96,7 @@ static const BuiltinProto builtins[] = {
 	{ "getOne",			LB::b_getOne,		2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPos",			LB::b_getPos,		2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "getProp",		LB::b_getProp,		2, 3, 400, FBLTIN_LIST },	//			D4 f
+	{ "getPropRef",		LB::b_getPropRef,	2, 3, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPropAt",		LB::b_getPropAt,	2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "list",			LB::b_list,			-1,0, 400, FBLTIN_LIST },	//			D4 f
 	{ "listP",			LB::b_listP,		1, 1, 400, FBLTIN_LIST },	//			D4 f
@@ -1399,6 +1400,38 @@ void LB::b_getPos(int nargs) {
 	}
 }
 
+// `obj.prop[n]` compiles to getPropRef(obj, #prop, n), and `obj.prop` on its own
+// to the two-argument form. It is a compiler helper rather than a documented
+// Lingo function -- Director emits it so the result can also be assigned to.
+// Only reading is supported here; assigning through it would need a real
+// reference datum.
+void LB::b_getPropRef(int nargs) {
+	Datum index;
+	if (nargs == 3)
+		index = g_lingo->pop();
+
+	Datum prop = g_lingo->pop();
+	Datum obj = g_lingo->pop();
+	Datum value;
+
+	if (obj.type == OBJECT && prop.type == SYMBOL && obj.u.obj->hasProp(*prop.u.s)) {
+		value = obj.u.obj->getProp(*prop.u.s);
+	} else if (obj.type == PARRAY) {
+		int found = LC::compareArrays(LC::eqData, obj, prop, true).u.i;
+		if (found > 0)
+			value = obj.u.parr->arr[found - 1].v;
+	}
+
+	if (nargs < 3) {
+		g_lingo->push(value);
+		return;
+	}
+
+	g_lingo->push(value);
+	g_lingo->push(index);
+	b_getAt(2);
+}
+
 void LB::b_getProp(int nargs) {
 	// Director also takes the chunk form on a string:
 	//   getProp(str, #char|#word|#item|#line, n)  ==  `the <chunk> n of str`
@@ -1429,6 +1462,18 @@ void LB::b_getProp(int nargs) {
 				g_lingo->push(LC::chunkRef(chunkType, n, n, src).eval());
 				return;
 			}
+		}
+
+		// The other three-argument form is `obj.prop[n]` -- the same thing
+		// getPropRef() answers, which Director emits when the result is only
+		// read. TKKG 7's photofit program walks its XML document with
+		// parserObj.child[i] and reaches both spellings.
+		if ((src.type == OBJECT || src.type == PARRAY) && chunk.type == SYMBOL) {
+			g_lingo->push(src);
+			g_lingo->push(chunk);
+			g_lingo->push(index);
+			b_getPropRef(3);
+			return;
 		}
 
 		g_lingo->lingoError("b_getProp: three arguments need a chunk symbol, got %s", chunk.type2str());

@@ -67,6 +67,7 @@ void b_getLast(int nargs);
 void b_getOne(int nargs);
 void b_getPos(int nargs);
 void b_getProp(int nargs);
+void b_getPropRef(int nargs);
 void b_getPropAt(int nargs);
 void b_list(int nargs);
 void b_listP(int nargs);
