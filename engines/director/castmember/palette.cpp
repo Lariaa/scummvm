@@ -119,7 +119,7 @@ void PaletteCastMember::load() {
 		Archive *arch = _cast->getArchive().get();
 		if (arch->hasResource(tag, paletteId)) {
 			Common::SeekableReadStreamEndian *pal = arch->getResource(MKTAG('C', 'L', 'U', 'T'), paletteId);
-			debugC(2, kDebugImages, "PaletteCastMember::load(): linking palette id %d to cast index %d", paletteId, _castId);
+			debugC(2, kDebugImages, "PaletteCastMember::load(): linking palette id %d to member %d of castLib %d", paletteId, _castId, _cast->_castLibID);
 			PaletteV4 palData = _cast->loadPalette(*pal, paletteId);
 			palData.id = CastMemberID(_castId, _cast->_castLibID);
 			g_director->addPalette(palData.id, palData.palette, palData.length);
