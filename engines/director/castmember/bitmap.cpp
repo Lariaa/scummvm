@@ -679,6 +679,21 @@ void BitmapCastMember::createMatte() {
 	} else {
 		whiteColor = tmp.format.RGBToColor(0xff, 0xff, 0xff);
 		colorFound = true;
+
+		// The CLUT8 branch above searches the edges for pure white and, failing
+		// that, keys whatever sits in the corner. Truecolor used to assume pure
+		// white unconditionally, so artwork with an off-white background -- or a
+		// black one, which is what a 32-bit source leaves behind once its alpha
+		// is dropped -- had nothing to knock out and stayed fully opaque.
+		// Janosch Panama's walking bear and tiger were drawn as solid boxes over
+		// the meadow that way.
+		if (tmp.w > 0 && tmp.h > 0) {
+			uint32 corner = tmp.getPixel(0, 0);
+			if (corner != whiteColor) {
+				whiteColor = corner;
+				debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s has no pure white in the corner; using corner colour 0x%08x as background", _castId, _name.c_str(), whiteColor);
+			}
+		}
 	}
 
 	// Matte ink knocks out the background that is connected to the image's edges --
