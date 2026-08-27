@@ -1156,6 +1156,18 @@ void Score::createScriptInstances(int frameNum) {
 				continue;
 			}
 
+			// Director fills in a behaviour's spriteNum when it attaches the
+			// instance to a channel, and scripts routinely declare it as a
+			// property of their own -- TKKG 7's canvas behaviour opens with
+			// `property mMausUnten, ancestor, spriteNum`. A declared property
+			// shadows the _currentSpriteNum fallback in
+			// ScriptContext::getProp(), so unless it is written here
+			// `the spriteNum` reads back VOID: that behaviour then asked for
+			// `the rect of sprite VOID` and stored a void canvas rectangle.
+			// Forced, so it lands on the instance rather than being handed to
+			// an ancestor the behaviour may share with others.
+			instance.u.obj->setProp("spriteNum", Datum(i), true);
+
 			channel->_scriptInstanceList.push_back(instance);
 		}
 
