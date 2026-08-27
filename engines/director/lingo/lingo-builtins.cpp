@@ -1456,6 +1456,18 @@ void LB::b_getProp(int nargs) {
 			}
 		}
 
+		// The other three-argument form is `obj.prop[n]` -- the same thing
+		// getPropRef() answers, which Director emits when the result is only
+		// read. TKKG 7's photofit program walks its XML document with
+		// parserObj.child[i] and reaches both spellings.
+		if ((src.type == OBJECT || src.type == PARRAY) && chunk.type == SYMBOL) {
+			g_lingo->push(src);
+			g_lingo->push(chunk);
+			g_lingo->push(index);
+			b_getPropRef(3);
+			return;
+		}
+
 		g_lingo->lingoError("b_getProp: three arguments need a chunk symbol, got %s", chunk.type2str());
 		return;
 	}
