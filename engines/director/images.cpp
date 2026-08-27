@@ -273,6 +273,8 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 	}
 
 	uint32 color;
+	byte alpha = 0xff;
+	bool sawAlpha = false;
 
 	if (pixels.size() > 0) {
 		for (y = 0; y < _surface->h; y++) {
@@ -316,16 +318,28 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 				case 32:
 					// if we have the issue in D3 32bpp images, then the way to fix it should be the same as 16bpp images.
 					// check the code above, there is different behaviour between in D4 and D3. Currently we are only using D4.
+					//
+					// The first of the four planes is the alpha channel, and it
+					// is often a real one: Janosch Panama's walking bear stores
+					// 17690 pixels at 0 and 4497 at 255, with an anti-aliased
+					// rim in between, and exactly those 17690 are the paper
+					// around the figure. It used to be skipped and every pixel
+					// declared opaque, which left the matte code guessing at the
+					// background by colour instead.
 					if (skipCompression) {
+						alpha = pixels[(((y * _surface->w * 4)) + (x * 4))];
 						color = pixels[(((y * _surface->w * 4)) + (x * 4 + 1))] << 16 |
 							pixels[(((y * _surface->w * 4)) + (x * 4 + 2))] << 8 |
 							pixels[(((y * _surface->w * 4)) + (x * 4 + 3))];
 					} else {
+						alpha = pixels[(((y * _surface->w * 4)) + x)];
 						color = pixels[(((y * _surface->w * 4)) + (x + _surface->w))] << 16 |
 							pixels[(((y * _surface->w * 4)) + (x + 2 * _surface->w))] << 8 |
 							pixels[(((y * _surface->w * 4)) + (x + 3 * _surface->w))];
 					}
-					*((uint32 *)_surface->getBasePtr(x, y)) = (color << 8) | 0xff;
+					if (alpha)
+						sawAlpha = true;
+					*((uint32 *)_surface->getBasePtr(x, y)) = (color << 8) | alpha;
 					x++;
 					break;
 
@@ -335,6 +349,18 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 				}
 			}
 		}
+	}
+
+	// An image that is transparent everywhere was never meant to be one: the
+	// plane holds zeroes because nothing wrote an alpha channel, not because the
+	// artist erased the picture. Hand those back as fully opaque, which is what
+	// this decoder did for every 32-bit image before.
+	if (_bitsPerPixel == 32 && !sawAlpha) {
+		debugC(5, kDebugImages, "BITDDecoder::loadStream(): 32bpp image has an all-zero alpha plane, treating it as opaque");
+
+		for (int y = 0; y < _surface->h; y++)
+			for (int x = 0; x < _surface->w; x++)
+				*((uint32 *)_surface->getBasePtr(x, y)) |= 0xff;
 	}
 
 	return true;
