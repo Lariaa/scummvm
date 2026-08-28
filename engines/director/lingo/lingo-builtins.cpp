@@ -1048,13 +1048,21 @@ void LB::b_count(int nargs) {
 			}
 		}
 
-		// Otherwise `obj.prop.count`: fetch the property, then count what it
-		// holds. TKKG 7's photofit program walks its XML document that way,
-		// `parserObj.child.count`.
-		if (obj.type == OBJECT && prop.type == SYMBOL && obj.u.obj->hasProp(*prop.u.s))
+		// Otherwise `x.prop.count`: fetch the property, then count what it
+		// holds. TKKG 7's photofit program walks its XML document that way, and
+		// reaches it with both kinds of receiver -- `parserObj.child.count` on
+		// the Xtra object, and `node.child.count` on a node, which is a plain
+		// property list. Counting the receiver itself in the latter case gives
+		// the number of fields a node has rather than the number of children,
+		// and the caller's loop then runs off the end of the list.
+		if (obj.type == OBJECT && prop.type == SYMBOL && obj.u.obj->hasProp(*prop.u.s)) {
 			list = obj.u.obj->getProp(*prop.u.s);
-		else
+		} else if (obj.type == PARRAY) {
+			int found = LC::compareArrays(LC::eqData, obj, prop, true).u.i;
+			list = found > 0 ? obj.u.parr->arr[found - 1].v : obj;
+		} else {
 			list = obj;
+		}
 	}
 
 	Datum result;
