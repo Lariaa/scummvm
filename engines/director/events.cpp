@@ -231,19 +231,27 @@ bool Movie::processSysEvent(Common::Event &event) {
 				if (g_system->getEventManager()->getButtonState() == 0)
 					return true;
 
+			// Record where the mouse now is *before* dispatching, because
+			// processEvent() runs the handler here and now, and Lingo::execute()
+			// pumps system events every hundred opcodes. A handler long enough
+			// to reach that pump would otherwise land back in this branch with
+			// the old channel still recorded and fire the same mouseLeave again,
+			// without end.
 			if (spriteId > 0) {
 				if (spriteId != _lastEnteredChannelId) {
-					if (_lastEnteredChannelId) {
-						processEvent(kEventMouseLeave, _lastEnteredChannelId);
-					}
-
+					uint16 leaving = _lastEnteredChannelId;
 					_lastEnteredChannelId = spriteId;
+
+					if (leaving)
+						processEvent(kEventMouseLeave, leaving);
+
 					processEvent(kEventMouseEnter, spriteId);
 				}
 			} else {
 				if (_lastEnteredChannelId) {
-					processEvent(kEventMouseLeave, _lastEnteredChannelId);
+					uint16 leaving = _lastEnteredChannelId;
 					_lastEnteredChannelId = 0;
+					processEvent(kEventMouseLeave, leaving);
 				}
 			}
 		}
