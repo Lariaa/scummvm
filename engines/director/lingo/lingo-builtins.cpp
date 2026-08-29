@@ -46,6 +46,7 @@
 #include "director/castmember/transition.h"
 #include "director/lingo/lingo-builtins.h"
 #include "director/lingo/lingo-code.h"
+#include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-codegen.h"
 #include "director/lingo/lingo-utils.h"
 
@@ -222,7 +223,10 @@ static const BuiltinProto builtins[] = {
 	{ "insertFrame",	LB::b_insertFrame,	0, 0, 500, CBLTIN },	//				D5 c
 	{ "updateFrame",	LB::b_updateFrame,	0, 0, 500, CBLTIN },	//				D5 c
 	// Point
+	{ "color",			LB::b_color,		1, 4, 700, FBLTIN },	//							D7 f
+	{ "paletteIndex",	LB::b_paletteIndex,	1, 1, 700, FBLTIN },	//							D7 f
 	{ "point",			LB::b_point,		2, 2, 400, FBLTIN },	//			D4 f
+	{ "rgb",			LB::b_rgb,			1, 3, 700, FBLTIN },	//							D7 f
 	// Rect
 	{ "inflate",        LB::b_inflate,      2, 3, 400, FBLTIN },    //			D4 f
 	{ "inside",			LB::b_inside,		2, 2, 400, FBLTIN },	//			D4 f
@@ -4095,6 +4099,108 @@ void LB::b_updateFrame(int nargs) {
 ///////////////////
 // Point
 ///////////////////
+// Parses "#rrggbb" or "rrggbb", which is what rgb() takes as its one-argument
+// form.
+static bool parseHexColor(const Common::String &s, uint8 &r, uint8 &g, uint8 &b) {
+	Common::String hex = s;
+	if (hex.hasPrefix("#"))
+		hex.deleteChar(0);
+
+	if (hex.size() != 6)
+		return false;
+
+	for (uint i = 0; i < 6; i++) {
+		if (!Common::isXDigit(hex[i]))
+			return false;
+	}
+
+	long v = strtol(hex.c_str(), nullptr, 16);
+	r = (v >> 16) & 0xff;
+	g = (v >> 8) & 0xff;
+	b = v & 0xff;
+	return true;
+}
+
+// color(#rgb, r, g, b) and color(#paletteIndex, n), the two forms the D7 manual
+// gives. A bare color(n) is taken as a palette index, which is how the older
+// numeric colour properties read.
+void LB::b_color(int nargs) {
+	Common::Array<Datum> args;
+	for (int i = 0; i < nargs; i++)
+		args.insert_at(0, g_lingo->pop());
+
+	if (args[0].type == SYMBOL) {
+		bool wantRGB = args[0].u.s->equalsIgnoreCase("rgb");
+
+		if (wantRGB && nargs == 4) {
+			g_lingo->push(Datum(new ColorObject(
+				(uint8)CLIP<int>(args[1].asInt(), 0, 255),
+				(uint8)CLIP<int>(args[2].asInt(), 0, 255),
+				(uint8)CLIP<int>(args[3].asInt(), 0, 255))));
+			return;
+		}
+
+		if (!wantRGB && nargs == 2) {
+			g_lingo->push(Datum(new ColorObject(args[1].asInt())));
+			return;
+		}
+
+		warning("b_color(): %s takes %d arguments, got %d", args[0].u.s->c_str(), wantRGB ? 4 : 2, nargs);
+		g_lingo->pushVoid();
+		return;
+	}
+
+	if (nargs == 1) {
+		g_lingo->push(Datum(new ColorObject(args[0].asInt())));
+		return;
+	}
+
+	if (nargs == 3) {
+		g_lingo->push(Datum(new ColorObject(
+			(uint8)CLIP<int>(args[0].asInt(), 0, 255),
+			(uint8)CLIP<int>(args[1].asInt(), 0, 255),
+			(uint8)CLIP<int>(args[2].asInt(), 0, 255))));
+		return;
+	}
+
+	warning("b_color(): cannot make a colour from %d arguments", nargs);
+	g_lingo->pushVoid();
+}
+
+// rgb("#rrggbb") and rgb(r, g, b).
+void LB::b_rgb(int nargs) {
+	if (nargs == 1) {
+		Datum d = g_lingo->pop();
+		uint8 r, g, b;
+
+		if (d.type == STRING && parseHexColor(*d.u.s, r, g, b)) {
+			g_lingo->push(Datum(new ColorObject(r, g, b)));
+			return;
+		}
+
+		warning("b_rgb(): expected a hex string, got %s", d.type2str());
+		g_lingo->pushVoid();
+		return;
+	}
+
+	if (nargs == 3) {
+		int b = g_lingo->pop().asInt();
+		int g = g_lingo->pop().asInt();
+		int r = g_lingo->pop().asInt();
+
+		g_lingo->push(Datum(new ColorObject((uint8)CLIP<int>(r, 0, 255), (uint8)CLIP<int>(g, 0, 255), (uint8)CLIP<int>(b, 0, 255))));
+		return;
+	}
+
+	warning("b_rgb(): cannot make a colour from %d arguments", nargs);
+	g_lingo->dropStack(nargs);
+	g_lingo->pushVoid();
+}
+
+void LB::b_paletteIndex(int nargs) {
+	g_lingo->push(Datum(new ColorObject(g_lingo->pop().asInt())));
+}
+
 void LB::b_point(int nargs) {
 	Datum y(g_lingo->pop().asInt());
 	Datum x(g_lingo->pop().asInt());
