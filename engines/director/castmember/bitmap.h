@@ -98,6 +98,9 @@ public:
 	uint32 _tag;
 	bool _noMatte;
 	bool _external;
+	// No bit identified for this in the cast data, so it defaults to true --
+	// which is what the matte did before it was settable.
+	bool _useAlpha = true;
 
 	// D4 stucture:
 	// uint16 _pitch;
@@ -111,7 +114,7 @@ public:
 	uint16 _pitch;
 	// _initialRect			// 2
 	// _boundingRect		// 10  D%-
-	byte _alphaThreshold; 	// 10  D7+
+	byte _alphaThreshold = 0; // 10  D7+ (absent before D7)
 	   // padding
 	uint16 _editVersion;	// 12  D6+
 	Common::Point _scrollPoint; // 14
