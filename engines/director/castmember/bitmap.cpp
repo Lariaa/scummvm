@@ -1233,6 +1233,61 @@ void BitmapCastMember::setPicture(Image::ImageDecoder &image, bool adjustSize) {
 	setModified(true);
 }
 
+// cropRect is in the picture's own coordinates. The registration point keeps
+// pointing at the same pixel, so it moves by the cut-off corner.
+void BitmapCastMember::crop(const Common::Rect &cropRect) {
+	if (!_picture || _picture->_surface.w <= 0 || _picture->_surface.h <= 0) {
+		warning("BitmapCastMember::crop(): cast %d has no picture to crop", _castId);
+		return;
+	}
+
+	Common::Rect bounds(_picture->_surface.w, _picture->_surface.h);
+	Common::Rect area(cropRect);
+	area.clip(bounds);
+
+	if (area.width() <= 0 || area.height() <= 0) {
+		warning("BitmapCastMember::crop(): cast %d, crop rect %d,%d,%d,%d does not meet the %dx%d picture",
+				_castId, cropRect.left, cropRect.top, cropRect.right, cropRect.bottom, bounds.width(), bounds.height());
+		return;
+	}
+
+	Graphics::Surface cropped;
+	cropped.create(area.width(), area.height(), _picture->_surface.format);
+	cropped.copyRectToSurface(_picture->_surface, 0, 0, area);
+
+	_picture->_surface.free();
+	_picture->_surface.copyFrom(cropped);
+	cropped.free();
+
+	_regX -= area.left;
+	_regY -= area.top;
+	_initialRect = Common::Rect(_picture->_surface.w, _picture->_surface.h);
+	_boundingRect = _initialRect;
+	_pitch = _picture->_surface.pitch;
+
+	// Every cached derivative was built from the old, larger picture. _matte can
+	// alias _matteSource, so it goes first (see the destructor).
+	if (_ditheredImg) {
+		_ditheredImg->free();
+		delete _ditheredImg;
+		_ditheredImg = nullptr;
+		_ditheredTargetClut = CastMemberID(0, 0);
+	}
+	if (_matte && _matte != _matteSource) {
+		_matte->free();
+		delete _matte;
+	}
+	_matte = nullptr;
+	if (_matteSource) {
+		_matteSource->free();
+		delete _matteSource;
+		_matteSource = nullptr;
+	}
+	_noMatte = false;
+
+	setModified(true);
+}
+
 Common::Point BitmapCastMember::getRegistrationOffset() {
 	return Common::Point(_regX - _initialRect.left, _regY - _initialRect.top);
 }

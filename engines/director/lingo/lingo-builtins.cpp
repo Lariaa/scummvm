@@ -187,6 +187,7 @@ static const BuiltinProto builtins[] = {
 	{ "constrainH",		LB::b_constrainH,	2, 2, 200, FBLTIN },	// D2 f
 	{ "constrainV",		LB::b_constrainV,	2, 2, 200, FBLTIN },	// D2 f
 	{ "copyToClipBoard",LB::b_copyToClipBoard,1,1,400, CBLTIN }, 	//			D4 c
+	{ "crop",			LB::b_crop,			2, 2, 700, CBLTIN },	//							D7 c
 	{ "duplicate",		LB::b_duplicate,	1, 2, 400, CBLTIN },	//			D4 c
 	{ "editableText",	LB::b_editableText,	0, 0, 200, CBLTIN },	// D2
 	{ "erase",			LB::b_erase,		1, 1, 400, CBLTIN },	//			D4 c
@@ -3069,6 +3070,37 @@ void LB::b_erase(int nargs) {
 			}
 		}
 	}
+}
+
+void LB::b_crop(int nargs) {
+	Datum rectArg = g_lingo->pop();
+	Datum memberArg = g_lingo->pop();
+
+	if (rectArg.type != RECT || rectArg.u.farr->arr.size() < 4) {
+		warning("LB::b_crop(): expected a rect, got %s", rectArg.type2str());
+		return;
+	}
+
+	Movie *movie = g_director->getCurrentMovie();
+	CastMemberID id = memberArg.asMemberID();
+	CastMember *member = movie->getCastMember(id);
+	if (!member) {
+		warning("LB::b_crop(): %s not found", id.asString().c_str());
+		return;
+	}
+	if (member->_type != kCastBitmap) {
+		warning("LB::b_crop(): %s is a %s, not a bitmap", id.asString().c_str(), castType2str(member->_type));
+		return;
+	}
+
+	Common::Rect cropRect(rectArg.u.farr->arr[0].asInt(), rectArg.u.farr->arr[1].asInt(),
+						  rectArg.u.farr->arr[2].asInt(), rectArg.u.farr->arr[3].asInt());
+
+	member->load();
+	// The old rects have to go before the picture shrinks under them.
+	if (movie->getScore())
+		movie->getScore()->invalidateRectsForMember(member);
+	((BitmapCastMember *)member)->crop(cropRect);
 }
 
 void LB::b_findEmpty(int nargs) {
