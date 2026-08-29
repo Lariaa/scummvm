@@ -429,11 +429,32 @@ Datum Window::getPicture() {
 	ref->_picture = new Picture();
 	ref->_picture->_surface.copyFrom(surface->rawSurface());
 
-	if (ref->_picture->_surface.format.isCLUT8()) {
+	const Graphics::Surface &grab = ref->_picture->_surface;
+	if (grab.format.isCLUT8()) {
 		const byte *palette = g_director->_wm->getPalette();
 		int count = (int)g_director->_wm->getPaletteSize();	// colours, not bytes
 		if (palette && count > 0)
 			ref->_picture->copyPalette(palette, MIN(count, 256));
+	}
+
+	// What a grab is made of decides how the member it lands in draws, so say
+	// it: a compose surface that carries no alpha and one that is transparent
+	// everywhere look the same here but not on screen.
+	if (debugChannelSet(4, kDebugImages)) {
+		uint8 aMin = 0xff, aMax = 0;
+		if (grab.format.bytesPerPixel == 4 && grab.format.aBits() == 8) {
+			for (int y = 0; y < grab.h; y++) {
+				for (int x = 0; x < grab.w; x++) {
+					uint8 a, r, g, b;
+					grab.format.colorToARGB(grab.getPixel(x, y), a, r, g, b);
+					aMin = MIN(aMin, a);
+					aMax = MAX(aMax, a);
+				}
+			}
+		}
+		debugC(4, kDebugImages, "Window::getPicture(): '%s' %dx%d %s, alpha %d..%d, palette %d colours",
+				getName().c_str(), grab.w, grab.h, grab.format.toString().c_str(),
+				aMin, aMax, ref->_picture->getPaletteCount());
 	}
 
 	d.type = PICTUREREF;
