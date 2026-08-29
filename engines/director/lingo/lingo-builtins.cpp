@@ -4378,6 +4378,11 @@ void LB::b_intersect(int nargs) {
 	d.u.farr->arr.push_back(Datum((int)inter.right));
 	d.u.farr->arr.push_back(Datum((int)inter.bottom));
 
+	debugC(4, kDebugLingoExec, "LB::b_intersect(): rect(%d, %d, %d, %d) x rect(%d, %d, %d, %d) -> rect(%d, %d, %d, %d)",
+			rect1.left, rect1.top, rect1.right, rect1.bottom,
+			rect2.left, rect2.top, rect2.right, rect2.bottom,
+			inter.left, inter.top, inter.right, inter.bottom);
+
 	g_lingo->push(d);
 }
 
@@ -4428,6 +4433,12 @@ void LB::b_inside(int nargs) {
 	Common::Point point1(p1.u.farr->arr[0].asInt(), p1.u.farr->arr[1].asInt());
 
 	d = rect2.contains(point1);
+
+	// Games gate a drop on this, so a rectangle that never contains anything
+	// looks exactly like a refusal. Name the operands; inside() is rare enough
+	// that this costs nothing.
+	debugC(4, kDebugLingoExec, "LB::b_inside(): point(%d, %d) in rect(%d, %d, %d, %d) -> %d",
+			point1.x, point1.y, rect2.left, rect2.top, rect2.right, rect2.bottom, d.asInt());
 
 	g_lingo->push(d);
 }
