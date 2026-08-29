@@ -101,6 +101,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheImageDirect,		"imageDirect",		false, 200, false },// D2 p
 	{ kTheItemDelimiter,	"itemDelimiter",	false, 400, false },//			D4 p
 	{ kTheKey,				"key",				false, 200, true },	// D2 f
+	{ kTheKeyboardFocusSprite,"keyboardFocusSprite",false, 700, false },//				D7 p
 	{ kTheKeyCode,			"keyCode",			false, 200, true },	// D2 f
 	{ kTheKeyDownScript,	"keyDownScript",	false, 200, false },// D2 p
 	{ kTheKeyPressed,		"keyPressed",		false, 500, false },//				D5 p
@@ -118,6 +119,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheMenu,				"menu",				true,  300, false },//		D3 p
 	{ kTheMenuItem,			"menuitem",			true,  300, false },//		D3 p
 	{ kTheMenuItems,		"menuitems",		false, 300, true },	//		D3 f
+	{ kTheMilliSeconds,		"milliSeconds",		false, 700, true },	//					D7 f
 	{ kTheMouseCast,		"mouseCast",		false, 300, true },	//		D3 f
 	{ kTheMouseChar,		"mouseChar",		false, 300, true },	//		D3 f
 	{ kTheMouseDown,		"mouseDown",		false, 200, true },	// D2 f
@@ -241,9 +243,11 @@ const TheEntityField fields[] = {
 	{ kTheSprite,	"puppet",		kThePuppet,		200 },// D2 p
 	{ kTheSprite,	"rect",			kTheRect,		400 },//				D4 p ???
 	{ kTheSprite,	"right",		kTheRight,		200 },// D2 p
+	{ kTheSprite,	"rotation",		kTheRotation,	700 },//							D7 p
 	{ kTheSprite,	"scoreColor",	kTheScoreColor,	400 },//				D4 p
 	{ kTheSprite,	"scriptInstanceList",kTheScriptInstanceList,600 },//			D6 p
 	{ kTheSprite,	"scriptNum",	kTheScriptNum,	400 },//				D4 p
+	{ kTheSprite,	"skew",			kTheSkew,		700 },//							D7 p
 	{ kTheSprite,	"stretch",		kTheStretch,	200 },// D2 p
 	{ kTheSprite,	"top",			kTheTop,		200 },// D2 p
 	{ kTheSprite,	"trails",		kTheTrails,		300 },//		D3.1 p
@@ -375,6 +379,10 @@ const TheEntityField fields[] = {
 	{ kTheCast,		"interface",	kTheInterface,	500 },//					D5 p
 	{ kTheCast,		"mediaBusy",	kTheMediaBusy,	600 },//						D6 p
 
+	// Alpha channel fields of a 32-bit bitmap cast member
+	{ kTheCast,		"alphaThreshold",kTheAlphaThreshold,700 },//					D7 p
+	{ kTheCast,		"useAlpha",		kTheUseAlpha,	700 },//						D7 p
+
 	// Cursor Xtra cast member fields
 	{ kTheCast,		"autoMask",		kTheAutoMask,	700 },//						D7 p
 	{ kTheCast,		"castMemberList",kTheCastMemberList,700 },//					D7 p
@@ -415,6 +423,7 @@ const TheEntityField fields[] = {
 	{ kTheWindow,	"drawRect",		kTheDrawRect,	400 },//				D4 p
 	{ kTheWindow,	"fileName",		kTheFileName,	400 },//				D4 p
 	{ kTheWindow,	"modal",		kTheModal,		400 },//				D4 p
+	{ kTheWindow,	"picture",		kThePicture,	700 },//							D7 p
 	{ kTheWindow,	"rect",			kTheRect,		400 },//				D4 p
 	{ kTheWindow,	"title",		kTheTitle,		400 },//				D4 p
 	{ kTheWindow,	"titleVisible",	kTheTitleVisible,400 },//				D4 p
@@ -712,6 +721,12 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		} else {
 			d = Common::String();
 		}
+		break;
+	case kTheKeyboardFocusSprite:
+		// The sprite that receives keystrokes. Director reports 0 when no sprite
+		// holds the focus and -1 when the Score is in charge of it; we only ever
+		// track a channel, so 0 covers both.
+		d = (int)movie->_currentEditableTextChannel;
 		break;
 	case kTheKeyCode:
 		d = _vm->_keyCode;
@@ -1191,6 +1206,12 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 	case kTheSwitchColorDepth:
 		getTheEntitySTUB(kTheSwitchColorDepth);
 		break;
+	case kTheMilliSeconds:
+		// Wall clock since the machine came up, straight from the host -- the
+		// docs are explicit that Director does not keep this one itself. The
+		// finer-grained twin of "the ticks".
+		d = (int)g_system->getMillis();
+		break;
 	case kTheTicks:
 		d = (int)_vm->getMacTicks();
 		break;
@@ -1403,6 +1424,13 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		else
 			g_lingo->_itemDelimiter = d.asString().decode(Common::kUtf8)[0];
 		break;
+	case kTheKeyboardFocusSprite: {
+		// -1 hands the focus back to the Score, 0 takes it away from every
+		// sprite; both leave us with no editable channel of our own.
+		int focus = d.asInt();
+		movie->_currentEditableTextChannel = focus > 0 ? (uint16)focus : 0;
+		break;
+	}
 	case kTheKeyDownScript:
 		movie->setPrimaryEventHandler(kEventKeyDown, d.asString());
 		break;
@@ -1873,6 +1901,14 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 	case kTheRight:
 		d = channel->getBbox().right;
 		break;
+	// The score keeps both angles in hundredths of a degree (sprite record
+	// fields 28 and 32); Lingo hands them out as degrees, as a float.
+	case kTheRotation:
+		d = Datum((double)sprite->_angleRot / 100.0);
+		break;
+	case kTheSkew:
+		d = Datum((double)sprite->_angleSkew / 100.0);
+		break;
 	case kTheScoreColor:
 		//Check the last 3 bits of the _colorcode byte as value lies in 0 to 5
 		d = (int)(sprite->_colorcode & 0x7);
@@ -2084,6 +2120,23 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 
 		sprite->setAutoPuppet(kAPThickness, true);
 		break;
+	// Stored in hundredths of a degree, the same unit the score uses. We cannot
+	// draw an arbitrary angle yet -- Sprite::isFlippedH()/isFlippedV() only turn
+	// the half turns into axis flips -- but the value has to round-trip, because
+	// scripts read it back to accumulate a drag (TKKG 7's rotate handle does
+	// exactly that). A sprite left to the score gets its angles overwritten on
+	// the next frame; a puppeted one, which is what these scripts use, keeps them.
+	case kTheRotation:
+	case kTheSkew: {
+		double degrees = d.asFloat();
+		int32 angle = (int32)(degrees * 100.0 + (degrees < 0 ? -0.5 : 0.5));
+		int32 &target = (field == kTheRotation) ? sprite->_angleRot : sprite->_angleSkew;
+		if (angle != target) {
+			target = angle;
+			channel->setDirty();
+		}
+		break;
+	}
 	case kTheBgColor:
 	case kTheColor:
 		{

@@ -39,6 +39,7 @@
 #include "director/sprite.h"
 #include "director/castmember/castmember.h"
 #include "director/debugger/debugtools.h"
+#include "director/picture.h"
 #include "graphics/managed_surface.h"
 
 namespace Director {
@@ -411,6 +412,35 @@ Datum Window::getStageRect() {
 	d.u.farr->arr.push_back(rect.right);
 	d.u.farr->arr.push_back(rect.bottom);
 
+	return d;
+}
+
+Datum Window::getPicture() {
+	Datum d;
+
+	Graphics::ManagedSurface *surface = getSurface();
+	if (!surface || surface->w <= 0 || surface->h <= 0) {
+		warning("Window::getPicture(): window '%s' has no surface to capture", getName().c_str());
+		return d;
+	}
+
+	// A copy, not a view: the caller assigns this to a cast member that outlives
+	// the next frame, and the compose surface is redrawn continuously.
+	PictureReference *ref = new PictureReference;
+	ref->_picture = new Picture();
+	ref->_picture->_surface.copyFrom(surface->rawSurface());
+
+	// An 8-bit grab is only meaningful together with the palette it was taken
+	// under; in true colour the pixels already carry their own colour.
+	if (ref->_picture->_surface.format.isCLUT8()) {
+		const byte *palette = g_director->_wm->getPalette();
+		int count = (int)g_director->_wm->getPaletteSize();	// colours, not bytes
+		if (palette && count > 0)
+			ref->_picture->copyPalette(palette, MIN(count, 256));
+	}
+
+	d.type = PICTUREREF;
+	d.u.picture = ref;
 	return d;
 }
 

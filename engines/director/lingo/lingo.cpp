@@ -1143,6 +1143,14 @@ int Datum::asInt() const {
 			res = (int)u.f;
 		}
 		break;
+	case MEDIA:
+		// "the media of member" is an opaque handle; the docs call it "a unique
+		// code that identifies a cast member in RAM". Scripts test it against
+		// -1 rather than reading it, so hand back the same value asString()
+		// prints instead of warning on every call (TKKG 7's memory manager asks
+		// for this on every snapshot).
+		res = (int)((uint32)(size_t)((void *)u.obj) & 0x7fffffff);
+		break;
 	default:
 		warning("Incorrect operation asInt() for type: %s", type2str());
 	}

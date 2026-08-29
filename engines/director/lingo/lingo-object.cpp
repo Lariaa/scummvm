@@ -1127,6 +1127,7 @@ bool Window::hasField(int field) {
 	case kTheDrawRect:
 	case kTheFileName:
 	case kTheModal:
+	case kThePicture:
 	case kTheRect:
 	case kTheSourceRect:
 	case kTheTitle:
@@ -1162,9 +1163,15 @@ Datum Window::getField(int field) {
 
 		// TODO: This should allow stretching or panning
 		return getStageRect();
+	case kThePicture:
+		// A snapshot of what the window currently shows. "the picture of the
+		// stage" is how a D7 movie grabs the screen: assign it to a bitmap cast
+		// member, crop that member, and you have a screengrab as a cast member.
+		// Scripts call updateStage() first, so the compose surface is current.
+		ensureMovieIsLoaded();
+		return getPicture();
 	case kTheSourceRect:
 	// case kTheImage:
-	// case kThePicture::
 		ensureMovieIsLoaded();  // Remove fallthrough once implemented
 		// fallthrough
 	default:

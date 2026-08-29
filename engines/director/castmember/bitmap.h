@@ -63,6 +63,9 @@ public:
 	void setPicture(PictureReference &picture);
 	void setPicture(Image::ImageDecoder &image, bool adjustSize);
 
+	// "crop member(x), rect" -- D7's way of cutting a screen grab down to size.
+	void crop(const Common::Rect &cropRect);
+
 	Common::Point getRegistrationOffset() override;
 	Common::Point getRegistrationOffset(int16 width, int16 height) override;
 
@@ -96,6 +99,12 @@ public:
 	uint32 _tag;
 	bool _noMatte;
 	bool _external;
+	// D7's "useAlpha" property. The cast data has no bit we have identified for
+	// it, so this starts out true: the alpha channel of a 32-bit member is the
+	// only transparency information we have, and Janosch Panama's artwork needs
+	// it. Scripts that switch it off (TKKG 7 does, on a member built from a
+	// stage grab) are honoured.
+	bool _useAlpha = true;
 
 	// D4 stucture:
 	// uint16 _pitch;
@@ -109,7 +118,7 @@ public:
 	uint16 _pitch;
 	// _initialRect			// 2
 	// _boundingRect		// 10  D%-
-	byte _alphaThreshold; 	// 10  D7+
+	byte _alphaThreshold = 0; // 10  D7+ (absent before D7, and read back by Lingo)
 	   // padding
 	uint16 _editVersion;	// 12  D6+
 	Common::Point _scrollPoint; // 14

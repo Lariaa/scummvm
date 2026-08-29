@@ -1727,6 +1727,18 @@ void LC::call(const Common::String &name, int nargs, bool allowRetVal) {
 		}
 	}
 
+	// "new(#bitmap, castLib "x")" is D7's cast-member constructor, not the birth
+	// of a child object: the first argument is a cast type symbol, not a script.
+	// Every "new" in scope would otherwise swallow it -- inside a parent script
+	// that is the script's own "on new" handler, with #bitmap arriving as "me"
+	// (TKKG 7's PhotoObjekt builds its photos exactly like that).
+	// Only when a builtin is actually there to answer it, so nothing changes for
+	// the Director versions that have no cast-member "new".
+	bool newCastMember = name.equalsIgnoreCase("new") && nargs >= 1 &&
+			g_lingo->peek(nargs - 1).type == SYMBOL &&
+			(allowRetVal ? g_lingo->_builtinFuncs.contains(name)
+						 : g_lingo->_builtinCmds.contains(name));
+
 	// If we're calling from within a me object, and it has a function handler with a
 	// matching name, include the me object in the CFrame (so we still get property lookups).
 	// Doesn't matter that the first arg isn't the me object (which would have been caught
@@ -1735,7 +1747,7 @@ void LC::call(const Common::String &name, int nargs, bool allowRetVal) {
 	// If the method is called from outside and without the object as the first arg,
 	// it will still work using the normal getHandler lookup.
 	// However properties will return garbage (the number 3??).
-	if (!useListBuiltin && g_lingo->_state->me.type == OBJECT) {
+	if (!useListBuiltin && !newCastMember && g_lingo->_state->me.type == OBJECT) {
 		AbstractObject *target = g_lingo->_state->me.u.obj;
 		funcSym = target->getMethod(name);
 		if (funcSym.type != VOIDSYM) {
@@ -1746,6 +1758,11 @@ void LC::call(const Common::String &name, int nargs, bool allowRetVal) {
 
 	// Handler
 	funcSym = g_lingo->getHandler(name);
+
+	// Drop a script's own "on new" for the cast-member form (see above); the
+	// builtin lookup right below picks it up instead.
+	if (newCastMember)
+		funcSym = Symbol();
 
 	if (useListBuiltin)
 		funcSym = g_lingo->_builtinListHandlers[name];

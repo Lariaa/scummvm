@@ -47,7 +47,9 @@ struct Picture {
 	Picture(Image::ImageDecoder &img);
 	Picture(Picture &picture);
 	~Picture();
-private:
+
+	// A screen grab is built surface-first (Window::getPicture()), so the
+	// palette has to be attachable after construction.
 	void copyPalette(const byte *src, int numColors);
 };
 

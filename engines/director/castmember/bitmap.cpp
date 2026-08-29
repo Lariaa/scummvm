@@ -45,6 +45,36 @@
 
 namespace Director {
 
+// An empty bitmap, with no picture of its own yet. The header has always
+// declared this constructor; it had no definition until "new(#bitmap)" needed
+// one. Everything that matters is filled in by whatever is assigned next --
+// "the picture of", "the media of", or importFileInto.
+BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId)
+		: CastMember(cast, castId) {
+	_type = kCastBitmap;
+	_picture = new Picture();
+	_ditheredImg = nullptr;
+	_matteSource = nullptr;
+	_matte = nullptr;
+	_noMatte = false;
+	_bytes = 0;
+	_pitch = 0;
+	_flags2 = 0;
+	_regX = _regY = 0;
+	_clut = CastMemberID(0, 0);
+	_ditheredTargetClut = CastMemberID(0, 0);
+	_bitsPerPixel = 0;
+	_external = false;
+	_editVersion = 0;
+	_updateFlags = 0;
+	_tag = MKTAG('B', 'I', 'T', 'D');
+	_version = cast ? cast->_version : 0;
+	_initialRect = Common::Rect(0, 0);
+	_boundingRect = Common::Rect(0, 0);
+	// There is no resource behind this one, so nothing is ever going to load it.
+	_loaded = true;
+}
+
 BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream, uint32 castTag, uint16 version, uint8 flags1)
 		: CastMember(cast, castId, stream) {
 	_type = kCastBitmap;
@@ -347,6 +377,8 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, BitmapCastMember &
 	_matte = nullptr;
 	_noMatte = false;
 	_external = source._external;
+	_alphaThreshold = source._alphaThreshold;
+	_useAlpha = source._useAlpha;
 
 	_version = source._version;
 
@@ -669,7 +701,10 @@ void BitmapCastMember::createMatte() {
 	debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d: source %dx%d %s, declared %d bpp",
 			_castId, src.w, src.h, src.format.toString().c_str(), _bitsPerPixel);
 
-	if (src.format.bytesPerPixel == 4 && src.format.aBits() == 8) {
+	// "the useAlpha of member" switches the alpha channel off. TKKG 7 does this
+	// on the bitmap it builds from a stage grab, where the channel is left over
+	// from the compose surface and means nothing.
+	if (src.format.bytesPerPixel == 4 && src.format.aBits() == 8 && _useAlpha) {
 		Graphics::Surface *fromAlpha = new Graphics::Surface();
 		fromAlpha->create(src.w, src.h, Graphics::PixelFormat::createFormatCLUT8());
 
@@ -1232,6 +1267,69 @@ void BitmapCastMember::setPicture(Image::ImageDecoder &image, bool adjustSize) {
 	setModified(true);
 }
 
+// "crop member(x), rect" cuts the picture down to cropRect, which is given in
+// the picture's own coordinates -- for a stage grab that is the same as stage
+// coordinates, which is what makes the D7 idiom work:
+//
+//     member("Stage").picture = the picture of the stage
+//     crop member("Stage"), the rect of sprite("section")
+//
+// The docs note that "a bitmap will remain in the same relative position after
+// cropping because the registration point doesn't move": the reg point keeps
+// pointing at the same pixel of the artwork, so it shifts by the cut-off
+// corner. TKKG 7 crops every canvas snapshot this way.
+void BitmapCastMember::crop(const Common::Rect &cropRect) {
+	if (!_picture || _picture->_surface.w <= 0 || _picture->_surface.h <= 0) {
+		warning("BitmapCastMember::crop(): cast %d has no picture to crop", _castId);
+		return;
+	}
+
+	Common::Rect bounds(_picture->_surface.w, _picture->_surface.h);
+	Common::Rect area(cropRect);
+	area.clip(bounds);
+
+	if (area.width() <= 0 || area.height() <= 0) {
+		warning("BitmapCastMember::crop(): cast %d, crop rect %d,%d,%d,%d does not meet the %dx%d picture",
+				_castId, cropRect.left, cropRect.top, cropRect.right, cropRect.bottom, bounds.width(), bounds.height());
+		return;
+	}
+
+	Graphics::Surface cropped;
+	cropped.create(area.width(), area.height(), _picture->_surface.format);
+	cropped.copyRectToSurface(_picture->_surface, 0, 0, area);
+
+	_picture->_surface.free();
+	_picture->_surface.copyFrom(cropped);
+	cropped.free();
+
+	_regX -= area.left;
+	_regY -= area.top;
+	_initialRect = Common::Rect(_picture->_surface.w, _picture->_surface.h);
+	_boundingRect = _initialRect;
+	_pitch = _picture->_surface.pitch;
+
+	// Every cached derivative was built from the old, larger picture.
+	if (_ditheredImg) {
+		_ditheredImg->free();
+		delete _ditheredImg;
+		_ditheredImg = nullptr;
+		_ditheredTargetClut = CastMemberID(0, 0);
+	}
+	if (_matte && _matte != _matteSource) {
+		_matte->free();
+		delete _matte;
+	}
+	_matte = nullptr;
+	if (_matteSource) {
+		_matteSource->free();
+		delete _matteSource;
+		_matteSource = nullptr;
+	}
+	_noMatte = false;
+
+	setModified(true);
+}
+
 Common::Point BitmapCastMember::getRegistrationOffset() {
 	return Common::Point(_regX - _initialRect.left, _regY - _initialRect.top);
 }
@@ -1255,11 +1353,13 @@ CollisionTest BitmapCastMember::isWithin(const Common::Rect &bbox, const Common:
 
 bool BitmapCastMember::hasField(int field) {
 	switch (field) {
+	case kTheAlphaThreshold:
 	case kTheDepth:
 	case kTheRegPoint:
 	case kThePalette:
 	case kThePaletteRef:
 	case kThePicture:
+	case kTheUseAlpha:
 		return true;
 	default:
 		break;
@@ -1271,6 +1371,12 @@ Datum BitmapCastMember::getField(int field) {
 	Datum d;
 
 	switch (field) {
+	case kTheAlphaThreshold:
+		d = (int)_alphaThreshold;
+		break;
+	case kTheUseAlpha:
+		d = _useAlpha ? 1 : 0;
+		break;
 	case kTheDepth:
 		d = _bitsPerPixel;
 		break;
@@ -1350,6 +1456,32 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 	case kTheDepth:
 		warning("BitmapCastMember::setField(): Attempt to set read-only field %s of cast %d", g_lingo->field2str(field), _castId);
 		return;
+	case kTheAlphaThreshold:
+		_alphaThreshold = (byte)CLIP<int>(d.asInt(), 0, 255);
+		return;
+	case kTheUseAlpha: {
+		bool useAlpha = d.asInt() != 0;
+		if (useAlpha != _useAlpha) {
+			_useAlpha = useAlpha;
+			// The matte is built from the alpha channel when this is on and
+			// flood filled when it is off, so the cached one is now wrong.
+			// _matte aliases _matteSource when the drawn size matched, so it
+			// goes first (see the destructor).
+			if (_matte && _matte != _matteSource) {
+				_matte->free();
+				delete _matte;
+			}
+			_matte = nullptr;
+			if (_matteSource) {
+				_matteSource->free();
+				delete _matteSource;
+				_matteSource = nullptr;
+			}
+			_noMatte = false;
+			_modified = true;
+		}
+		return;
+	}
 	case kTheRegPoint:
 		if (d.type == POINT || (d.type == ARRAY && d.u.farr->arr.size() >= 2)) {
 			Score *score = g_director->getCurrentMovie()->getScore();

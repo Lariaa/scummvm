@@ -187,6 +187,7 @@ static const BuiltinProto builtins[] = {
 	{ "constrainH",		LB::b_constrainH,	2, 2, 200, FBLTIN },	// D2 f
 	{ "constrainV",		LB::b_constrainV,	2, 2, 200, FBLTIN },	// D2 f
 	{ "copyToClipBoard",LB::b_copyToClipBoard,1,1,400, CBLTIN }, 	//			D4 c
+	{ "crop",			LB::b_crop,			2, 2, 700, CBLTIN },	//							D7 c
 	{ "duplicate",		LB::b_duplicate,	1, 2, 400, CBLTIN },	//			D4 c
 	{ "editableText",	LB::b_editableText,	0, 0, 200, CBLTIN },	// D2
 	{ "erase",			LB::b_erase,		1, 1, 400, CBLTIN },	//			D4 c
@@ -198,6 +199,7 @@ static const BuiltinProto builtins[] = {
 	{ "marker",			LB::b_marker,		1, 1, 200, FBLTIN },	// D2 f
 	{ "move",			LB::b_move,			1, 2, 400, CBLTIN },	//			D4 c
 	{ "moveableSprite",	LB::b_moveableSprite,0, 0, 200, CBLTIN },	// D2, FIXME: the field in D4+
+	{ "new",			LB::b_new,			1, 2, 700, FBLTIN },	//							D7 f
 	{ "pasteClipBoardInto",LB::b_pasteClipBoardInto,1,1,400,CBLTIN },//			D4 c
 	{ "puppetPalette",	LB::b_puppetPalette, -1,0, 200, CBLTIN },	// D2 c
 	{ "puppetSound",	LB::b_puppetSound,	-1,0, 200, CBLTIN },	// D2 c
@@ -3069,6 +3071,118 @@ void LB::b_erase(int nargs) {
 			}
 		}
 	}
+}
+
+void LB::b_crop(int nargs) {
+	Datum rectArg = g_lingo->pop();
+	Datum memberArg = g_lingo->pop();
+
+	if (rectArg.type != RECT || rectArg.u.farr->arr.size() < 4) {
+		warning("LB::b_crop(): expected a rect, got %s", rectArg.type2str());
+		return;
+	}
+
+	Movie *movie = g_director->getCurrentMovie();
+	CastMemberID id = memberArg.asMemberID();
+	CastMember *member = movie->getCastMember(id);
+	if (!member) {
+		warning("LB::b_crop(): %s not found", id.asString().c_str());
+		return;
+	}
+	if (member->_type != kCastBitmap) {
+		warning("LB::b_crop(): %s is a %s, not a bitmap", id.asString().c_str(), castType2str(member->_type));
+		return;
+	}
+
+	Common::Rect cropRect(rectArg.u.farr->arr[0].asInt(), rectArg.u.farr->arr[1].asInt(),
+						  rectArg.u.farr->arr[2].asInt(), rectArg.u.farr->arr[3].asInt());
+
+	member->load();
+	// The old, larger rects have to go before the picture shrinks under them.
+	if (movie->getScore())
+		movie->getScore()->invalidateRectsForMember(member);
+	((BitmapCastMember *)member)->crop(cropRect);
+}
+
+// new(#castType {, castLib whichCast | member whichMember})
+//
+// D7's way of making a cast member at run time; it returns the member reference
+// of the new one. Only reached when the first argument is not an object -- a
+// child object is born through the object's own "new" method, which LC::call
+// resolves before it ever looks a builtin up, and a movie's own "on new"
+// handler still overrides this (see the handler lookup in LC::call).
+//
+// TKKG 7's phantom-picture program builds every saved photo this way:
+//   bildmember = new(#bitmap, castLib("sortiertisch"))
+//   bildmember.media = gCanvasObj[modus].getSnapshot()
+void LB::b_new(int nargs) {
+	Datum where;
+	if (nargs > 1)
+		where = g_lingo->pop();
+	Datum typeArg = g_lingo->pop();
+
+	Movie *movie = g_director->getCurrentMovie();
+	Datum res;
+
+	if (typeArg.type != SYMBOL) {
+		warning("LB::b_new(): expected a cast type symbol, got %s", typeArg.type2str());
+		g_lingo->push(res);
+		return;
+	}
+
+	Common::String typeName = typeArg.asString();
+	if (!typeName.equalsIgnoreCase("bitmap")) {
+		warning("LB::b_new(): STUB: creating a #%s cast member is not supported", typeName.c_str());
+		g_lingo->push(res);
+		return;
+	}
+
+	// The target slot: an explicit member reference picks it, a castLib says
+	// "the next free one in that cast", nothing says "the default cast".
+	Cast *defaultCast = movie->getCast();
+	if (!defaultCast) {
+		warning("LB::b_new(): no cast loaded");
+		g_lingo->push(res);
+		return;
+	}
+	int castLibId = defaultCast->_castLibID;
+	int slot = 0;
+	if (where.type == CASTREF || where.type == FIELDREF) {
+		castLibId = where.u.cast->castLib;
+		slot = where.u.cast->member;
+	} else if (where.type == CASTLIBREF) {
+		castLibId = where.u.i;
+	} else if (where.type != VOID) {
+		warning("LB::b_new(): unexpected second argument %s, using the default cast", where.type2str());
+	}
+
+	Cast *cast = movie->getCast(CastMemberID(1, castLibId));
+	if (!cast) {
+		warning("LB::b_new(): castLib %d not found", castLibId);
+		g_lingo->push(res);
+		return;
+	}
+
+	if (slot <= 0) {
+		for (int i = MAX<int>(cast->_castArrayStart, 1); i <= (int)cast->_castArrayEnd; i++) {
+			CastMember *existing = cast->getCastMember(i);
+			if (!existing || existing->_type == kCastTypeNull) {
+				slot = i;
+				break;
+			}
+		}
+		if (slot <= 0)
+			slot = (int)cast->_castArrayEnd + 1;
+	}
+
+	cast->setCastMember(slot, new BitmapCastMember(cast, (uint16)slot));
+	if (slot > (int)cast->_castArrayEnd)
+		cast->_castArrayEnd = (uint16)slot;
+
+	debugC(3, kDebugLingoExec, "LB::b_new(): created #%s as member %d of castLib %d", typeName.c_str(), slot, castLibId);
+
+	res = Datum(CastMemberID(slot, castLibId));
+	g_lingo->push(res);
 }
 
 void LB::b_findEmpty(int nargs) {
