@@ -195,6 +195,7 @@ enum TheEntityType {
 enum TheFieldType {
 	kTheNOField = 0,
 	kTheAbbr    = 1,
+	kTheAlphaThreshold,
 	kTheAntiAlias,
 	kTheAutoMask,
 	kTheAutoTab,
@@ -327,6 +328,7 @@ enum TheFieldType {
 	kTheTransitionType,
 	kTheTweened,
 	kTheType,
+	kTheUseAlpha,
 	kTheVideo,
 	kTheVisibility,
 	kTheVisible,
