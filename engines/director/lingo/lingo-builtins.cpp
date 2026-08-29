@@ -199,6 +199,7 @@ static const BuiltinProto builtins[] = {
 	{ "marker",			LB::b_marker,		1, 1, 200, FBLTIN },	// D2 f
 	{ "move",			LB::b_move,			1, 2, 400, CBLTIN },	//			D4 c
 	{ "moveableSprite",	LB::b_moveableSprite,0, 0, 200, CBLTIN },	// D2, FIXME: the field in D4+
+	{ "new",			LB::b_new,			1, 2, 700, FBLTIN },	//							D7 f
 	{ "pasteClipBoardInto",LB::b_pasteClipBoardInto,1,1,400,CBLTIN },//			D4 c
 	{ "puppetPalette",	LB::b_puppetPalette, -1,0, 200, CBLTIN },	// D2 c
 	{ "puppetSound",	LB::b_puppetSound,	-1,0, 200, CBLTIN },	// D2 c
@@ -3101,6 +3102,79 @@ void LB::b_crop(int nargs) {
 	if (movie->getScore())
 		movie->getScore()->invalidateRectsForMember(member);
 	((BitmapCastMember *)member)->crop(cropRect);
+}
+
+// new(#castType {, castLib whichCast | member whichMember}), returning the
+// member reference. LC::call routes the symbol form here; an object receiver
+// never reaches this.
+void LB::b_new(int nargs) {
+	Datum where;
+	if (nargs > 1)
+		where = g_lingo->pop();
+	Datum typeArg = g_lingo->pop();
+
+	Movie *movie = g_director->getCurrentMovie();
+	Datum res;
+
+	if (typeArg.type != SYMBOL) {
+		warning("LB::b_new(): expected a cast type symbol, got %s", typeArg.type2str());
+		g_lingo->push(res);
+		return;
+	}
+
+	Common::String typeName = typeArg.asString();
+	if (!typeName.equalsIgnoreCase("bitmap")) {
+		warning("LB::b_new(): STUB: creating a #%s cast member is not supported", typeName.c_str());
+		g_lingo->push(res);
+		return;
+	}
+
+	// A member reference picks the slot, a castLib picks the cast, nothing
+	// means the default cast.
+	Cast *defaultCast = movie->getCast();
+	if (!defaultCast) {
+		warning("LB::b_new(): no cast loaded");
+		g_lingo->push(res);
+		return;
+	}
+	int castLibId = defaultCast->_castLibID;
+	int slot = 0;
+	if (where.type == CASTREF || where.type == FIELDREF) {
+		castLibId = where.u.cast->castLib;
+		slot = where.u.cast->member;
+	} else if (where.type == CASTLIBREF) {
+		castLibId = where.u.i;
+	} else if (where.type != VOID) {
+		warning("LB::b_new(): unexpected second argument %s, using the default cast", where.type2str());
+	}
+
+	Cast *cast = movie->getCast(CastMemberID(1, castLibId));
+	if (!cast) {
+		warning("LB::b_new(): castLib %d not found", castLibId);
+		g_lingo->push(res);
+		return;
+	}
+
+	if (slot <= 0) {
+		for (int i = MAX<int>(cast->_castArrayStart, 1); i <= (int)cast->_castArrayEnd; i++) {
+			CastMember *existing = cast->getCastMember(i);
+			if (!existing || existing->_type == kCastTypeNull) {
+				slot = i;
+				break;
+			}
+		}
+		if (slot <= 0)
+			slot = (int)cast->_castArrayEnd + 1;
+	}
+
+	cast->setCastMember(slot, new BitmapCastMember(cast, (uint16)slot));
+	if (slot > (int)cast->_castArrayEnd)
+		cast->_castArrayEnd = (uint16)slot;
+
+	debugC(3, kDebugLingoExec, "LB::b_new(): created #%s as member %d of castLib %d", typeName.c_str(), slot, castLibId);
+
+	res = Datum(CastMemberID(slot, castLibId));
+	g_lingo->push(res);
 }
 
 void LB::b_findEmpty(int nargs) {
