@@ -1143,6 +1143,11 @@ int Datum::asInt() const {
 			res = (int)u.f;
 		}
 		break;
+	case MEDIA:
+		// An opaque handle; scripts only compare it, so hand back what
+		// asString() prints rather than warning on every call.
+		res = (int)((uint32)(size_t)((void *)u.obj) & 0x7fffffff);
+		break;
 	default:
 		warning("Incorrect operation asInt() for type: %s", type2str());
 	}
