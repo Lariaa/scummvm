@@ -46,6 +46,32 @@
 
 namespace Director {
 
+// An empty bitmap; whatever is assigned next fills it in.
+BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId)
+		: CastMember(cast, castId) {
+	_type = kCastBitmap;
+	_picture = new Picture();
+	_ditheredImg = nullptr;
+	_matteSource = nullptr;
+	_matte = nullptr;
+	_noMatte = false;
+	_bytes = 0;
+	_pitch = 0;
+	_flags2 = 0;
+	_regX = _regY = 0;
+	_clut = CastMemberID(0, 0);
+	_ditheredTargetClut = CastMemberID(0, 0);
+	_bitsPerPixel = 0;
+	_external = false;
+	_editVersion = 0;
+	_updateFlags = 0;
+	_tag = MKTAG('B', 'I', 'T', 'D');
+	_version = cast ? cast->_version : 0;
+	_initialRect = Common::Rect(0, 0);
+	_boundingRect = Common::Rect(0, 0);
+	_loaded = true;		// no resource behind it, so nothing will ever load it
+}
+
 BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream, uint32 castTag, uint16 version, uint8 flags1)
 		: CastMember(cast, castId, stream) {
 	_type = kCastBitmap;
