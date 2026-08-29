@@ -263,6 +263,35 @@ public:
 	Common::String formatFunctionList(const char *prefix);
 };
 
+// Director 7's colour object, which the manual calls "both a function and data
+// type". A colour is either an absolute RGB triple or an index into the current
+// palette, and it converts between the two on demand, so a movie can name a
+// colour once and have it hold across palettes and screen depths.
+class ColorObject : public Object<ColorObject> {
+public:
+	ColorObject(uint8 r, uint8 g, uint8 b);
+	ColorObject(int paletteIndex);
+
+	Common::String asString() override;
+
+	bool hasProp(const Common::String &propName) override;
+	Datum getProp(const Common::String &propName) override;
+	Common::String getPropAt(uint32 index) override;
+	uint32 getPropCount() override;
+	void setProp(const Common::String &propName, const Datum &value, bool force = false) override;
+
+	// The colour as the engine's own packed value, for the places that still
+	// deal in plain numbers.
+	uint32 toPackedRGB() const;
+	int toPaletteIndex() const;
+
+	bool _isRGB = true;
+	uint8 _r = 0;
+	uint8 _g = 0;
+	uint8 _b = 0;
+	int _paletteIndex = 0;
+};
+
 namespace LM {
 
 // predefined methods
