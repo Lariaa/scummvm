@@ -1304,6 +1304,21 @@ void Score::setLastPalette() {
 			// Force a full-stage redraw so the background is re-rendered with the
 			// new palette, not just the dirty rectangles.
 			_window->_resetScreen = true;
+
+			// Palette indices are turned into screen colours where they are read
+			// -- Frame::readSprite() for sprite fore/back colours, loadArchive()
+			// for the stage colour -- and never again. A frame read before this
+			// point therefore still shows what the *previous* palette made of
+			// its indices, which for the first frame of a movie is the palette
+			// the movie before it left behind. Name the stage colour, the one
+			// index every scene shows at full size, so the effect is visible in
+			// a log instead of only on screen.
+			if (_movie && _movie->getCast()) {
+				uint32 restaged = _vm->transformColor(_movie->getCast()->_stageColor);
+				if (restaged != _movie->_stageColor)
+					debugC(2, kDebugImages, "Score::setLastPalette(): stage colour index %d was resolved to 0x%08x under the old palette, but is 0x%08x under %s",
+							_movie->getCast()->_stageColor, _movie->_stageColor, restaged, currentPalette.asString().c_str());
+			}
 		}
 	}
 
