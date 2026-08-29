@@ -415,6 +415,7 @@ const TheEntityField fields[] = {
 	{ kTheWindow,	"drawRect",		kTheDrawRect,	400 },//				D4 p
 	{ kTheWindow,	"fileName",		kTheFileName,	400 },//				D4 p
 	{ kTheWindow,	"modal",		kTheModal,		400 },//				D4 p
+	{ kTheWindow,	"picture",		kThePicture,	700 },//							D7 p
 	{ kTheWindow,	"rect",			kTheRect,		400 },//				D4 p
 	{ kTheWindow,	"title",		kTheTitle,		400 },//				D4 p
 	{ kTheWindow,	"titleVisible",	kTheTitleVisible,400 },//				D4 p
