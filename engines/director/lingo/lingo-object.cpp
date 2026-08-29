@@ -1117,6 +1117,7 @@ bool Window::hasField(int field) {
 	case kTheDrawRect:
 	case kTheFileName:
 	case kTheModal:
+	case kThePicture:
 	case kTheRect:
 	case kTheSourceRect:
 	case kTheTitle:
@@ -1152,9 +1153,11 @@ Datum Window::getField(int field) {
 
 		// TODO: This should allow stretching or panning
 		return getStageRect();
+	case kThePicture:
+		ensureMovieIsLoaded();
+		return getPicture();
 	case kTheSourceRect:
 	// case kTheImage:
-	// case kThePicture::
 		ensureMovieIsLoaded();  // Remove fallthrough once implemented
 		// fallthrough
 	default:

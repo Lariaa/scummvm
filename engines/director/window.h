@@ -167,6 +167,7 @@ public:
 	void move(int x, int y);
 
 	Datum getStageRect();
+	Datum getPicture();
 	void setStageRect(Datum datum);
 	void setModal(bool modal);
 	bool getModal() { return _isModal; };

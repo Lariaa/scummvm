@@ -47,7 +47,8 @@ struct Picture {
 	Picture(Image::ImageDecoder &img);
 	Picture(Picture &picture);
 	~Picture();
-private:
+
+	// Public because a screen grab is built surface first, palette after.
 	void copyPalette(const byte *src, int numColors);
 };
 
