@@ -266,12 +266,6 @@ bool Movie::processSysEvent(Common::Event &event) {
 		} else {
 			pos = event.mouse;
 
-			if (g_director->getVersion() >= 600) {
-				if (_lastClickedSpriteId && _lastClickedSpriteId != spriteId) {
-					processInputEvent(kEventMouseUpOutSide, _lastClickedSpriteId, pos);
-				}
-			}
-
 			// FIXME: Check if these are tracked with the right mouse button
 			_lastEventTime = g_director->getMacTicks();
 			_lastClickTime2 = _lastClickTime;
@@ -329,6 +323,17 @@ bool Movie::processSysEvent(Common::Event &event) {
 						ev = kEventRightMouseUp;
 					}
 				}
+			}
+
+			// "mouseUpOutside ... occurs when the user rolls out of a sprite's
+			// bounds and then releases the mouse button" (D7 lexicon), and a
+			// sprite the mouse left before the release gets no mouseUp at all.
+			// This used to be emitted from the button-*down* branch, so it
+			// arrived one click late and a drag that ended somewhere else was
+			// never finished off.
+			if (g_director->getVersion() >= 600 && ev == kEventMouseUp) {
+				if (_lastClickedSpriteId && _lastClickedSpriteId != spriteId)
+					processInputEvent(kEventMouseUpOutSide, _lastClickedSpriteId, pos);
 			}
 
 			result = processInputEvent(ev, 0, pos);
