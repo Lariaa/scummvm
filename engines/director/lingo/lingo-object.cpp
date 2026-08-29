@@ -842,6 +842,158 @@ Common::String ScriptContext::formatFunctionList(const char *prefix) {
 }
 
 
+/* ColorObject */
+
+ColorObject::ColorObject(uint8 r, uint8 g, uint8 b) : Object<ColorObject>("color") {
+	_objType = kColorObj;
+	_isRGB = true;
+	_r = r;
+	_g = g;
+	_b = b;
+}
+
+ColorObject::ColorObject(int paletteIndex) : Object<ColorObject>("color") {
+	_objType = kColorObj;
+	_isRGB = false;
+	_paletteIndex = paletteIndex;
+}
+
+// How Director prints one: `rgb( 120, 10, 35 )` or `paletteIndex( 142 )`.
+Common::String ColorObject::asString() {
+	if (_isRGB)
+		return Common::String::format("rgb( %d, %d, %d )", _r, _g, _b);
+
+	return Common::String::format("paletteIndex( %d )", _paletteIndex);
+}
+
+int ColorObject::toPaletteIndex() const {
+	if (!_isRGB)
+		return _paletteIndex;
+
+	return (int)g_director->_wm->findBestColor(_r, _g, _b);
+}
+
+uint32 ColorObject::toPackedRGB() const {
+	if (_isRGB)
+		return (_r << 16) | (_g << 8) | _b;
+
+	const byte *palette = g_director->getPalette();
+	if (!palette || _paletteIndex < 0 || _paletteIndex >= (int)g_director->getPaletteColorCount())
+		return 0;
+
+	return (palette[_paletteIndex * 3] << 16) | (palette[_paletteIndex * 3 + 1] << 8) | palette[_paletteIndex * 3 + 2];
+}
+
+bool ColorObject::hasProp(const Common::String &propName) {
+	return propName.equalsIgnoreCase("red")
+		|| propName.equalsIgnoreCase("green")
+		|| propName.equalsIgnoreCase("blue")
+		|| propName.equalsIgnoreCase("colorType")
+		|| propName.equalsIgnoreCase("paletteIndex")
+		|| propName.equalsIgnoreCase("hexString")
+		|| propName.equalsIgnoreCase("ilk");
+}
+
+Datum ColorObject::getProp(const Common::String &propName) {
+	// The components read back whichever way the colour is stored: a
+	// paletteIndex colour still answers red/green/blue, resolved through the
+	// current palette, which is the whole point of the type.
+	if (propName.equalsIgnoreCase("red") || propName.equalsIgnoreCase("green") || propName.equalsIgnoreCase("blue")) {
+		uint32 rgb = toPackedRGB();
+
+		if (propName.equalsIgnoreCase("red"))
+			return Datum((int)((rgb >> 16) & 0xff));
+		if (propName.equalsIgnoreCase("green"))
+			return Datum((int)((rgb >> 8) & 0xff));
+		return Datum((int)(rgb & 0xff));
+	}
+
+	if (propName.equalsIgnoreCase("colorType") || propName.equalsIgnoreCase("ilk")) {
+		Datum d(Common::String(_isRGB ? "rgb" : "paletteIndex"));
+		d.type = SYMBOL;
+		return d;
+	}
+
+	if (propName.equalsIgnoreCase("paletteIndex"))
+		return Datum(toPaletteIndex());
+
+	if (propName.equalsIgnoreCase("hexString")) {
+		uint32 rgb = toPackedRGB();
+		return Datum(Common::String::format("#%02X%02X%02X", (rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff));
+	}
+
+	warning("ColorObject::getProp(): unknown property '%s'", propName.c_str());
+	return Datum();
+}
+
+Common::String ColorObject::getPropAt(uint32 index) {
+	static const char *rgbProps[] = { "red", "green", "blue", "colorType" };
+	static const char *palProps[] = { "paletteIndex", "colorType" };
+
+	if (_isRGB)
+		return (index >= 1 && index <= 4) ? rgbProps[index - 1] : Common::String();
+
+	return (index >= 1 && index <= 2) ? palProps[index - 1] : Common::String();
+}
+
+uint32 ColorObject::getPropCount() {
+	return _isRGB ? 4 : 2;
+}
+
+void ColorObject::setProp(const Common::String &propName, const Datum &value, bool force) {
+	// Assigning colorType converts in place, so `col.colorType = #paletteIndex`
+	// turns an rgb() into the nearest paletteIndex() and back again.
+	if (propName.equalsIgnoreCase("colorType")) {
+		bool wantRGB = value.asString().equalsIgnoreCase("rgb");
+		if (wantRGB == _isRGB)
+			return;
+
+		if (wantRGB) {
+			uint32 rgb = toPackedRGB();
+			_r = (rgb >> 16) & 0xff;
+			_g = (rgb >> 8) & 0xff;
+			_b = rgb & 0xff;
+		} else {
+			_paletteIndex = toPaletteIndex();
+		}
+
+		_isRGB = wantRGB;
+		return;
+	}
+
+	if (propName.equalsIgnoreCase("paletteIndex")) {
+		_paletteIndex = value.asInt();
+		_isRGB = false;
+		return;
+	}
+
+	if (propName.equalsIgnoreCase("red") || propName.equalsIgnoreCase("green") || propName.equalsIgnoreCase("blue")) {
+		// Setting a component on a paletteIndex colour makes it an rgb one:
+		// there is no other way to hold the result.
+		if (!_isRGB) {
+			uint32 rgb = toPackedRGB();
+			_r = (rgb >> 16) & 0xff;
+			_g = (rgb >> 8) & 0xff;
+			_b = rgb & 0xff;
+			_isRGB = true;
+		}
+
+		int v = CLIP<int>(value.asInt(), 0, 255);
+
+		if (propName.equalsIgnoreCase("red"))
+			_r = v;
+		else if (propName.equalsIgnoreCase("green"))
+			_g = v;
+		else
+			_b = v;
+
+		return;
+	}
+
+	warning("ColorObject::setProp(): unknown property '%s'", propName.c_str());
+}
+
+
 // Object array
 
 void LM::m_get(int nargs) {

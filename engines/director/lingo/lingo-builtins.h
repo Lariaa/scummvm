@@ -183,7 +183,10 @@ void b_showXlib(int nargs);
 void b_xFactoryList(int nargs);
 void b_xtra(int nargs);
 
+void b_color(int nargs);
+void b_paletteIndex(int nargs);
 void b_point(int nargs);
+void b_rgb(int nargs);
 void b_inflate(int nargs);
 void b_inside(int nargs);
 void b_intersect(int nargs);
