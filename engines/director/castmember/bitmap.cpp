@@ -374,6 +374,8 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, BitmapCastMember &
 	_matte = nullptr;
 	_noMatte = false;
 	_external = source._external;
+	_alphaThreshold = source._alphaThreshold;
+	_useAlpha = source._useAlpha;
 
 	_version = source._version;
 
@@ -696,7 +698,7 @@ void BitmapCastMember::createMatte() {
 	debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d: source %dx%d %s, declared %d bpp",
 			_castId, src.w, src.h, src.format.toString().c_str(), _bitsPerPixel);
 
-	if (src.format.bytesPerPixel == 4 && src.format.aBits() == 8) {
+	if (src.format.bytesPerPixel == 4 && src.format.aBits() == 8 && _useAlpha) {
 		Graphics::Surface *fromAlpha = new Graphics::Surface();
 		fromAlpha->create(src.w, src.h, Graphics::PixelFormat::createFormatCLUT8());
 
@@ -1337,11 +1339,13 @@ CollisionTest BitmapCastMember::isWithin(const Common::Rect &bbox, const Common:
 
 bool BitmapCastMember::hasField(int field) {
 	switch (field) {
+	case kTheAlphaThreshold:
 	case kTheDepth:
 	case kTheRegPoint:
 	case kThePalette:
 	case kThePaletteRef:
 	case kThePicture:
+	case kTheUseAlpha:
 		return true;
 	default:
 		break;
@@ -1353,6 +1357,12 @@ Datum BitmapCastMember::getField(int field) {
 	Datum d;
 
 	switch (field) {
+	case kTheAlphaThreshold:
+		d = (int)_alphaThreshold;
+		break;
+	case kTheUseAlpha:
+		d = _useAlpha ? 1 : 0;
+		break;
 	case kTheDepth:
 		d = _bitsPerPixel;
 		break;
@@ -1432,6 +1442,30 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 	case kTheDepth:
 		warning("BitmapCastMember::setField(): Attempt to set read-only field %s of cast %d", g_lingo->field2str(field), _castId);
 		return;
+	case kTheAlphaThreshold:
+		_alphaThreshold = (byte)CLIP<int>(d.asInt(), 0, 255);
+		return;
+	case kTheUseAlpha: {
+		bool useAlpha = d.asInt() != 0;
+		if (useAlpha != _useAlpha) {
+			_useAlpha = useAlpha;
+			// The cached matte was built the other way round; _matte can alias
+			// _matteSource, so it goes first (see the destructor).
+			if (_matte && _matte != _matteSource) {
+				_matte->free();
+				delete _matte;
+			}
+			_matte = nullptr;
+			if (_matteSource) {
+				_matteSource->free();
+				delete _matteSource;
+				_matteSource = nullptr;
+			}
+			_noMatte = false;
+			_modified = true;
+		}
+		return;
+	}
 	case kTheRegPoint:
 		if (d.type == POINT || (d.type == ARRAY && d.u.farr->arr.size() >= 2)) {
 			Score *score = g_director->getCurrentMovie()->getScore();
