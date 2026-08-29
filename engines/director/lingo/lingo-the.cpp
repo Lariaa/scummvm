@@ -101,6 +101,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheImageDirect,		"imageDirect",		false, 200, false },// D2 p
 	{ kTheItemDelimiter,	"itemDelimiter",	false, 400, false },//			D4 p
 	{ kTheKey,				"key",				false, 200, true },	// D2 f
+	{ kTheKeyboardFocusSprite,"keyboardFocusSprite",false, 700, false },//				D7 p
 	{ kTheKeyCode,			"keyCode",			false, 200, true },	// D2 f
 	{ kTheKeyDownScript,	"keyDownScript",	false, 200, false },// D2 p
 	{ kTheKeyPressed,		"keyPressed",		false, 500, false },//				D5 p
@@ -118,6 +119,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheMenu,				"menu",				true,  300, false },//		D3 p
 	{ kTheMenuItem,			"menuitem",			true,  300, false },//		D3 p
 	{ kTheMenuItems,		"menuitems",		false, 300, true },	//		D3 f
+	{ kTheMilliSeconds,		"milliSeconds",		false, 700, true },	//					D7 f
 	{ kTheMouseCast,		"mouseCast",		false, 300, true },	//		D3 f
 	{ kTheMouseChar,		"mouseChar",		false, 300, true },	//		D3 f
 	{ kTheMouseDown,		"mouseDown",		false, 200, true },	// D2 f
@@ -720,6 +722,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 			d = Common::String();
 		}
 		break;
+	case kTheKeyboardFocusSprite:
+		d = (int)movie->_currentEditableTextChannel;
+		break;
 	case kTheKeyCode:
 		d = _vm->_keyCode;
 		break;
@@ -1198,6 +1203,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 	case kTheSwitchColorDepth:
 		getTheEntitySTUB(kTheSwitchColorDepth);
 		break;
+	case kTheMilliSeconds:
+		d = (int)g_system->getMillis();
+		break;
 	case kTheTicks:
 		d = (int)_vm->getMacTicks();
 		break;
@@ -1410,6 +1418,12 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		else
 			g_lingo->_itemDelimiter = d.asString().decode(Common::kUtf8)[0];
 		break;
+	case kTheKeyboardFocusSprite: {
+		// -1 gives the focus back to the Score, 0 takes it off every sprite.
+		int focus = d.asInt();
+		movie->_currentEditableTextChannel = focus > 0 ? (uint16)focus : 0;
+		break;
+	}
 	case kTheKeyDownScript:
 		movie->setPrimaryEventHandler(kEventKeyDown, d.asString());
 		break;
