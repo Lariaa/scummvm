@@ -377,6 +377,10 @@ const TheEntityField fields[] = {
 	{ kTheCast,		"interface",	kTheInterface,	500 },//					D5 p
 	{ kTheCast,		"mediaBusy",	kTheMediaBusy,	600 },//						D6 p
 
+	// Alpha channel fields of a 32-bit bitmap cast member
+	{ kTheCast,		"alphaThreshold",kTheAlphaThreshold,700 },//					D7 p
+	{ kTheCast,		"useAlpha",		kTheUseAlpha,	700 },//						D7 p
+
 	// Cursor Xtra cast member fields
 	{ kTheCast,		"autoMask",		kTheAutoMask,	700 },//						D7 p
 	{ kTheCast,		"castMemberList",kTheCastMemberList,700 },//					D7 p
