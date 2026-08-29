@@ -63,6 +63,8 @@ public:
 	void setPicture(PictureReference &picture);
 	void setPicture(Image::ImageDecoder &image, bool adjustSize);
 
+	void crop(const Common::Rect &cropRect);
+
 	Common::Point getRegistrationOffset() override;
 	Common::Point getRegistrationOffset(int16 width, int16 height) override;
 
