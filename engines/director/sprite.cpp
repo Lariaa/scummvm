@@ -708,6 +708,16 @@ void Sprite::setCast(CastMemberID memberID, bool replaceDims) {
 			switch (_cast->_type) {
 			case kCastShape:
 			case kCastText:
+				// These normally keep the size the score gave them, but a
+				// sprite with no extent can never draw, so there is nothing to
+				// preserve: take the member's own rect. Same shape as the
+				// digital-video case below, which keeps 0x0 because there it is
+				// deliberate; a score that parks a channel on a 0x0 dummy until
+				// Lingo fills it in means the opposite.
+				if (_width <= 0 || _height <= 0) {
+					_width = dims.width();
+					_height = dims.height();
+				}
 				break;
 			case kCastDigitalVideo:
 				// A video the score sizes to 0x0 is intentionally invisible (a
