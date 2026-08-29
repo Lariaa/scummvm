@@ -585,11 +585,26 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 			const auto pals = g_director->getLoadedPalettes();
 			CastMemberID palIndex = pals.contains(castPaletteId) ? castPaletteId : CastMemberID(kClutSystemMac, -1);
 
+			// A _clut names a cast lib by the number it had in the movie the
+			// member was authored in. Load the same external cast into a movie
+			// that orders its casts differently and that number points at the
+			// wrong lib -- or at none. The member id is still good, so look for
+			// the palette in the bitmap's own cast before giving up: that is
+			// where its siblings keep theirs.
+			if (palIndex != castPaletteId && !castPaletteId.isNull() && _cast) {
+				CastMemberID sameCast(castPaletteId.member, _cast->_castLibID);
+				if (pals.contains(sameCast)) {
+					debugC(4, kDebugImages, "BitmapCastMember::getDitherImg(): cast %d wants palette %s, which is not loaded; using %s from its own cast",
+							_castId, castPaletteId.asString().c_str(), sameCast.asString().c_str());
+					palIndex = sameCast;
+				}
+			}
+
 			// Unlike getPalette(), this lookup says nothing when it misses -- it
 			// just swaps in the Mac system palette and carries on, which recolours
 			// the whole image. Name it, or a wrong-palette render is invisible in
 			// a log.
-			if (palIndex != castPaletteId)
+			if (palIndex != castPaletteId && palIndex == CastMemberID(kClutSystemMac, -1))
 				warning("BitmapCastMember::getDitherImg(): cast %d wants palette %s, which is not loaded; falling back to the Mac system palette",
 						_castId, castPaletteId.asString().c_str());
 
@@ -1287,6 +1302,10 @@ void BitmapCastMember::crop(const Common::Rect &cropRect) {
 	_picture->_surface.copyFrom(cropped);
 	cropped.free();
 
+	debugC(4, kDebugImages, "BitmapCastMember::crop(): cast %d, %dx%d %s -> %d,%d,%d,%d",
+			_castId, bounds.width(), bounds.height(), _picture->_surface.format.toString().c_str(),
+			area.left, area.top, area.right, area.bottom);
+
 	_regX -= area.left;
 	_regY -= area.top;
 	_initialRect = Common::Rect(_picture->_surface.w, _picture->_surface.h);
@@ -1537,6 +1556,10 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 		return;
 	case kThePicture:
 		if (d.type == PICTUREREF && d.u.picture != nullptr) {
+			debugC(4, kDebugImages, "BitmapCastMember::setField(): cast %d takes a %dx%d %s picture, was %dx%d %d bpp",
+					_castId, d.u.picture->_picture->_surface.w, d.u.picture->_picture->_surface.h,
+					d.u.picture->_picture->_surface.format.toString().c_str(),
+					_initialRect.width(), _initialRect.height(), _bitsPerPixel);
 			setPicture(*d.u.picture);
 			// This is a random PICT from somewhere,
 			// set the external flag so we remap the palette.
