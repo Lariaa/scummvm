@@ -105,6 +105,7 @@ void b_value(int nargs);
 void b_constrainH(int nargs);
 void b_constrainV(int nargs);
 void b_copyToClipBoard(int nargs);
+void b_crop(int nargs);
 void b_duplicate(int nargs);
 void b_editableText(int nargs);
 void b_erase(int nargs);
