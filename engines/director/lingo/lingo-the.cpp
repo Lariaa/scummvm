@@ -241,9 +241,11 @@ const TheEntityField fields[] = {
 	{ kTheSprite,	"puppet",		kThePuppet,		200 },// D2 p
 	{ kTheSprite,	"rect",			kTheRect,		400 },//				D4 p ???
 	{ kTheSprite,	"right",		kTheRight,		200 },// D2 p
+	{ kTheSprite,	"rotation",		kTheRotation,	700 },//							D7 p
 	{ kTheSprite,	"scoreColor",	kTheScoreColor,	400 },//				D4 p
 	{ kTheSprite,	"scriptInstanceList",kTheScriptInstanceList,600 },//			D6 p
 	{ kTheSprite,	"scriptNum",	kTheScriptNum,	400 },//				D4 p
+	{ kTheSprite,	"skew",			kTheSkew,		700 },//							D7 p
 	{ kTheSprite,	"stretch",		kTheStretch,	200 },// D2 p
 	{ kTheSprite,	"top",			kTheTop,		200 },// D2 p
 	{ kTheSprite,	"trails",		kTheTrails,		300 },//		D3.1 p
@@ -1859,6 +1861,13 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 	case kTheRight:
 		d = channel->getBbox().right;
 		break;
+	// The score keeps hundredths of a degree, Lingo speaks degrees.
+	case kTheRotation:
+		d = Datum((double)sprite->_angleRot / 100.0);
+		break;
+	case kTheSkew:
+		d = Datum((double)sprite->_angleSkew / 100.0);
+		break;
 	case kTheScoreColor:
 		//Check the last 3 bits of the _colorcode byte as value lies in 0 to 5
 		d = (int)(sprite->_colorcode & 0x7);
@@ -2070,6 +2079,20 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 
 		sprite->setAutoPuppet(kAPThickness, true);
 		break;
+	// Only the half turns are drawn (Sprite::isFlippedH()/isFlippedV()), but the
+	// value has to round-trip: scripts read it back to accumulate a drag. The
+	// score overwrites it next frame unless the sprite is puppeted.
+	case kTheRotation:
+	case kTheSkew: {
+		double degrees = d.asFloat();
+		int32 angle = (int32)(degrees * 100.0 + (degrees < 0 ? -0.5 : 0.5));
+		int32 &target = (field == kTheRotation) ? sprite->_angleRot : sprite->_angleSkew;
+		if (angle != target) {
+			target = angle;
+			channel->setDirty();
+		}
+		break;
+	}
 	case kTheBgColor:
 	case kTheColor:
 		{
