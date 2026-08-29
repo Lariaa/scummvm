@@ -116,6 +116,7 @@ void b_label(int nargs);
 void b_marker(int nargs);
 void b_move(int nargs);
 void b_moveableSprite(int nargs);
+void b_new(int nargs);
 void b_pasteClipBoardInto(int nargs);
 void b_puppetPalette(int nargs);
 void b_puppetSound(int nargs);
