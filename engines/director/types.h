@@ -110,7 +110,8 @@ enum ObjectType {
 	kXtraObj = 1 << 3,
 	kAllObj = kFactoryObj | kXObj | kScriptObj | kXtraObj,
 	kWindowObj = 1 << 4,
-	kCastMemberObj = 1 << 5
+	kCastMemberObj = 1 << 5,
+	kColorObj = 1 << 6
 };
 
 enum ShapeType {
