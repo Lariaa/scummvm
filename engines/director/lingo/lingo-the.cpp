@@ -41,6 +41,7 @@
 #include "director/castmember/text.h"
 #include "director/lingo/lingo-builtins.h"
 #include "director/lingo/lingo-code.h"
+#include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-the.h"
 #include "director/debugger/debugtools.h"
 
@@ -210,10 +211,12 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 
 const TheEntityField fields[] = {
 	{ kTheSprite,	"backColor",	kTheBackColor,	200 },// D2 p
+	{ kTheSprite,	"bgColor",		kTheBgColor,	700 },//							D7 p
 	{ kTheSprite,	"blend",		kTheBlend,		400 },//				D4 p
 	{ kTheSprite,	"bottom",		kTheBottom,		200 },// D2 p
 	{ kTheSprite,	"castNum",		kTheCastNum,	200 },// D2 p
 	{ kTheSprite,	"castLibNum",	kTheCastLibNum,	500 },//					D5 p
+	{ kTheSprite,	"color",		kTheColor,		700 },//							D7 p
 	{ kTheSprite,	"constraint",	kTheConstraint, 200 },// D2 p
 	{ kTheSprite,	"currentTime",	kTheCurrentTime,600 },//						D6 p
 	{ kTheSprite,	"cursor",		kTheCursor,		200 },// D2 p
@@ -1769,6 +1772,14 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 	case kTheFlipV: // D7
 		d = (sprite->_thickness & kTFlipV) ? 1 : 0;
 		break;
+	case kTheBgColor:
+	case kTheColor:
+		// D7 hands these out as colour objects rather than numbers. The sprite
+		// stores whatever transformColor() made of it, so give back the palette
+		// form; a script that wants components can convert with .colorType.
+		d = Datum(new ColorObject((int)g_director->transformColor(
+				field == kTheColor ? sprite->_foreColor : sprite->_backColor)));
+		break;
 	case kTheForeColor:
 		// TODO: Provide proper reverse transform for non-indexed color
 		d = (int)g_director->transformColor(sprite->_foreColor);
@@ -2057,6 +2068,24 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		channel->setDirty();
 
 		sprite->setAutoPuppet(kAPThickness, true);
+		break;
+	case kTheBgColor:
+	case kTheColor:
+		{
+			// Takes a colour object, but a plain number is accepted too -- the
+			// older numeric properties are still the common spelling.
+			int index = (d.type == OBJECT && d.u.obj->getObjType() == kColorObj)
+				? ((ColorObject *)d.u.obj)->toPaletteIndex()
+				: d.asInt();
+
+			uint32 newColor = g_director->transformColor(index);
+			uint32 &target = (field == kTheColor) ? sprite->_foreColor : sprite->_backColor;
+
+			if (newColor != target) {
+				target = newColor;
+				channel->setDirty();
+			}
+		}
 		break;
 	case kTheForeColor:
 		{
