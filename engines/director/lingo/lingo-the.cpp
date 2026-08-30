@@ -2174,6 +2174,14 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 			channel->setNeedsDraw();
 		}
 		channel->setPosition(d.asPoint().x, d.asPoint().y);
+
+		// Every other geometry setter here marks its own auto-puppet; this one
+		// did not, so a sprite positioned with `set the loc` looked unpositioned
+		// to Channel::setClean(), whose re-sync block only leaves a sprite alone
+		// while one of kAPLoc/kAPLocH/kAPLocV is set, and handed the channel the
+		// score's position back. Based on Director in a Nutshell, page 15.
+		sprite->setAutoPuppet(kAPLoc, true);
+
 		break;
 	case kTheLocH:
 		if (d.asInt() != channel->getPosition().x) {
