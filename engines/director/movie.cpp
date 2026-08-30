@@ -49,6 +49,7 @@ Movie::Movie(Window *window) {
 	_stageColor = _vm->_wm->_colorWhite;
 
 	_lastClickedSpriteId = 0;
+	_pressedSpriteId = 0;
 	_currentSpriteNum = 0;
 	_currentEditableTextChannel = 0;
 	_lastEventTime = _vm->getMacTicks();
