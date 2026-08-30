@@ -291,6 +291,15 @@ bool Movie::processSysEvent(Common::Event &event) {
 			}
 
 			debugC(3, kDebugEvents, "Movie::processSysEvent(): Button Down @(%d, %d), movie '%s'", pos.x, pos.y, _macName.c_str());
+
+			// Remembered here rather than read back from _lastClickedSpriteId,
+			// which resolveScriptEvent() only fills in once the queued mouseDown
+			// is dispatched: a quick click has its release processed first, so at
+			// that point the variable still names the previous interaction's
+			// sprite.
+			if (ev == kEventMouseDown)
+				_pressedSpriteId = spriteId;
+
 			result = processInputEvent(ev, 0, pos);
 
 			// D5 has special behavior here
@@ -332,8 +341,9 @@ bool Movie::processSysEvent(Common::Event &event) {
 			// arrived one click late and a drag that ended somewhere else was
 			// never finished off.
 			if (g_director->getVersion() >= 600 && ev == kEventMouseUp) {
-				if (_lastClickedSpriteId && _lastClickedSpriteId != spriteId)
-					processInputEvent(kEventMouseUpOutSide, _lastClickedSpriteId, pos);
+				if (_pressedSpriteId && _pressedSpriteId != spriteId)
+					processInputEvent(kEventMouseUpOutSide, _pressedSpriteId, pos);
+				_pressedSpriteId = 0;
 			}
 
 			result = processInputEvent(ev, 0, pos);
