@@ -143,6 +143,30 @@ DirectorPlotData Channel::getPlotData() {
 		pd.oneBitImage = true;
 	}
 
+	// Background transparency is an exact match against the sprite's back
+	// colour (graphics.cpp: `*dst = (src == p->backColor) ? *dst : src`), and
+	// that colour was resolved from its palette index once, in
+	// Frame::readSprite(). Where the two no longer agree, nothing is
+	// transparent and the sprite paints as a solid block over everything below
+	// it. TKKG 7's photofit screen parks a 640x480 BackgndTrans overlay
+	// (member 72) on channel 40, above the canvas in channel 2 and its element
+	// slots in 10-39. Report the corners, which are background in any such
+	// overlay, so a mismatch is visible in a log.
+	if (pd.srf && _sprite->_ink == kInkTypeBackgndTrans && debugChannelSet(2, kDebugImages)) {
+		const Graphics::Surface &s = *pd.srf;
+		if (s.w > 0 && s.h > 0) {
+			uint32 c[4] = { s.getPixel(0, 0), s.getPixel(s.w - 1, 0),
+							s.getPixel(0, s.h - 1), s.getPixel(s.w - 1, s.h - 1) };
+			int hits = 0;
+			for (int i = 0; i < 4; i++)
+				if (c[i] == _sprite->getBackColor())
+					hits++;
+			debugC(2, kDebugImages, "Channel::getPlotData(): BackgndTrans %s, %dx%d: backColor 0x%08x, corners 0x%08x 0x%08x 0x%08x 0x%08x, %d of 4 transparent",
+					_sprite->_castId.asString().c_str(), s.w, s.h,
+					_sprite->getBackColor(), c[0], c[1], c[2], c[3], hits);
+		}
+	}
+
 	if (!pd.srf && _sprite->_spriteType != kBitmapSprite) {
 		// Shapes come colourized from macDrawPixel
 		pd.ms = _sprite->getShape();
