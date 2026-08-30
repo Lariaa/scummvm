@@ -733,6 +733,16 @@ void Sprite::setCast(CastMemberID memberID, bool replaceDims) {
 				_height = dims.height();
 				break;
 			}
+
+			// setWidth(), setHeight() and setBbox() all clamp to zero; this is the
+			// one path that copies a member's rect through unchecked. TKKG 7's
+			// photofit menu reads back `the rect of sprite 55` as
+			// rect(73, 36, 73, -8180) right after Lingo wrote
+			// rect(-56, -100, 56, 101) to it, and a height of -8216 sends the
+			// dropped face element some 6800 pixels above the canvas. Name the
+			// member that carries it rather than guessing.
+			if (_width < 0 || _height < 0)
+				warning("Sprite::setCast(): %s has a negative extent %dx%d", memberID.asString().c_str(), _width, _height);
 		}
 
 	} else {
