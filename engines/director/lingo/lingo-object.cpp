@@ -756,6 +756,15 @@ bool ScriptContext::hasProp(const Common::String &propName) {
 		return true;
 	}
 	if (_objType == kScriptObj) {
+		// How many properties the instance holds. b_count() already answers the
+		// call form, count(me); this is the same value reached as a property, which
+		// is how `repeat with i = 1 to me.count` walks an instance. Tested before
+		// the ancestor below because it describes this instance, not an inherited
+		// one -- TKKG 13 and 14 both stall in media/intro.dir without it.
+		if (propName.equalsIgnoreCase("count")) {
+			return true;
+		}
+
 		if (_properties.contains("ancestor") && _properties["ancestor"].type == OBJECT
 				&& (_properties["ancestor"].u.obj->getObjType() & (kScriptObj | kXtraObj))) {
 			return _properties["ancestor"].u.obj->hasProp(propName);
@@ -778,6 +787,12 @@ Datum ScriptContext::getProp(const Common::String &propName) {
 		return _properties[propName];
 	}
 	if (_objType == kScriptObj) {
+		// Kept in step with hasProp(): without it the fallthrough at the end of this
+		// function would quietly mint a new "count" property holding VOID.
+		if (propName.equalsIgnoreCase("count")) {
+			return Datum((int)getPropCount());
+		}
+
 		if (_properties.contains("ancestor") && _properties["ancestor"].type == OBJECT
 				&& (_properties["ancestor"].u.obj->getObjType() & (kScriptObj | kXtraObj))) {
 			debugC(3, kDebugLingoExec, "Getting prop '%s' from ancestor: <%s>", propName.c_str(), _properties["ancestor"].asString(true).c_str());
