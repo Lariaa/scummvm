@@ -106,6 +106,7 @@ static const BuiltinProto builtins[] = {
 	{ "min",			LB::b_min,			-1,0, 400, FBLTIN_LIST },	//			D4 f
 	{ "setaProp",		LB::b_setaProp,		3, 3, 400, HBLTIN_LIST },	//			D4 h
 	{ "setAt",			LB::b_setAt,		3, 3, 400, HBLTIN_LIST },	//			D4 h
+	{ "setContents",	LB::b_setContents,	2, 2, 400, HBLTIN },		//			D4 h, undocumented
 	{ "setProp",		LB::b_setProp,		3, 3, 400, HBLTIN_LIST },	//			D4 h
 	{ "sort",			LB::b_sort,			1, 1, 400, HBLTIN_LIST },	//			D4 h
 	// Files
@@ -1024,6 +1025,25 @@ void LB::b_append(int nargs) {
 	list.u.farr->_sorted = false;		// Drop the sorted flag
 }
 
+// The four chunk symbols Lingo accepts wherever a chunk expression can be named
+// with a symbol rather than spelled out: count(str, #word), getProp(str, #char, n),
+// getPropRef(var, #char, n). Returns false for any other symbol, so callers can
+// fall through to their non-chunk handling.
+static bool chunkTypeFromSymbol(const Common::String &name, ChunkType &type) {
+	if (name.equalsIgnoreCase("char"))
+		type = kChunkChar;
+	else if (name.equalsIgnoreCase("word"))
+		type = kChunkWord;
+	else if (name.equalsIgnoreCase("item"))
+		type = kChunkItem;
+	else if (name.equalsIgnoreCase("line"))
+		type = kChunkLine;
+	else
+		return false;
+
+	return true;
+}
+
 void LB::b_count(int nargs) {
 	Datum list = g_lingo->pop();
 
@@ -1036,25 +1056,10 @@ void LB::b_count(int nargs) {
 		// The chunk form on a string: `count(str, #char|#word|#item|#line)` is
 		// how many of those the string holds, the same spelling b_getProp()
 		// already accepts. Janosch Panama measures `the labelList` this way.
-		if (obj.type == STRING && prop.type == SYMBOL) {
-			ChunkType chunkType = kChunkChar;
-			bool isChunk = true;
-
-			if (prop.u.s->equalsIgnoreCase("char"))
-				chunkType = kChunkChar;
-			else if (prop.u.s->equalsIgnoreCase("word"))
-				chunkType = kChunkWord;
-			else if (prop.u.s->equalsIgnoreCase("item"))
-				chunkType = kChunkItem;
-			else if (prop.u.s->equalsIgnoreCase("line"))
-				chunkType = kChunkLine;
-			else
-				isChunk = false;
-
-			if (isChunk) {
-				g_lingo->push(LC::lastChunk(chunkType, obj).u.cref->startChunk);
-				return;
-			}
+		ChunkType chunkType = kChunkChar;
+		if (obj.type == STRING && prop.type == SYMBOL && chunkTypeFromSymbol(*prop.u.s, chunkType)) {
+			g_lingo->push(LC::lastChunk(chunkType, obj).u.cref->startChunk);
+			return;
 		}
 
 		// Otherwise `x.prop.count`: fetch the property, then count what it
@@ -1451,26 +1456,11 @@ void LB::b_getProp(int nargs) {
 		Datum chunk = g_lingo->pop();
 		Datum src = g_lingo->pop();
 
-		if (chunk.type == SYMBOL) {
-			ChunkType chunkType = kChunkChar;
-			bool isChunk = true;
-
-			if (chunk.u.s->equalsIgnoreCase("char"))
-				chunkType = kChunkChar;
-			else if (chunk.u.s->equalsIgnoreCase("word"))
-				chunkType = kChunkWord;
-			else if (chunk.u.s->equalsIgnoreCase("item"))
-				chunkType = kChunkItem;
-			else if (chunk.u.s->equalsIgnoreCase("line"))
-				chunkType = kChunkLine;
-			else
-				isChunk = false;
-
-			if (isChunk) {
-				int n = index.asInt();
-				g_lingo->push(LC::chunkRef(chunkType, n, n, src).eval());
-				return;
-			}
+		ChunkType chunkType = kChunkChar;
+		if (chunk.type == SYMBOL && chunkTypeFromSymbol(*chunk.u.s, chunkType)) {
+			int n = index.asInt();
+			g_lingo->push(LC::chunkRef(chunkType, n, n, src).eval());
+			return;
 		}
 
 		// The other three-argument form is `obj.prop[n]` -- the same thing
@@ -1786,6 +1776,23 @@ void LB::b_setAt(int nargs) {
 	default:
 		break;
 	}
+}
+
+void LB::b_setContents(int nargs) {
+	// setContents(ref, value) writes through a reference. It appears in no
+	// edition of the Lingo dictionary (D5, D7 and MX 2004 checked) because it is
+	// not something you write by hand: the compiler emits it, paired with
+	// getPropRef(), for a `put ... into <chunk of a variable>` whose target has
+	// to be computed. Loewenzahn 5, 7 and 8 reach it from
+	//   put "M" into char <n> of msk
+	// in a cursor behavior.
+	//
+	// Assigning through the reference is exactly varAssign(), which already
+	// covers CHUNKREF along with the plain variable and field references.
+	Datum value = g_lingo->pop();
+	Datum ref = g_lingo->pop();
+
+	g_lingo->varAssign(ref, value);
 }
 
 void LB::b_setProp(int nargs) {
