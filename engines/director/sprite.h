@@ -127,6 +127,7 @@ public:
 	MacShape *getShape();
 	uint32 getForeColor();
 	uint32 getBackColor();
+	uint32 getRGBColor(byte r, byte g, byte b) const;
 	void setAutoPuppet(AutoPuppetProperty property, bool value);
 	bool getAutoPuppet(AutoPuppetProperty property);
 	void releaseAutoPuppet(uint32 copyBackMask);
@@ -158,7 +159,7 @@ public:
 	uint32 _copyBackMask;
 
 	CastMemberID _scriptId;
-	byte _colorcode; // x40 editable, 0x80 moveable
+	byte _colorcode; // 0x10 fore colour is RGB, 0x20 back colour is RGB, 0x40 editable, 0x80 moveable
 	byte _blendAmount;
 	uint32 _unk3;
 
@@ -197,8 +198,12 @@ public:
 
 	// D7+
 	byte _flags;
-	byte _fgColorG, _fgColorB;		// R component sits in _foreColor
-	byte _bgColorG, _bgColorB;		// R component sits in _backColor
+	// Only meaningful when _colorcode says the colour is RGB rather than a
+	// palette index: 0x10 for the foreground, 0x20 for the background.
+	// _foreColor/_backColor hold the R byte run through transformColor(), so the
+	// raw one is kept here too and getForeColor()/getBackColor() recompose it.
+	byte _fgColorR, _fgColorG, _fgColorB;
+	byte _bgColorR, _bgColorG, _bgColorB;
 	int32 _angleRot;
 	int32 _angleSkew;
 

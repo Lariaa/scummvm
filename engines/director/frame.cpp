@@ -2006,11 +2006,18 @@ void readSpriteDataD7(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 			sprite._copyBackMask |= kSCBInk;
 			break;
 		case 2:
-			sprite._foreColor = g_director->transformColor((uint8)stream.readByte());
+			// The R component when _colorcode says the foreground is RGB (0x10);
+			// a palette index otherwise. Which it is cannot be decided here --
+			// _colorcode arrives at offset 20, and a frame delta may carry the
+			// two in either order -- so keep the raw byte and let
+			// Sprite::getForeColor() choose.
+			sprite._fgColorR = (uint8)stream.readByte();
+			sprite._foreColor = g_director->transformColor(sprite._fgColorR);
 			sprite._copyBackMask |= kSCBForeColor;
 			break;
 		case 3:
-			sprite._backColor = g_director->transformColor((uint8)stream.readByte());
+			sprite._bgColorR = (uint8)stream.readByte();
+			sprite._backColor = g_director->transformColor(sprite._bgColorR);
 			sprite._copyBackMask |= kSCBBackColor;
 			break;
 		case 4:
