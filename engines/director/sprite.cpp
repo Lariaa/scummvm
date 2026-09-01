@@ -349,9 +349,14 @@ MacShape *Sprite::getShape() {
 uint32 Sprite::getRGBColor(byte r, byte g, byte b, uint32 indexColor, const char *which) const {
 	uint32 rgb = g_director->_wm->findBestColor(r, g, b);
 
+	// Both hex values are in the screen's own pixel format, which is not
+	// necessarily ARGB -- on ABGR8888 (0, 0, 255) prints as 0xffff0000, which
+	// reads like red but is blue. Compare the two against each other, not
+	// against the triple.
 	if (rgb != indexColor && debugChannelSet(4, kDebugImages))
-		debugC(4, kDebugImages, "Sprite::get%sColor(): %s declares RGB (%d, %d, %d) -> 0x%08x; index %d gave 0x%08x",
-				which, _castId.asString().c_str(), r, g, b, rgb, r, indexColor);
+		debugC(4, kDebugImages, "Sprite::get%sColor(): %s declares RGB (%d, %d, %d) -> %s 0x%08x; index %d gave 0x%08x",
+				which, _castId.asString().c_str(), r, g, b,
+				g_director->_pixelformat.toString().c_str(), rgb, r, indexColor);
 
 	return rgb;
 }
@@ -633,6 +638,21 @@ Common::Rect Sprite::getBbox(bool unstretched) {
 }
 
 void Sprite::setBbox(int l, int t, int r, int b) {
+	// Everything a sprite keeps of this is int16, and Common::Rect asserts on a
+	// rect whose corners are the wrong way round. Lingo can hand us anything:
+	// TKKG 7's photofit transition (EffektObjekt.calculateRectOfPhase, driven
+	// from CanvasElementObj.getGesamtQuad) walks off into rects in the hundreds
+	// of millions and took the engine down on the assert. Clamp, and say so, so
+	// the script's own divergence stays visible instead of being truncated into
+	// a plausible-looking rect.
+	if (l < -32768 || t < -32768 || r > 32767 || b > 32767) {
+		warning("Sprite::setBbox(): rect(%d, %d, %d, %d) does not fit a sprite, clamping", l, t, r, b);
+		l = CLIP<int>(l, -32768, 32767);
+		t = CLIP<int>(t, -32768, 32767);
+		r = CLIP<int>(r, -32768, 32767);
+		b = CLIP<int>(b, -32768, 32767);
+	}
+
 	// A rect that is degenerate in only one axis is legitimate: Lingo uses it to
 	// build a one-dimensional rail, e.g. for `the constraint of sprite`. Clamp each
 	// axis on its own -- zeroing both would collapse such a rail down to its
