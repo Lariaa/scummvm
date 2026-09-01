@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/algorithm.h"
 #include "common/file.h"
 #include "common/hash-str.h"
 #include "common/hashmap.h"
@@ -950,6 +951,71 @@ static Common::Path resolveBasenameInGameTree(const Common::String &baseName, co
 			return Common::Path((*s_index)[cand], g_director->_dirSeparator);
 	}
 	return Common::Path();
+}
+
+/**
+ * Collect the names of everything inside a folder of the game tree, sorted and
+ * free of duplicates.
+ *
+ * Three sources have to be mixed, because a name the game expects to find can
+ * live in any of them: files injected by a game quirk, files the game itself
+ * wrote through FileIO or saveMovie() (those exist only in the save storage),
+ * and the game folder on disk. A name can appear in more than one -- a save
+ * shadowing a shipped file, say -- so identical entries are collapsed.
+ *
+ * With filesOnly, directories are left out. That is what the BudAPI Xtra draws
+ * the line at: it has a separate baFolderList for folders, and every one of its
+ * own enumerators skips entries carrying FILE_ATTRIBUTE_DIRECTORY.
+ */
+Common::StringArray listFolderContents(const Common::Path &path, bool filesOnly) {
+	Common::StringArray names;
+
+	// Refresh the quirks archive: the save state may have changed since it was
+	// built, e.g. when a game is saved and then reopened in the same session.
+	g_director->gameQuirks(g_director->getGameId(), g_director->getPlatform());
+
+	const char *archives[] = { kQuirksCacheArchive, kSavedFilesArchive };
+	for (auto &name : archives) {
+		Common::Archive *arch = SearchMan.getArchive(name);
+		if (!arch)
+			continue;
+
+		Common::ArchiveMemberList files;
+		arch->listMatchingMembers(files, path.append(path.empty() ? "*" : "/*", '/'), true);
+		for (auto &fi : files)
+			names.push_back(Common::lastPathComponent(fi->getName(), '/'));
+	}
+
+	// Walk down from the game directory rather than trusting the path as given:
+	// a component that does not exist stops the descent, and d.exists() below
+	// then keeps us from listing some parent folder by accident.
+	Common::FSNode d = Common::FSNode(*g_director->getGameDataDir());
+	for (auto &it : path.splitComponents()) {
+		d = d.getChild(it);
+		if (!d.exists())
+			break;
+	}
+
+	if (d.exists()) {
+		Common::FSList f;
+		if (!d.getChildren(f, filesOnly ? Common::FSNode::kListFilesOnly : Common::FSNode::kListAll)) {
+			warning("listFolderContents(): cannot access directory %s", path.toString(Common::Path::kNativeSeparator).c_str());
+		} else {
+			for (uint i = 0; i < f.size(); i++)
+				names.push_back(f[i].getName());
+		}
+	}
+
+	Common::sort(names.begin(), names.end());
+
+	for (uint i = 1; i < names.size();) {
+		if (names[i].equalsIgnoreCase(names[i - 1]))
+			names.remove_at(i);
+		else
+			i++;
+	}
+
+	return names;
 }
 
 Common::Path findPath(const Common::Path &path, bool currentFolder, bool searchPaths, bool directory, const char **exts) {
