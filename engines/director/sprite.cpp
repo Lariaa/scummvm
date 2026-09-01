@@ -706,8 +706,19 @@ void Sprite::setCast(CastMemberID memberID, bool replaceDims) {
 		if (replaceDims) {
 			Common::Rect dims = _cast->getInitialRect();
 			switch (_cast->_type) {
-			case kCastShape:
 			case kCastText:
+				// A fixed or scrolling field is laid out at its member's rect:
+				// TextCastMember::createWidget() raises the widget to it with
+				// exactly this MAX. The sprite has to follow, or the widget is
+				// drawn at one size and clipped to another.
+				if (((TextCastMember *)_cast)->_textType == kTextTypeFixed ||
+						((TextCastMember *)_cast)->_textType == kTextTypeScrolling) {
+					_width = MAX<int>(_width, dims.width());
+					_height = MAX<int>(_height, dims.height());
+					break;
+				}
+				// fall through
+			case kCastShape:
 				// These normally keep the size the score gave them, but a
 				// sprite with no extent can never draw, so there is nothing to
 				// preserve: take the member's own rect. Same shape as the
