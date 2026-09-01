@@ -288,7 +288,12 @@ MacShape *Sprite::getShape() {
 			// still counts as active (isEmpty() only tests kInactiveSprite), so it
 			// reaches us every frame with nothing to draw. That is normal -- only a
 			// sprite that names a member we then failed to resolve is worth reporting.
-			if (!_castId.isNull())
+			//
+			// Test the member number rather than isNull(), which also requires the
+			// cast library to be zero: clearing a sprite keeps whichever library the
+			// channel inherited, so the id reads "member 0 of castLib 1" and slipped
+			// past the guard. TKKG 5's login screen alone reported it 137 times.
+			if (_castId.member != 0)
 				warning("Sprite::getShape(): sprite has no cast defined for %s", _castId.asString().c_str());
 			delete shape;
 			return nullptr;
