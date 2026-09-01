@@ -1028,15 +1028,19 @@ uint32 Handler::translateBytecode(Bytecode &bytecode, uint32 index) {
 			// This must be a case. Find the comparison against the switch expression.
 			auto originalStackSize = stack.size();
 			uint32 currIndex = index + 1;
-			Bytecode *currBytecode = &bytecodeArray[currIndex];
-			do {
+			// The bounds test has to happen before each subscript, not in the
+			// while clause: Common::Array::operator[] asserts, so reading one
+			// past the end aborts rather than falling into the error path below.
+			// Loewenzahn Spielebox has a handler that runs off the end this way.
+			Bytecode *currBytecode = nullptr;
+			while (currIndex < bytecodeArray.size()) {
+				currBytecode = &bytecodeArray[currIndex];
+				if (stack.size() == originalStackSize + 1
+						&& (currBytecode->opcode == kOpEq || currBytecode->opcode == kOpNtEq))
+					break;
 				translateBytecode(*currBytecode, currIndex);
 				currIndex += 1;
-				currBytecode = &bytecodeArray[currIndex];
-			} while (
-				currIndex < bytecodeArray.size()
-				&& !(stack.size() == originalStackSize + 1 && (currBytecode->opcode == kOpEq || currBytecode->opcode == kOpNtEq))
-			);
+			}
 			if (currIndex >= bytecodeArray.size()) {
 				bytecode.translation = Common::SharedPtr<Node>(new CommentNode(bytecode.pos, "ERROR: Expected eq or nteq!"));
 				ast.addStatement(bytecode.translation);
@@ -1049,16 +1053,30 @@ uint32 Handler::translateBytecode(Bytecode &bytecode, uint32 index) {
 			Common::SharedPtr<Node> caseValue = pop(); // This is the value the switch expression is compared against.
 
 			currIndex += 1;
-			currBytecode = &bytecodeArray[currIndex];
-			if (currIndex >= bytecodeArray.size() || currBytecode->opcode != kOpJmpIfZ) {
+			// Subscript only once the index is known good; the test that follows
+			// was already ordered to bail out here, it just came too late to stop
+			// operator[] from asserting.
+			if (currIndex >= bytecodeArray.size()
+					|| bytecodeArray[currIndex].opcode != kOpJmpIfZ) {
 				bytecode.translation = Common::SharedPtr<Node>(new CommentNode(bytecode.pos, "ERROR: Expected jmpifz!"));
 				ast.addStatement(bytecode.translation);
 				return currIndex - index + 1;
 			}
+			currBytecode = &bytecodeArray[currIndex];
 
 			auto &jmpifz = *currBytecode;
 			auto jmpPos = jmpifz.pos + jmpifz.obj;
-			size_t targetIndex = bytecodePosMap[jmpPos];
+			// A jump to a position that carries no bytecode would have operator[]
+			// insert a fresh 0, and targetIndex - 1 then wraps to SIZE_MAX. find()
+			// keeps the map clean and lets the miss be handled here.
+			auto jmpTarget = bytecodePosMap.find(jmpPos);
+			if (jmpTarget == bytecodePosMap.end() || jmpTarget->second == 0
+					|| jmpTarget->second >= bytecodeArray.size()) {
+				bytecode.translation = Common::SharedPtr<Node>(new CommentNode(bytecode.pos, "ERROR: Case jmpifz has no target!"));
+				ast.addStatement(bytecode.translation);
+				return currIndex - index + 1;
+			}
+			size_t targetIndex = jmpTarget->second;
 			auto &targetBytecode = bytecodeArray[targetIndex];
 			auto &prevFromTarget = bytecodeArray[targetIndex - 1];
 			CaseExpect expect;
