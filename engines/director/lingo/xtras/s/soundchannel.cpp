@@ -22,6 +22,8 @@
 #include "common/system.h"
 
 #include "director/director.h"
+#include "director/sound.h"
+#include "director/window.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-builtins.h"
 #include "director/lingo/lingo-object.h"
@@ -70,15 +72,107 @@ SoundChannelXtraObject::SoundChannelXtraObject(ObjectType ObjectType) :Object<So
 	_objType = ObjectType;
 }
 
+// The Sound Channel object's own properties, from the Director Scripting
+// Dictionary 11.5 ("Property summary for the Sound Channel object"). Everything
+// listed there is accepted, so that reading one never raises a Lingo error even
+// where we can only answer a plausible default -- the games use these to steer
+// playback, not to introspect the engine.
+static const char *sndChannelProps[] = {
+	"channelCount", "currentTime", "elapsedTime", "endTime", "loopCount",
+	"loopEndTime", "loopsRemaining", "loopStartTime", "member", "pan",
+	"sampleCount", "sampleRate", "startTime", "status", "volume", nullptr
+};
+
 bool SoundChannelXtraObject::hasProp(const Common::String &propName) {
-	return (propName == "name");
+	if (propName == "name")
+		return true;
+
+	if (_channel > 0) {
+		for (const char **it = sndChannelProps; *it; it++) {
+			if (propName.equalsIgnoreCase(*it))
+				return true;
+		}
+	}
+
+	return false;
 }
 
 Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 	if (propName == "name")
 		return Datum(SoundChannelXtra::xlibName);
+
+	DirectorSound *sound = _channel > 0 ? g_director->getCurrentWindow()->getSoundManager() : nullptr;
+	if (!sound)
+		return Datum();
+
+	if (propName.equalsIgnoreCase("volume"))
+		return Datum((int)sound->getChannelVolume(_channel));
+
+	if (propName.equalsIgnoreCase("pan"))
+		return Datum((int)sound->getChannelBalance(_channel));
+
+	// 0 idle, 1 loading, 2 queued, 3 playing, 4 paused. We do not model queueing
+	// or pausing, so a channel is either playing or idle.
+	if (propName.equalsIgnoreCase("status"))
+		return Datum(sound->isChannelActive(_channel) ? 3 : 0);
+
+	// elapsedTime counts from the start of the sound regardless of looping or of
+	// currentTime being set; currentTime is the absolute position within it. We
+	// have one clock, so both report it -- Loewenzahn 3's intro compares
+	// sound(1).currentTime against a list of cue times in milliseconds.
+	if (propName.equalsIgnoreCase("currentTime") || propName.equalsIgnoreCase("elapsedTime"))
+		return Datum((int)sound->getChannelElapsedTime(_channel));
+
+	if (propName.equalsIgnoreCase("member")) {
+		SoundID last = sound->getChannelLastPlayed(_channel);
+		if (last.type == kSoundCast)
+			return Datum(CastMemberID(last.u.cast.member, last.u.cast.castLib));
+		return Datum();
+	}
+
+	// Defaults for the rest of the documented set: no loop is running, and the
+	// sound occupies the whole of whatever is playing.
+	if (propName.equalsIgnoreCase("loopCount") || propName.equalsIgnoreCase("loopsRemaining")
+			|| propName.equalsIgnoreCase("loopStartTime") || propName.equalsIgnoreCase("loopEndTime")
+			|| propName.equalsIgnoreCase("startTime") || propName.equalsIgnoreCase("sampleCount"))
+		return Datum(0);
+
+	if (propName.equalsIgnoreCase("endTime"))
+		return Datum((int)sound->getChannelElapsedTime(_channel));
+
+	if (propName.equalsIgnoreCase("channelCount"))
+		return Datum(2);
+
+	if (propName.equalsIgnoreCase("sampleRate"))
+		return Datum(44100);
+
 	warning("SoundChannelXtra::getProp: unknown property '%s'", propName.c_str());
 	return Datum();
+}
+
+void SoundChannelXtraObject::setProp(const Common::String &propName, const Datum &value, bool force) {
+	if (_channel <= 0)
+		return;
+
+	DirectorSound *sound = g_director->getCurrentWindow()->getSoundManager();
+	if (!sound)
+		return;
+
+	// volume runs 0 (mute) to 255 (the machine's full level); TKKG 10, 13 and 14
+	// all open their intro with sound(1).volume = 255.
+	if (propName.equalsIgnoreCase("volume")) {
+		sound->setChannelVolume(_channel, (uint8)CLIP<int>(value.asInt(), 0, 255));
+		return;
+	}
+
+	if (propName.equalsIgnoreCase("pan")) {
+		sound->setChannelBalance(_channel, (int8)CLIP<int>(value.asInt(), -100, 100));
+		return;
+	}
+
+	// status, elapsedTime and the loop counters are read-only per the dictionary;
+	// the rest we accept and drop rather than raise an error mid-playback.
+	debugC(3, kDebugXObj, "SoundChannelXtra::setProp: ignoring '%s' on channel %d", propName.c_str(), _channel);
 }
 
 void SoundChannelXtra::open(ObjectType type, const Common::Path &path) {
@@ -114,11 +208,20 @@ void SoundChannelXtra::m_sound(int nargs) {
 		return;
 	}
 
-	// The one-argument form hands back a sound object for the channel, which we
-	// do not model.
-	g_lingo->printSTUBWithArglist("SoundChannelXtra::m_sound", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
+	// The one-argument form hands back the Sound Channel object for that channel.
+	// It has to be an object: games reach straight through it, and pushing a bare
+	// 0 made `sound(1).volume = 255` fail with "setObjectProp: Invalid object: 0",
+	// which under lingostrict ends the movie. That one line was the wall TKKG 10,
+	// 13 and 14 and Loewenzahn 3 all stopped at.
+	int channel = g_lingo->pop().asInt();
+
+	// Datum(AbstractObject *) shares the object's own refCount, so the instance is
+	// freed with the last Datum holding it. That matters because this is called
+	// per frame -- Loewenzahn 3's intro asks for sound(1) on every exitFrame.
+	SoundChannelXtraObject *obj = new SoundChannelXtraObject(kXtraObj);
+	obj->_channel = channel;
+
+	g_lingo->push(Datum(obj));
 }
 
 }
