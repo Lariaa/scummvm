@@ -1938,74 +1938,15 @@ void LB::b_getNthFileNameInFolder(int nargs) {
 	// for directory, we either return the correct path, which we can access recursively.
 	// or we get a wrong path, which will lead us to a non-exist file node
 
-	Common::StringArray directory_list = path.splitComponents();
-	Common::FSNode d = Common::FSNode(*g_director->getGameDataDir());
-	for (auto &it : directory_list) {
-		d = d.getChild(it);
-		if (!d.exists())
-			break;
-	}
-
-	Datum r("");
-	Common::Array<Common::String> fileNameList;
-
-	// Update the game quirks archive in case our save state has changed.
-	// This is necessary because we may save a game and then try to open a game in the same session.
-	g_director->gameQuirks(g_director->getGameId(), g_director->getPlatform());
-
-	// First, mix in any files injected from the quirks
-	Common::Archive *cache = SearchMan.getArchive(kQuirksCacheArchive);
-	if (cache) {
-		Common::ArchiveMemberList files;
-
-		cache->listMatchingMembers(files, path.append(path.empty() ? "*" : "/*", '/'), true);
-
-		for (auto &fi : files) {
-			fileNameList.push_back(Common::lastPathComponent(fi->getName(), '/'));
-		}
-	}
-
-	// Next, mix in anything the game has written to the save file storage.
-	// Movies stored with saveMovie() and files written through FileIO only live
-	// there, so a game that checks for its own save by walking the directory
+	// Quirk-injected files, files the game wrote to save storage, and the game
+	// folder itself, sorted and de-duplicated. Save storage matters here because
+	// movies stored with saveMovie() and files written through FileIO live only
+	// there, so a game that looks for its own save by walking the directory
 	// instead of opening it by name would never see it. "Ein Fall fuer Muetze &
 	// Co" does exactly that: it compares every entry of "the pathName" against
 	// "SCORES.DXR" and starts a fresh player profile when there is no match.
-	Common::Archive *saved = SearchMan.getArchive(kSavedFilesArchive);
-	if (saved) {
-		Common::ArchiveMemberList files;
-
-		saved->listMatchingMembers(files, path.append(path.empty() ? "*" : "/*", '/'), true);
-
-		for (auto &fi : files) {
-			fileNameList.push_back(Common::lastPathComponent(fi->getName(), '/'));
-		}
-	}
-
-	// Next, mix in files from the game filesystem (if they exist)
-	if (d.exists()) {
-		Common::FSList f;
-		if (!d.getChildren(f, Common::FSNode::kListAll)) {
-			warning("Cannot access directory %s", path.toString(Common::Path::kNativeSeparator).c_str());
-		} else {
-			for (uint i = 0; i < f.size(); i++)
-				fileNameList.push_back(f[i].getName());
-		}
-	}
-
-	// Sort files alphabetically
-	Common::sort(fileNameList.begin(), fileNameList.end());
-
-	// A name can reach us from more than one source: a save file that a quirk
-	// injects as well, or a save shadowing a file of the same name in the game
-	// folder. Handing out the same entry twice would also shift every index
-	// after it, so collapse duplicates before indexing.
-	for (uint i = 1; i < fileNameList.size();) {
-		if (fileNameList[i].equalsIgnoreCase(fileNameList[i - 1]))
-			fileNameList.remove_at(i);
-		else
-			i++;
-	}
+	Datum r("");
+	Common::StringArray fileNameList = listFolderContents(path);
 
 	if ((uint)fileNum < fileNameList.size())
 		r = Datum(fileNameList[fileNum]);
