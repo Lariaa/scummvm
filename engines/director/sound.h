@@ -217,6 +217,8 @@ public:
 	bool fadeChannels();
 
 	bool isChannelActive(int soundChannel);
+	uint32 getChannelElapsedTime(int soundChannel);
+	SoundID getChannelLastPlayed(int soundChannel);
 	uint8 getChannelVolume(int soundChannel);
 	void setChannelVolume(int channel, uint8 volume);
 	int8 getChannelBalance(int soundChannel);
