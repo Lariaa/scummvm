@@ -10326,14 +10326,14 @@ static const DirectorGameDescription gameDescriptions[] = {
 	WINGAME1t_l("loewe5", "", "Setup/WinRoot/Terzio/xn--Lwenzahn 5-ecb/xn--lwenzahn5.exe-imb", "9c59833b332f0b9f8ecc97f0aa47ec99", 2386566, Common::DE_DEU, 800),
 
 	// Original filenames contain Löwenzahn 7
-	MACGAME1_l("loewe7", "Classic", "xn--Lwenzahn 7 (classic)-39b", "rt:19e9fb7b215165e975ab6c6fcedc07cd", 195151, Common::DE_DEU, 800),
-	MACGAME1_l("loewe7", "OSX",		"xn--Lwenzahn 7 (OS X)-zzb",	"rt:77b66cfdd98d1be9cf2e99f3a8ad8a17", 242617, Common::DE_DEU, 800),
-	WINGAME1_l("loewe7", "",		"Setup/WinRoot/Terzio/xn--Lwenzahn 7-ecb/Loewe_7.exe", "t:e2eebc4104de6c8565295702c5e0b77c", 58572, Common::DE_DEU, 800),
+	MACGAME1f_l("loewe7", "Classic", "xn--Lwenzahn 7 (classic)-39b", "rt:19e9fb7b215165e975ab6c6fcedc07cd", 195151, Common::DE_DEU, 800, GF_TRUECOLOR),
+	MACGAME1f_l("loewe7", "OSX",	"xn--Lwenzahn 7 (OS X)-zzb",	"rt:77b66cfdd98d1be9cf2e99f3a8ad8a17", 242617, Common::DE_DEU, 800, GF_TRUECOLOR),
+	WINGAME1f_l("loewe7", "",		"Setup/WinRoot/Terzio/xn--Lwenzahn 7-ecb/Loewe_7.exe", "t:e2eebc4104de6c8565295702c5e0b77c", 58572, Common::DE_DEU, 800, GF_TRUECOLOR),
 
 	// Original filenames contain Löwenzahn 8
-	MACGAME1_l("loewe8", "",	"xn--Lwenzahn 8-ecb",		"rt:11588cdc1e3eec81c6052dfdb1cbac6e", 190547, Common::DE_DEU, 851),
-	MACGAME1_l("loewe8", "OSX",	"xn--Lwenzahn 8 (OSX)-mwb", "rt:bdb87b75fe7db4ee20d859bd640f5697", 276263, Common::DE_DEU, 851),
-	WINGAME1_l("loewe8", "",	"Setup/WinRoot/Terzio/Loewenzahn 8/Loewe_8.exe", "t:973b650dd2564c20cc1d3501a7498dc1", 71020, Common::DE_DEU, 851),
+	MACGAME1f_l("loewe8", "",	"xn--Lwenzahn 8-ecb",		"rt:11588cdc1e3eec81c6052dfdb1cbac6e", 190547, Common::DE_DEU, 851, GF_TRUECOLOR),
+	MACGAME1f_l("loewe8", "OSX", "xn--Lwenzahn 8 (OSX)-mwb", "rt:bdb87b75fe7db4ee20d859bd640f5697", 276263, Common::DE_DEU, 851, GF_TRUECOLOR),
+	WINGAME1f_l("loewe8", "",	"Setup/WinRoot/Terzio/Loewenzahn 8/Loewe_8.exe", "t:973b650dd2564c20cc1d3501a7498dc1", 71020, Common::DE_DEU, 851, GF_TRUECOLOR),
 
 	MACGAME1_l("loewecalendar", "", "Adventskalender",										 "rt:0e5578cf47954a2c7af8930264791666", 157787, Common::DE_DEU, 850),
 	WINGAME1_l("loewecalendar", "",	"Setup/WinRoot/Terzio/LZ_Adventskalender/LZ_Advent.exe", "t:a08e0377bea127d46b3491db914ef07a",   78516, Common::DE_DEU, 851),
