@@ -108,6 +108,7 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0x65, LC::c_stackdrop, 	"b" },
 	{ 0x66, LC::cb_v4theentitynamepush, "bN" },
 	{ 0x67, LC::cb_call,		"bN" }, // D5+ objcall
+	{ 0x6d, LC::cb_varrefpushv4, "b" }, // push a variable reference
 	{ 0x6e, LC::c_intpush,		"b" },  // D8.5+ push int
 	{ 0x70, LC::cb_objectfieldpush, "bN" }, // D8.5+ chained property
 
@@ -409,6 +410,24 @@ Datum Lingo::findVarV4(int varType, const Datum &id) {
 		break;
 	}
 	return res;
+}
+
+// Opcode 0x6d. Unlike cb_varpush (0x4b/0x4c), which carries the variable in the
+// instruction, this one takes the type as its operand and the ID off the stack --
+// the same shape cb_v4assign/cb_v4assign2 already use -- and pushes a reference
+// rather than the value. It is what Lingo emits ahead of a chunk expression on a
+// variable, e.g. `put "M" into char 1 to length(the crs) of msk`, which compiles to
+// this push followed by getPropRef(ref, #char, ...) and setContents().
+//
+// Without it the reference never reached the stack, getPropRef() consumed the bare
+// ID that cb_zeropush had left behind and returned nothing, and the resulting
+// "Builtin 'getPropRef' did not return value" is an error(), not a warning -- so
+// Loewenzahn 7 died on the beginSprite of every sprite carrying that behavior.
+void LC::cb_varrefpushv4() {
+	int varType = g_lingo->readInt();
+	Datum varId = g_lingo->pop();
+
+	g_lingo->push(g_lingo->findVarV4(varType, varId));
 }
 
 void LC::cb_unk() {
