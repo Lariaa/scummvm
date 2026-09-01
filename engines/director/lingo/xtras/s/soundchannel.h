@@ -30,6 +30,12 @@ public:
 
 	bool hasProp(const Common::String &propName) override;
 	Datum getProp(const Common::String &propName) override;
+	void setProp(const Common::String &propName, const Datum &value, bool force = false) override;
+
+	// Which sound channel this object stands for. 0 for the instance the Xtra
+	// registers itself under, which is not bound to any channel; sound(n) hands
+	// out objects carrying n.
+	int _channel = 0;
 };
 
 namespace SoundChannelXtra {
