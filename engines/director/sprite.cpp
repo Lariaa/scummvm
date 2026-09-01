@@ -86,8 +86,8 @@ void Sprite::reset() {
 
 	// D7+
 	_flags = 0;
-	_fgColorG = _fgColorB = 0;
-	_bgColorG = _bgColorB = 0;
+	_fgColorR = _fgColorG = _fgColorB = 0;
+	_bgColorR = _bgColorG = _bgColorB = 0;
 	_angleRot = 0;
 	_angleSkew = 0;
 }
@@ -143,8 +143,10 @@ Sprite& Sprite::operator=(const Sprite &sprite) {
 	_spriteListIdx = sprite._spriteListIdx;
 
 	_flags = sprite._flags;
+	_fgColorR = sprite._fgColorR;
 	_fgColorG = sprite._fgColorG;
 	_fgColorB = sprite._fgColorB;
+	_bgColorR = sprite._bgColorR;
 	_bgColorG = sprite._bgColorG;
 	_bgColorB = sprite._bgColorB;
 	_angleRot = sprite._angleRot;
@@ -324,9 +326,31 @@ MacShape *Sprite::getShape() {
 	return shape;
 }
 
+// A D7 sprite may carry its colours as RGB triples rather than palette
+// indices; _colorcode says which, 0x10 for the foreground and 0x20 for the
+// background. The R byte sits in _foreColor/_backColor's source field and G
+// and B follow at offsets 24 to 27, so the three have to be recomposed here.
+// transformColor() cannot do it: it only treats a value above 0xff as packed
+// RGB, and pure blue is 0x0000ff.
+//
+// Measured in TKKG 7's photofit screen (Sz27a3.dir): channel 40 parks a
+// 640x480 background-transparent overlay over the canvas and its element
+// slots, with colorcode 0x20 and a background of (0, 0, 255). Reading the R
+// byte as an index made that white, so the blue never matched, nothing was
+// transparent, and the overlay covered the canvas in exactly that blue. The
+// flag is set on the artwork sprites, whose triples read as real colours
+// (255,255,255 / 0,0,0 / 0,0,255), and clear on the icons, whose unused G and
+// B bytes hold leftovers such as (255,194,72).
+uint32 Sprite::getRGBColor(byte r, byte g, byte b) const {
+	return g_director->_wm->findBestColor(r, g, b);
+}
+
 uint32 Sprite::getBackColor() {
-	if (!_cast)
+	if (!_cast) {
+		if (_colorcode & 0x20)
+			return getRGBColor(_bgColorR, _bgColorG, _bgColorB);
 		return _backColor;
+	}
 
 	switch (_cast->_type) {
 	case kCastText:
@@ -334,13 +358,18 @@ uint32 Sprite::getBackColor() {
 		return _cast->getBackColor();
 	}
 	default:
+		if (_colorcode & 0x20)
+			return getRGBColor(_bgColorR, _bgColorG, _bgColorB);
 		return _backColor;
 	}
 }
 
 uint32 Sprite::getForeColor() {
-	if (!_cast)
+	if (!_cast) {
+		if (_colorcode & 0x10)
+			return getRGBColor(_fgColorR, _fgColorG, _fgColorB);
 		return _foreColor;
+	}
 
 	switch (_cast->_type) {
 	case kCastText:
@@ -348,6 +377,8 @@ uint32 Sprite::getForeColor() {
 		return _cast->getForeColor();
 	}
 	default:
+		if (_colorcode & 0x10)
+			return getRGBColor(_fgColorR, _fgColorG, _fgColorB);
 		return _foreColor;
 	}
 }
@@ -823,11 +854,13 @@ void Sprite::replaceFrom(Sprite *nextSprite) {
 	}
 	if (!getAutoPuppet(kAPForeColor) && (nextSprite->_copyBackMask & kSCBForeColor)) {
 		_foreColor = nextSprite->_foreColor;
+		_fgColorR = nextSprite->_fgColorR;
 		_fgColorB = nextSprite->_fgColorB;
 		_fgColorG = nextSprite->_fgColorG;
 	}
 	if (!getAutoPuppet(kAPBackColor) && (nextSprite->_copyBackMask & kSCBBackColor)) {
 		_backColor = nextSprite->_backColor;
+		_bgColorR = nextSprite->_bgColorR;
 		_bgColorB = nextSprite->_bgColorB;
 		_bgColorG = nextSprite->_bgColorG;
 	}
