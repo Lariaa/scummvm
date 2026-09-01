@@ -572,7 +572,51 @@ XOBJSTUB(BudAPIXtra::m_baRecycleFile, 0)
 XOBJSTUB(BudAPIXtra::m_baCopyFile, 0)
 XOBJSTUB(BudAPIXtra::m_baCopyXFiles, 0)
 XOBJSTUB(BudAPIXtra::m_baXCopy, 0)
-XOBJSTUB(BudAPIXtra::m_baFileList, 0)
+void BudAPIXtra::m_baFileList(int nargs) {
+	// baFileList(folder, pattern) -> linear list of the file names in folder that
+	// match pattern. Verified against BUDAPI.X32 in Ghidra and against the two
+	// call sites in Loewenzahn 3:
+	//
+	//  - bare names, no paths. The CD check does getOne(Dir, "aaaLZ3.vrs"), and
+	//    the piano screen opens entries as `path & a`, prepending the folder
+	//    itself.
+	//  - files only. BudAPI carries a separate baFolderList, and each of its own
+	//    enumerators skips entries with FILE_ATTRIBUTE_DIRECTORY set.
+	//  - an empty pattern means "*.*", the same default two of those enumerators
+	//    apply.
+	//  - a folder that does not resolve must NOT produce a list. The CD check
+	//    guards on `if ilk(Dir) = #list`, so returning 0 is what makes it try the
+	//    next drive letter instead of accepting an empty CD.
+	Common::String pattern = (nargs >= 2) ? g_lingo->pop().asString() : Common::String();
+	Common::String folder = g_lingo->pop().asString();
+
+	if (pattern.empty())
+		pattern = "*.*";
+
+	// Drive letters are stripped on the way in, so the CD check's sweep from Z:
+	// down to C: resolves against the one game tree we have; the first letter to
+	// match becomes the game's idea of the CD drive, which is harmless because
+	// every path it builds from it is stripped the same way.
+	Common::Path path = findPath(folder, true, true, true);
+	if (path.empty() && !folder.empty()) {
+		debugC(3, kDebugXObj, "BudAPIXtra::m_baFileList: folder '%s' does not resolve", folder.c_str());
+		g_lingo->push(Datum(0));
+		return;
+	}
+
+	Datum result;
+	result.type = ARRAY;
+	result.u.farr = new FArray;
+
+	for (auto &name : listFolderContents(path, true)) {
+		if (name.matchString(pattern, true))
+			result.u.farr->arr.push_back(Datum(name));
+	}
+
+	debugC(3, kDebugXObj, "BudAPIXtra::m_baFileList: '%s' '%s' -> %d entries",
+		folder.c_str(), pattern.c_str(), result.u.farr->arr.size());
+	g_lingo->push(result);
+}
 XOBJSTUB(BudAPIXtra::m_baFolderList, 0)
 XOBJSTUB(BudAPIXtra::m_baFindFirstFile, 0)
 XOBJSTUB(BudAPIXtra::m_baFindNextFile, 0)
