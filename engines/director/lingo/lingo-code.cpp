@@ -153,6 +153,7 @@ static const struct FuncDescr {
 	{ LC::cb_objectfieldassign, "cb_objectfieldassign", "s" },
 	{ LC::cb_objectfieldpush, "cb_objectfieldpush", "s" },
 	{ LC::cb_varrefpush,	"cb_varrefpush",	"s" },
+	{ LC::cb_varrefpushv4,	"cb_varrefpushv4",	"i" },
 	{ LC::cb_theassign,		"cb_theassign",		"s" },
 	{ LC::cb_theassign2,	"cb_theassign2",	"s" },
 	{ LC::cb_thepush,		"cb_thepush",		"s" },
