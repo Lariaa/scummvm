@@ -75,6 +75,7 @@ void b_max(int nargs);
 void b_min(int nargs);
 void b_setaProp(int nargs);
 void b_setAt(int nargs);
+void b_setContents(int nargs);
 void b_setProp(int nargs);
 void b_sort(int nargs);
 
