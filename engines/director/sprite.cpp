@@ -341,46 +341,39 @@ MacShape *Sprite::getShape() {
 // flag is set on the artwork sprites, whose triples read as real colours
 // (255,255,255 / 0,0,0 / 0,0,255), and clear on the icons, whose unused G and
 // B bytes hold leftovers such as (255,194,72).
-uint32 Sprite::getRGBColor(byte r, byte g, byte b) const {
-	return g_director->_wm->findBestColor(r, g, b);
+// Both accessors report what the change costs: the composed colour next to the
+// one the R byte used to produce as an index. Every line is a place this now
+// draws differently, so a run over a D7 game is a list to check rather than a
+// hunt. Guarded, because debugC() evaluates its arguments whether or not the
+// channel is on and this sits in the draw path.
+uint32 Sprite::getRGBColor(byte r, byte g, byte b, uint32 indexColor, const char *which) const {
+	uint32 rgb = g_director->_wm->findBestColor(r, g, b);
+
+	if (rgb != indexColor && debugChannelSet(4, kDebugImages))
+		debugC(4, kDebugImages, "Sprite::get%sColor(): %s declares RGB (%d, %d, %d) -> 0x%08x; index %d gave 0x%08x",
+				which, _castId.asString().c_str(), r, g, b, rgb, r, indexColor);
+
+	return rgb;
 }
 
 uint32 Sprite::getBackColor() {
-	if (!_cast) {
-		if (_colorcode & 0x20)
-			return getRGBColor(_bgColorR, _bgColorG, _bgColorB);
-		return _backColor;
-	}
-
-	switch (_cast->_type) {
-	case kCastText:
-	case kCastButton: {
+	if (_cast && (_cast->_type == kCastText || _cast->_type == kCastButton))
 		return _cast->getBackColor();
-	}
-	default:
-		if (_colorcode & 0x20)
-			return getRGBColor(_bgColorR, _bgColorG, _bgColorB);
-		return _backColor;
-	}
+
+	if (_colorcode & 0x20)
+		return getRGBColor(_bgColorR, _bgColorG, _bgColorB, _backColor, "Back");
+
+	return _backColor;
 }
 
 uint32 Sprite::getForeColor() {
-	if (!_cast) {
-		if (_colorcode & 0x10)
-			return getRGBColor(_fgColorR, _fgColorG, _fgColorB);
-		return _foreColor;
-	}
-
-	switch (_cast->_type) {
-	case kCastText:
-	case kCastButton: {
+	if (_cast && (_cast->_type == kCastText || _cast->_type == kCastButton))
 		return _cast->getForeColor();
-	}
-	default:
-		if (_colorcode & 0x10)
-			return getRGBColor(_fgColorR, _fgColorG, _fgColorB);
-		return _foreColor;
-	}
+
+	if (_colorcode & 0x10)
+		return getRGBColor(_fgColorR, _fgColorG, _fgColorB, _foreColor, "Fore");
+
+	return _foreColor;
 }
 
 bool Sprite::getEditable() {
