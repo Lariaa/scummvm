@@ -57,6 +57,8 @@ Common::Path findMoviePath(const Common::String &path, bool currentFolder = true
 Common::Path findXLibPath(const Common::String &path, bool currentFolder = true, bool searchPaths = true);
 Common::Path findAudioPath(const Common::String &path, bool currentFolder = true, bool searchPaths = true);
 
+Common::StringArray listFolderContents(const Common::Path &path, bool filesOnly = false);
+
 Common::String getFileNameFromModal(bool save, const Common::String &suggested, const Common::String &title, const char *ext = "txt");
 Common::String savePrefix();
 
