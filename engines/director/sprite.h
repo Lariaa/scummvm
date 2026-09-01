@@ -127,7 +127,7 @@ public:
 	MacShape *getShape();
 	uint32 getForeColor();
 	uint32 getBackColor();
-	uint32 getRGBColor(byte r, byte g, byte b) const;
+	uint32 getRGBColor(byte r, byte g, byte b, uint32 indexColor, const char *which) const;
 	void setAutoPuppet(AutoPuppetProperty property, bool value);
 	bool getAutoPuppet(AutoPuppetProperty property);
 	void releaseAutoPuppet(uint32 copyBackMask);
