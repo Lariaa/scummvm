@@ -77,7 +77,17 @@
 
 namespace Director {
 
-const char *FileXtra::xlibName = "File";
+// "FileXtra", not "File": Director takes the name an Xtra answers to from the
+// header line of its msgTable, and FileXtra.x32 opens with "xtra FileXtra" (it is
+// the only name string in the whole binary -- verified in Ghidra, registered from
+// the MOA entry point at 10001b70 under the "msgTable" key). BudAPI is the control
+// case and already matches: its table says "xtra BudAPI", and xlibName is "BudAPI".
+//
+// The name reaches Lingo two ways, and both were wrong here: getProp("name") below
+// backs `xtra(i).name`, and b_xtra() matches `xtra("filextra")` against _openXtras.
+// TKKG 10 walks the former in XtraAvailable() and halts on the start frame when no
+// entry matches "filextra".
+const char *FileXtra::xlibName = "FileXtra";
 const XlibFileDesc FileXtra::fileNames[] = {
 	{ "filextra",   nullptr },
 	{ nullptr,        nullptr },
@@ -110,7 +120,7 @@ static BuiltinProto xlibBuiltins[] = {
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-FileXtraObject::FileXtraObject(ObjectType ObjectType) :Object<FileXtraObject>("File") {
+FileXtraObject::FileXtraObject(ObjectType ObjectType) :Object<FileXtraObject>("FileXtra") {
 	_objType = ObjectType;
 }
 
