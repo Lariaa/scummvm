@@ -356,6 +356,20 @@ void DirectorSound::cancelFade(int soundChannel) {
 	}
 }
 
+uint32 DirectorSound::getChannelElapsedTime(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return 0;
+
+	return _mixer->getSoundElapsedTime(_channels[soundChannel]->handle);
+}
+
+SoundID DirectorSound::getChannelLastPlayed(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return SoundID();
+
+	return _channels[soundChannel]->lastPlayedSound;
+}
+
 bool DirectorSound::isChannelActive(int soundChannel) {
 	if (!assertChannel(soundChannel))
 		return false;
