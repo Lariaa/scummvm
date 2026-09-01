@@ -160,6 +160,7 @@ void cb_objectcall();
 void cb_objectfieldassign();
 void cb_objectfieldpush();
 void cb_varrefpush();
+void cb_varrefpushv4();
 void cb_theassign();
 void cb_theassign2();
 void cb_thepush();
