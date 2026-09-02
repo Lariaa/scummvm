@@ -1123,6 +1123,18 @@ void LB::b_deleteAt(int nargs) {
 	TYPECHECK2(list, ARRAY, PARRAY);
 	int index = indexD.asInt();
 
+	// Lingo counts from 1, so index 0 turns into remove_at((uint)-1) and trips
+	// the Common::Array assert. The dictionary says Director puts up an alert
+	// for an index that is not in the list; warn and leave the list alone
+	// instead, matching how b_getAt() tolerates the same mistake -- raising a
+	// Lingo error here would end the movie under lingostrict, trading one crash
+	// for another. Loewenzahn 3 (the D6.5 original) does this on a mouseDown.
+	uint count = (list.type == ARRAY) ? list.u.farr->arr.size() : list.u.parr->arr.size();
+	if (index < 1 || (uint)index > count) {
+		warning("b_deleteAt: index out of bounds (%d of %u), ignoring", index, count);
+		return;
+	}
+
 	switch (list.type) {
 	case ARRAY:
 		list.u.farr->arr.remove_at(index - 1);
