@@ -64,6 +64,7 @@ const char *DirectMediaXtra::xlibName = "DirectMedia";
 const XlibFileDesc DirectMediaXtra::fileNames[] = {
 	{ "Directme",      nullptr },	// on-disk Xtra filename (DIRECTME.X32)
 	{ "directmedia",   nullptr },
+	{ "TBDirectMedia", nullptr },	// Tabuleiro's own name for it; Loewenzahn 5 ships this one
 	{ nullptr,        nullptr },
 };
 
@@ -85,6 +86,25 @@ static MethodProto xlibMethods[] = {
 
 static BuiltinProto xlibBuiltins[] = {
 	{ "isDirectShowInstalled", DirectMediaXtra::m_isDirectShowInstalled, 1, 1, 500, HBLTIN },
+
+	// The video calls are sprite methods -- the msgTable above spells every one of
+	// them "(sprite me, ...)" -- and Director dispatches those as free functions
+	// that take the sprite as their first argument. Registering them only as
+	// object methods left `videoseek(sprite(n), 0)` reaching nothing, and an
+	// undefined handler ends the movie under lingostrict. That is where
+	// Loewenzahn 5 stopped. Argument counts include the sprite, as written in the
+	// table; the methods stay registered as well, so an object-style call is
+	// unaffected.
+	{ "videoplay",			DirectMediaXtra::m_videoplay,			1, 1, 500, HBLTIN },
+	{ "videopause",			DirectMediaXtra::m_videopause,			1, 1, 500, HBLTIN },
+	{ "videoseek",			DirectMediaXtra::m_videoseek,			2, 2, 500, HBLTIN },
+	{ "videoplaysegment",	DirectMediaXtra::m_videoplaysegment,	3, 3, 500, HBLTIN },
+	{ "setvolume",			DirectMediaXtra::m_setvolume,			2, 2, 500, HBLTIN },
+	{ "getvolume",			DirectMediaXtra::m_getvolume,			1, 1, 500, HBLTIN },
+	{ "setbalance",			DirectMediaXtra::m_setbalance,			2, 2, 500, HBLTIN },
+	{ "getbalance",			DirectMediaXtra::m_getbalance,			1, 1, 500, HBLTIN },
+	{ "isPastCuePoint",		DirectMediaXtra::m_isPastCuePoint,		2, 2, 500, HBLTIN },
+	{ "mostRecentCuePoint",	DirectMediaXtra::m_mostRecentCuePoint,	1, 1, 500, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
