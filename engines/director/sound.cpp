@@ -32,6 +32,7 @@
 #include "audio/decoders/raw.h"
 #include "audio/softsynth/pcspk.h"
 #include "audio/decoders/aiff.h"
+#include "audio/decoders/mp3.h"
 
 #include "director/director.h"
 #include "director/movie.h"
@@ -1010,6 +1011,48 @@ AudioFileDecoder::AudioFileDecoder(Common::String &path)
 AudioFileDecoder::~AudioFileDecoder() {
 }
 
+/**
+ * Locate the first MPEG frame in a Shockwave Audio (".swa") file.
+ *
+ * A .swa is a Macromedia header followed by plain MPEG Layer III: a big-endian
+ * uint32 holding the header length, then the header itself, which carries the
+ * sample rate, the bit rate, the Xtra's CLSID and a copyright string. Its
+ * "MACR" signature sits at offset 36, and the audio begins at 4 + headerLength.
+ *
+ * Measured across the 4314 .swa files of the Loewenzahn/TKKG corpus: 4312 match
+ * this layout exactly. The other two are bare MP3s carrying an iTunes ID3v2 tag
+ * that were simply named .swa (both Loewenzahn 3 and 4 ship one as LOGO.swa),
+ * so a raw MP3 is accepted as well and MAD skips the tag on its own.
+ *
+ * Returns the offset the audio starts at, or -1 if this is not SWA or MP3.
+ */
+static int32 findMP3Start(Common::SeekableReadStream *stream) {
+	if (stream->size() < 40)
+		return -1;
+
+	stream->seek(36);
+	if (stream->readUint32BE() == MKTAG('M', 'A', 'C', 'R')) {
+		stream->seek(0);
+		uint32 headerSize = stream->readUint32BE();
+		// "MACR" living at offset 36 means the header always reaches at least
+		// that far; the length field excludes its own four bytes.
+		if (headerSize >= 36 && (int64)headerSize + 4 < stream->size())
+			return 4 + headerSize;
+	}
+
+	stream->seek(0);
+	byte magic[3];
+	if (stream->read(magic, sizeof(magic)) == sizeof(magic)) {
+		if (magic[0] == 'I' && magic[1] == 'D' && magic[2] == '3')
+			return 0;
+		// MPEG frame sync: eleven set bits.
+		if (magic[0] == 0xff && (magic[1] & 0xe0) == 0xe0)
+			return 0;
+	}
+
+	return -1;
+}
+
 Audio::AudioStream *AudioFileDecoder::getAudioStream(bool looping, bool forPuppet, DisposeAfterUse::Flag disposeAfterUse) {
 	if (_path.empty())
 		return nullptr;
@@ -1024,6 +1067,7 @@ Audio::AudioStream *AudioFileDecoder::getAudioStream(bool looping, bool forPuppe
 	uint32 magic1 = copiedStream->readUint32BE();
 	copiedStream->readUint32BE();
 	uint32 magic2 = copiedStream->readUint32BE();
+	int32 mp3Start = findMP3Start(copiedStream);
 	copiedStream->seek(0);
 
 	Audio::RewindableAudioStream *stream = nullptr;
@@ -1033,6 +1077,22 @@ Audio::AudioStream *AudioFileDecoder::getAudioStream(bool looping, bool forPuppe
 	} else if (magic1 == MKTAG('F', 'O', 'R', 'M') &&
 				(magic2 == MKTAG('A', 'I', 'F', 'F') || magic2 == MKTAG('A', 'I', 'F', 'C'))) {
 		stream = Audio::makeAIFFStream(copiedStream, disposeAfterUse);
+	} else if (mp3Start >= 0) {
+#ifdef USE_MAD
+		// makeMP3Stream() must not be handed a stream that is merely seeked to
+		// the audio: its skipID3() wraps the stream in a SeekableSubReadStream
+		// anchored at absolute offset 0, which would hand the Macromedia header
+		// straight back to the decoder. Wrap the audio portion here instead, so
+		// that offset 0 of what MAD sees is the first MPEG frame.
+		Common::SeekableReadStream *audio = new Common::SeekableSubReadStream(
+			copiedStream, mp3Start, copiedStream->size(), disposeAfterUse);
+		stream = Audio::makeMP3Stream(audio, DisposeAfterUse::YES);
+		if (!stream)
+			warning("AudioFileDecoder::getAudioStream(): failed to decode MPEG audio in %s", _path.c_str());
+#else
+		warning("AudioFileDecoder::getAudioStream(): %s needs MP3 support, which this build lacks", _path.c_str());
+		delete copiedStream;
+#endif
 	} else {
 		warning("Unknown file type for %s", _path.c_str());
 		delete copiedStream;
