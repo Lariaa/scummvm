@@ -177,6 +177,7 @@ static const BuiltinProto builtins[] = {
 	{ "cursor",	 		LB::b_cursor,		1, 1, 200, CBLTIN },	// D2 c
 	{ "framesToHMS",	LB::b_framesToHMS,	4, 4, 300, FBLTIN },	//		D3 f
 	{ "HMStoFrames",	LB::b_HMStoFrames,	4, 4, 300, FBLTIN },	//		D3 f
+	{ "keyPressed",		LB::b_keyPressed,	0, 1, 500, FBLTIN },	//					D5 f
 	{ "param",	 		LB::b_param,		1, 1, 400, FBLTIN },	//			D4 f
 	{ "printFrom",	 	LB::b_printFrom,	-1,0, 200, CBLTIN },	// D2 c
 	{ "put",			LB::b_put,			-1,0, 200, CBLTIN },	// D2
@@ -2585,6 +2586,43 @@ void LB::b_HMStoFrames(int nargs) {
 		frames = -frames;
 
 	g_lingo->push(frames);
+}
+
+void LB::b_keyPressed(int nargs) {
+	// Without an argument this is the same reading as `the keyPressed`: the
+	// character of the last key pressed. With one, it answers whether that key is
+	// down right now, which is the whole point of the function form -- unlike
+	// `the key`, it stays current inside a repeat loop, and that is where games
+	// use it. Loewenzahn Spielebox polls `if keyPressed(SPACE)` that way.
+	if (nargs == 0) {
+		Common::U32String buf;
+		buf.insertChar(g_director->_key, 0);
+		g_lingo->push(Datum(buf.encode()));
+		return;
+	}
+
+	Datum d = g_lingo->pop();
+	bool down = false;
+
+	if (d.type == INT) {
+		// A Director key code. _keysDown is keyed by Common::KeyCode, so the held
+		// keys have to be mapped through _KeyCodes to be comparable.
+		int wanted = d.asInt();
+		for (auto &it : g_director->_keysDown) {
+			if (g_director->_KeyCodes.contains(it._key) && g_director->_KeyCodes[it._key] == wanted) {
+				down = true;
+				break;
+			}
+		}
+	} else {
+		// An ASCII character. Common::KeyCode uses the lowercase ASCII value for
+		// letters, digits and space, so the character doubles as the key.
+		Common::String key = d.asString();
+		if (!key.empty())
+			down = g_director->_keysDown.contains(tolower((byte)key[0]));
+	}
+
+	g_lingo->push(Datum(down ? 1 : 0));
 }
 
 void LB::b_param(int nargs) {
