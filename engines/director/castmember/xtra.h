@@ -59,6 +59,12 @@ private:
 	// volume even though we don't play the underlying media. Stored so get/set
 	// stay consistent. 0-255, matching Lingo's sound-volume range.
 	int _volume = 255;
+
+public:
+	// Shockwave Audio streaming state, as the `state` property reports it:
+	// 0 stopped, 1 reloading, 2 preloaded, 3 playing, 4 paused, 5 finished,
+	// 9 error, 10 out of CPU. preLoadBuffer() is documented to leave it at 2.
+	int _swaState = 0;
 };
 
 } // End of namespace Director
