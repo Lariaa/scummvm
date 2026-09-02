@@ -1178,7 +1178,15 @@ Common::Path findXLibPath(const Common::String &path, bool currentFolder, bool s
 }
 
 Common::Path findAudioPath(const Common::String &path, bool currentFolder, bool searchPaths) {
-	const char *exts[] = { ".AIF", ".WAV", nullptr };
+	// Several titles ask for audio without an extension: Loewenzahn 4 and 5 call
+	// `sound playFile 4, "@:sounds:RA01"` and `playFile 4, "logo"` for .swa
+	// files (LZ4's SOUNDS folder holds 645 .swa against a single .aif), and
+	// Loewenzahn 8's login screen asks for "Trailer_ohne", which is an .mp3.
+	// The new extensions go last so titles shipping several formats under one
+	// base name keep resolving exactly as before; across the corpus only
+	// Kommissar Kugelblitz does that (KKSongsh exists as .aif and .swa), and it
+	// asks for the .swa by name.
+	const char *exts[] = { ".AIF", ".WAV", ".SWA", ".MP3", nullptr };
 
 	Common::Path result = findPath(path, currentFolder, searchPaths, false, exts);
 	return result;
