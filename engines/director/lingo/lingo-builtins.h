@@ -95,6 +95,7 @@ void b_clearGlobals(int nargs);
 void b_cursor(int nargs);
 void b_framesToHMS(int nargs);
 void b_HMStoFrames(int nargs);
+void b_keyPressed(int nargs);
 void b_param(int nargs);
 void b_printFrom(int nargs);
 void b_put(int nargs);
