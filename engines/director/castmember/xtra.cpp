@@ -148,7 +148,8 @@ bool XtraCastMember::hasProp(const Common::String &propName) {
 	// commonly poll these in an `on exitFrame` wait-loop before advancing, so we
 	// answer them to avoid an "unknown property" Lingo error.
 	if (propName.equalsIgnoreCase("percentPlayed") || propName.equalsIgnoreCase("percentStreamed")
-			|| propName.equalsIgnoreCase("volume") || propName.equalsIgnoreCase("duration"))
+			|| propName.equalsIgnoreCase("volume") || propName.equalsIgnoreCase("duration")
+			|| propName.equalsIgnoreCase("state"))
 		return true;
 	return CastMember::hasProp(propName);
 }
@@ -167,6 +168,13 @@ Datum XtraCastMember::getProp(const Common::String &propName) {
 	// this in a video sprite's beginSprite (DATA/login.dir, BHVideoSprite).
 	if (propName.equalsIgnoreCase("duration"))
 		return Datum(0);
+	// Read-only per the dictionary. It stays at 0 -- "streaming has stopped" --
+	// unless preLoadBuffer() has run, since nothing is ever actually streaming.
+	// Loewenzahn 3 (the D6.5 original) toggles on it: `if the State of member
+	// "Zeitlied" = 0 then play ... else stop(...)`, so 0 is also the answer that
+	// leaves the game on its play branch rather than its stop branch.
+	if (propName.equalsIgnoreCase("state"))
+		return Datum(_swaState);
 	return CastMember::getProp(propName);
 }
 
