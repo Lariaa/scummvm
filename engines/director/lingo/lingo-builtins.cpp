@@ -44,6 +44,7 @@
 #include "director/castmember/palette.h"
 #include "director/castmember/text.h"
 #include "director/castmember/transition.h"
+#include "director/castmember/xtra.h"
 #include "director/lingo/lingo-builtins.h"
 #include "director/lingo/lingo-code.h"
 #include "director/lingo/lingo-object.h"
@@ -145,6 +146,7 @@ static const BuiltinProto builtins[] = {
 	{ "stop",			LB::b_stop,			1, 1, 300, CBLTIN },	// SWA Xtra "stop member <swa>"
 		// play done												// D2
 	{ "preLoad",		LB::b_preLoad,		-1,0, 300, CBLTIN },	//		D3.1 c
+	{ "preLoadBuffer",	LB::b_preLoadBuffer, 1, 1, 500, CBLTIN },	// SWA Xtra "member(x).preLoadBuffer()"
 	{ "preLoadCast",	LB::b_preLoadCast,	-1,0, 300, CBLTIN },	//		D3.1 c
 	{ "preLoadMember",	LB::b_preLoadCast,	-1,0, 500, CBLTIN },	//				D5 c
 	{ "preLoadMovie",	LB::b_preLoadMovie,	1, 1, 500, CBLTIN },	//				D5 c
@@ -2408,6 +2410,23 @@ void LB::b_stop(int nargs) {
 	// argument instead of raising an "undefined handler" error that would abort
 	// Loewenzahn 3's login screen.
 	g_lingo->dropStack(nargs);
+}
+
+void LB::b_preLoadBuffer(int nargs) {
+	// Shockwave Audio Xtra: member(x).preLoadBuffer() reads part of the .swa into
+	// memory. We never stream the media, so there is nothing to buffer -- but the
+	// dictionary ties the two together ("when the preLoadBuffer command succeeds,
+	// the state member property equals 2"), and scripts read that afterwards, so
+	// record it. Kommissar Kugelblitz calls this every exitFrame on "KKSong".
+	Datum d = g_lingo->pop();
+
+	Movie *movie = g_director->getCurrentMovie();
+	if (!movie || (d.type != CASTREF && d.type != FIELDREF))
+		return;
+
+	CastMember *member = movie->getCastMember(*d.u.cast);
+	if (member && member->_type == kCastXtra)
+		((XtraCastMember *)member)->_swaState = 2;
 }
 
 void LB::b_playAccel(int nargs) {
