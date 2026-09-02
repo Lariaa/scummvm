@@ -9704,8 +9704,8 @@ static const DirectorGameDescription gameDescriptions[] = {
 								"Child.dxr", "t:57e4acc11a12a483541cfb69eb570810", 387835, 700),
 
 	// Original Mac filename is Löwenzahn 4
-	MACGAME1_l("loewe4", "", "xn--Lwenzahn 4-ecb",		"rt:6f75666ef42bcd1d34bd120d011b42b1",  114029, Common::DE_DEU, 702),
-	WINGAME1_l("loewe4", "", "SETUP/WIN95/LOEWE4.exe",	"t:4766360be9f3067a9f314b3b3a454fa7",  1818036, Common::DE_DEU, 702),
+	MACGAME1f_l("loewe4", "", "xn--Lwenzahn 4-ecb",		"rt:6f75666ef42bcd1d34bd120d011b42b1",  114029, Common::DE_DEU, 702, GF_TRUECOLOR),
+	WINGAME1f_l("loewe4", "", "SETUP/WIN95/LOEWE4.exe",	"t:4766360be9f3067a9f314b3b3a454fa7",  1818036, Common::DE_DEU, 702, GF_TRUECOLOR),
 
 	WINGAME2_l("loewesteinzeit", "","START.EXE",	  "t:13918e51d2093b5cdc92795b36454112", 1960654,
 									"data/131Koch.dxr", "80b7913156e36d8806b2dcdcbcd7d288", 817625, Common::DE_DEU, 702),
@@ -10323,7 +10323,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 									  "rock.cdq", "d:f1925162f13a34f8445e71374dd87914", 10430, 800),
 
 	// Original Win executable name is Löwenzahn5.exe
-	WINGAME1t_l("loewe5", "", "Setup/WinRoot/Terzio/xn--Lwenzahn 5-ecb/xn--lwenzahn5.exe-imb", "9c59833b332f0b9f8ecc97f0aa47ec99", 2386566, Common::DE_DEU, 800),
+	WINGAME1tf_l("loewe5", "", "Setup/WinRoot/Terzio/xn--Lwenzahn 5-ecb/xn--lwenzahn5.exe-imb", "9c59833b332f0b9f8ecc97f0aa47ec99", 2386566, Common::DE_DEU, 800, GF_TRUECOLOR),
 
 	// Original filenames contain Löwenzahn 7
 	MACGAME1f_l("loewe7", "Classic", "xn--Lwenzahn 7 (classic)-39b", "rt:19e9fb7b215165e975ab6c6fcedc07cd", 195151, Common::DE_DEU, 800, GF_TRUECOLOR),
@@ -10812,7 +10812,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 	// Re-releases, released as part of the "Jubiläums-Paket" 25th anniversary bundle
 	WINGAME1t_l("loewe2", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 2/Loewenzahn 2.exe", "861c0ac98a672fc3e537a26b8cc543be", 95970, Common::DE_DEU, 900),
 	WINGAME1t_l("loewe3", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 3/Loewenzahn 3.exe", "46243628b1d79872340993bdc4a156d8", 87791, Common::DE_DEU, 900),
-	WINGAME1t_l("loewe4", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 4/Loewenzahn 4.exe", "fcd7e3e7b9b1080f848c518b6e66d860", 87795, Common::DE_DEU, 900),
+	WINGAME1tf_l("loewe4", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 4/Loewenzahn 4.exe", "fcd7e3e7b9b1080f848c518b6e66d860", 87795, Common::DE_DEU, 900, GF_TRUECOLOR),
 	WINGAME1t_l("loewe6", "Jubiläums-Paket", "Setup/WinRoot/Terzio/Loewenzahn 6/Loewenzahn 6.exe", "c4135f262abdbf3f2dc660e341b8a192", 87820, Common::DE_DEU, 900),
 
 	// Mac versions are D8
