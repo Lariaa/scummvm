@@ -750,8 +750,20 @@ Common::Path resolvePathInner(const Common::String &path, const Common::Path &ba
 		Common::ArchiveMemberList list;
 		SearchMan.listMembers(list);
 		for (auto &it : list) {
-			Common::Path test(it->getName());
-			Common::Path testParent = test.getParent();
+			// getPathInArchive(), not getName(): for files inside an FSDirectory
+			// -- which is what SearchMan hands out for the game tree --
+			// getName() returns the bare file name (common/fs.cpp:62), so the
+			// parent below was always empty and this loop could never match a
+			// directory at all. getPathInArchive() is the documented accessor
+			// for the path relative to the archive root.
+			//
+			// Loewenzahn 8 depends on this: its login movie is reached as
+			// "@:login:login" and resolves through SearchMan to DATA/Login/
+			// login.dir, leaving _currentPath as "login\". Without a directory
+			// match, findPath() logged an empty "searching current folder" and
+			// never looked in that folder, so `sound playFile 2, "IntroCD8.mp3"`
+			// failed even though DATA/Login/IntroCD8.mp3 exists.
+			Common::Path testParent = it->getPathInArchive().getParent();
 			Common::StringArray destComponents = testParent.splitComponents();
 			if (destComponents[destComponents.size() - 1].empty()) {
 				destComponents.pop_back();
