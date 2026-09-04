@@ -254,6 +254,7 @@ static const BuiltinProto builtins[] = {
 	{ "false",			LB::b_false,		0, 0, 200, KBLTIN },	// D2 k
 	{ "quote",			LB::b_quote,		0, 0, 200, KBLTIN },	// D2 k
 	{ "return",			LB::b_returnconst,	0, 0, 200, KBLTIN },	// D2 k
+	{ "space",			LB::b_space,		0, 0, 600, KBLTIN },	//					D6 k
 	{ "tab",			LB::b_tab,			0, 0, 200, KBLTIN },	// D2 k
 	{ "true",			LB::b_true,			0, 0, 200, KBLTIN },	// D2 k
 	{ "version",		LB::b_version,		0, 0, 300, KBLTIN },	//		D3 k
@@ -4722,6 +4723,10 @@ void LB::b_quote(int nargs) {
 
 void LB::b_returnconst(int nargs) {
 	g_lingo->push(Datum(Common::String("\r")));
+}
+
+void LB::b_space(int nargs) {
+	g_lingo->push(Datum(Common::String(" ")));
 }
 
 void LB::b_tab(int nargs) {
