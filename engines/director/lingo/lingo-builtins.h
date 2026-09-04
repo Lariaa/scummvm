@@ -212,6 +212,7 @@ void b_enter(int nargs);
 void b_false(int nargs);
 void b_quote(int nargs);
 void b_returnconst(int nargs);
+void b_space(int nargs);
 void b_tab(int nargs);
 void b_true(int nargs);
 void b_version(int nargs);
