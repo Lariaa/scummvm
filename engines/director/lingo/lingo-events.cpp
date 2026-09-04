@@ -1004,7 +1004,24 @@ Datum Score::createScriptInstance(BehaviorElement *behavior) {
 	}
 
 	g_lingo->push(scr);
+	// A behavior without an `on new` of its own reaches the builtin, which runs
+	// to completion and leaves the instance on the stack. One that declares a
+	// handler gets a stack frame pushed instead -- and nothing ran it, so the
+	// arguments were consumed and the pop below took an empty stack. TKKG 10's
+	// "KP Checker" (script 33, `on new me, ...`) aborts the movie in frame 10
+	// that way. Drive the frame the way Lingo::executeHandler() does; with the
+	// builtin no frame is pushed and execute() returns at once.
+	int callFrame = g_lingo->_state->callstack.size();
 	LC::call("new", 1, true);
+	g_lingo->execute(callFrame);
+
+	// An aborted handler (an uncaught Lingo error, say) unwinds without leaving
+	// a return value behind.
+	if (g_lingo->_state->stack.empty()) {
+		warning("Score::createScriptInstance(): Behavior %s returned nothing", behavior->toString().c_str());
+		return Datum();
+	}
+
 	Datum instance = g_lingo->pop();
 
 	if (instance.type != OBJECT) {
