@@ -657,8 +657,17 @@ void Sprite::setBbox(int l, int t, int r, int b) {
 	// build a one-dimensional rail, e.g. for `the constraint of sprite`. Clamp each
 	// axis on its own -- zeroing both would collapse such a rail down to its
 	// top-left corner, pinning the constrained sprite there.
-	_width = MAX<int>(0, r - l);
-	_height = MAX<int>(0, b - t);
+	//
+	// The upper bound matters as much as the lower one. Clamping the corners
+	// above still leaves a span of up to 65535, which does not fit the int16
+	// these are kept in and wraps negative -- and getBbox() then builds
+	// Common::Rect(_width, _height) out of it and trips the isValidRect assert.
+	// TKKG 7's photofit reaches exactly that: after
+	//   rect(-435907128, -2141073249, -435907128, 833351864)
+	// is clamped, b - t is 65535, _height becomes -1, and the next updateStage
+	// takes the engine down inside getSpriteIntersections().
+	_width = (int16)CLIP<int>(r - l, 0, 32767);
+	_height = (int16)CLIP<int>(b - t, 0, 32767);
 
 	Common::Rect source(_width, _height);
 	if (_cast) {
