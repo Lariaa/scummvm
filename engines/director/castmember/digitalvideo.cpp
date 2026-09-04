@@ -108,6 +108,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId)
 	_scaleX = _scaleY = 100;
 	_dirty = false;
 	_emptyFile = false;
+	_externalDurationMs = 0;
 
 	memset(_ditheringPalette, 0, 256*3);
 }
@@ -145,6 +146,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Common
 	_center = _vflags & 0x01;
 	_dirty = false;
 	_emptyFile = false;
+	_externalDurationMs = 0;
 
 	memset(_ditheringPalette, 0, 256*3);
 
@@ -172,6 +174,8 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Digita
 		_children = source._children;
 
 	_filename = source._filename;
+	_externalFilename = source._externalFilename;
+	_externalDurationMs = source._externalDurationMs;
 
 	_vflags = source._vflags;
 	_looping = source._looping;
@@ -252,6 +256,12 @@ CastMember *DigitalVideoCastMember::createFromXtra(Cast *cast, uint16 castId, Xt
 }
 
 bool DigitalVideoCastMember::loadVideoFromCast() {
+	// A member promoted from an Xtra carries its own file name: DirectMedia
+	// stores it in the payload, where getVideoPath() -- which looks for a MooV
+	// child -- has nothing to find.
+	if (!_externalFilename.empty())
+		return loadVideo(_externalFilename);
+
 	Common::String path = getCast()->getVideoPath(_castId);
 	if (!path.empty())
 		return loadVideo(path);
