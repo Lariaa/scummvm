@@ -485,7 +485,22 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				Common::Rect srcRect = destRect;
 				srcRect.translate(-destOrigin.x, -destOrigin.y);
 				debugC(8, kDebugImages, "Channel::getMask(): cast mask %s, orig %dx%d, scaled %dx%d, dest %dx%d, crop %d,%d %dx%d",  maskID.asString().c_str(), bitmap->_picture->_surface.w, bitmap->_picture->_surface.h, maskSurface->w, maskSurface->h, bbox.width(), bbox.height(), destRect.left, destRect.top, destRect.width(), destRect.height());
-				_mask->copyRectToSurface(*maskSurface, destRect.left, destRect.top, srcRect);
+				// The two are aligned by their registration points, and nothing
+				// keeps an author from giving the mask one that puts it clear of
+				// the picture: Loewenzahn 4's EVO.DIR pairs "schlange" 123x254
+				// registered at -241,70 with a mask of the same name 117x253
+				// registered at 59,126, which lands the whole mask 300 pixels
+				// left of the sprite. The clip above then leaves an empty rect
+				// and copyRectToSurface() asserts on width > 0. Draw such a
+				// sprite unmasked rather than blanking it -- a mask sharing no
+				// pixel with its picture is not one the author can have meant.
+				bool disjoint = destRect.isEmpty();
+				if (disjoint) {
+					warning("Channel::getMask(): cast mask %s does not meet the %dx%d sprite it belongs to, ignoring",
+							maskID.asString().c_str(), bbox.width(), bbox.height());
+				} else {
+					_mask->copyRectToSurface(*maskSurface, destRect.left, destRect.top, srcRect);
+				}
 
 				if (scaledMask) {
 					scaledMask->free();
@@ -495,7 +510,7 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 					flattenedMask->free();
 					delete flattenedMask;
 				}
-				return &_mask->rawSurface();
+				return disjoint ? nullptr : &_mask->rawSurface();
 			} else {
 				warning("Channel::getMask(): Requested cast mask %s, but no picture found", maskID.asString().c_str());
 				return nullptr;
