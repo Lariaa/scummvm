@@ -330,6 +330,8 @@ enum TheFieldType {
 	kTheType,
 	kTheUseAlpha,
 	kTheVideo,
+	kTheVideoHeight,
+	kTheVideoWidth,
 	kTheVisibility,
 	kTheVisible,
 	kTheVolume,
