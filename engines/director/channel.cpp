@@ -192,10 +192,48 @@ DirectorPlotData Channel::getPlotData() {
 				}
 			}
 
-			debugC(2, kDebugImages, "Channel::getPlotData(): BackgndTrans %s on channel %d, %dx%d %s: backColor 0x%08x, %d of %d sampled pixels transparent; commonest 0x%08x (%d of %d), %d distinct",
+			// The commonest colour above is read off the widget surface, i.e.
+			// after the cast member has been converted into screen format. That
+			// leaves one question open: whether the artwork's background really
+			// is that colour, or only becomes it on the way. So sample the
+			// member's own picture too, and resolve the raw index through the
+			// palette the picture carries. Three values on one line then settle
+			// it -- raw index and its own RGB, the converted colour, and the
+			// back colour the comparison is made against.
+			Common::String source;
+			if (_sprite->_cast && _sprite->_cast->_type == kCastBitmap) {
+				Picture *pic = ((BitmapCastMember *)_sprite->_cast)->_picture;
+				if (pic && pic->_surface.getPixels() && pic->_surface.w > 0 && pic->_surface.h > 0) {
+					const Graphics::Surface &ps = pic->_surface;
+					Common::HashMap<uint32, int> rawHist;
+					for (int gy = 0; gy < kSteps; gy++)
+						for (int gx = 0; gx < kSteps; gx++)
+							rawHist[ps.getPixel(gx * (ps.w - 1) / (kSteps - 1), gy * (ps.h - 1) / (kSteps - 1))]++;
+
+					uint32 rawCommonest = 0;
+					int rawCount = 0;
+					for (auto &it : rawHist) {
+						if (it._value > rawCount) {
+							rawCount = it._value;
+							rawCommonest = it._key;
+						}
+					}
+
+					source = Common::String::format("; source %s commonest 0x%08x (%d)",
+							ps.format.toString().c_str(), rawCommonest, rawCount);
+
+					// Only an indexed picture has a palette to resolve through.
+					if (ps.format.isCLUT8() && rawCommonest < (uint32)pic->getPaletteCount()) {
+						const byte *p = pic->_palette + rawCommonest * 3;
+						source += Common::String::format(" = RGB(%d, %d, %d) in its own palette", p[0], p[1], p[2]);
+					}
+				}
+			}
+
+			debugC(2, kDebugImages, "Channel::getPlotData(): BackgndTrans %s on channel %d, %dx%d %s: backColor 0x%08x, %d of %d sampled pixels transparent; commonest 0x%08x (%d of %d), %d distinct%s",
 					_sprite->_castId.asString().c_str(), _sprite->_spriteInfo.channelNum,
 					s.w, s.h, s.format.toString().c_str(), back, clear, total,
-					commonest, commonestCount, total, (int)histogram.size());
+					commonest, commonestCount, total, (int)histogram.size(), source.c_str());
 		}
 	}
 
