@@ -393,16 +393,6 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				return nullptr;
 			}
 			BitmapCastMember *bitmap = (BitmapCastMember *)member;
-			// The docs call for a 1-bit mask, but 8-bit ones ship and Director
-			// takes them: TKKG 9 stores every mask as an 8bpp greyscale twin of
-			// its image, 0 where the image is background and 255 where it is not,
-			// plus a handful of antialiased values along the edge. The blitter
-			// only tests for non-zero, so those come out with hard edges instead
-			// of not at all.
-			if (bitmap->_bitsPerPixel != 1 && bitmap->_bitsPerPixel != 8) {
-				warning("Channel::getMask(): Requested cast mask %s, but bitmap is %dbpp", maskID.asString().c_str(), bitmap->_bitsPerPixel);
-				return nullptr;
-			}
 
 			if (_mask) {
 				delete _mask;
@@ -431,6 +421,45 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				// mask with a 158x70 one. Those keep the placement they had.
 				const Graphics::Surface *maskSurface = &bitmap->_picture->_surface;
 				Graphics::Surface *scaledMask = nullptr;
+				Graphics::Surface *flattenedMask = nullptr;
+
+				// The docs call for a 1-bit mask, but deeper ones ship and Director
+				// takes them. TKKG 9 stores every mask as an 8bpp greyscale twin of
+				// its image, 0 where the image is background and 255 where it is
+				// not, plus a handful of antialiased values along the edge; those
+				// go to the blitter as they are, since it walks the mask one byte
+				// per pixel.
+				//
+				// Anything wider has to be reduced first, and used to be turned
+				// away instead. Loewenzahn 4 draws its "Bauwagen" home button in
+				// every single movie as member "BW0" with mask "BW0.m", both 32bpp:
+				// the mask holds 3199 black and 928 white pixels, and not one of
+				// the white ones sits over the caravan, so it is a plain stencil
+				// that merely happens to be stored in a 32-bit image. Take the
+				// luminance and invert it -- a Director mask is drawn in QuickDraw
+				// terms, where the black pixels are the ones that get painted,
+				// which is also what the 1bpp branch of BITDDecoder produces:
+				// set bit (black) -> 0xff. Antialiased edges survive as
+				// intermediate values, which inkBlitSurface() already reads as
+				// partial coverage.
+				if (maskSurface->format.bytesPerPixel != 1) {
+					flattenedMask = new Graphics::Surface();
+					flattenedMask->create(maskSurface->w, maskSurface->h, Graphics::PixelFormat::createFormatCLUT8());
+
+					for (int y = 0; y < maskSurface->h; y++) {
+						byte *dst = (byte *)flattenedMask->getBasePtr(0, y);
+
+						for (int x = 0; x < maskSurface->w; x++) {
+							byte a, r, g, b;
+							maskSurface->format.colorToARGB(maskSurface->getPixel(x, y), a, r, g, b);
+							*dst++ = 255 - ((r * 30 + g * 59 + b * 11) / 100);
+						}
+					}
+					debugC(4, kDebugImages, "Channel::getMask(): flattened %dbpp cast mask %s to a %dx%d stencil",
+							bitmap->_bitsPerPixel, maskID.asString().c_str(), flattenedMask->w, flattenedMask->h);
+					maskSurface = flattenedMask;
+				}
+
 				bool matchingPair = _sprite->_cast
 					&& _sprite->_cast->_initialRect.width() == bitmap->_initialRect.width()
 					&& _sprite->_cast->_initialRect.height() == bitmap->_initialRect.height();
@@ -461,6 +490,10 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				if (scaledMask) {
 					scaledMask->free();
 					delete scaledMask;
+				}
+				if (flattenedMask) {
+					flattenedMask->free();
+					delete flattenedMask;
 				}
 				return &_mask->rawSurface();
 			} else {
