@@ -2245,10 +2245,29 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		break;
 	case kTheRect:
 		if (d.type == RECT || (d.type == ARRAY && d.u.farr->arr.size() >= 4)) {
+			// asInt(), not u.i: the union holds an int and a double in the same
+			// storage, so reading u.i off a FLOAT element yields the low half of
+			// the double's bit pattern rather than its value. A script only has
+			// to compute the corners -- `the rect of sprite n = [x * f, ...]`, or
+			// any list built from arithmetic -- for that to reach here, and the
+			// resulting rect is not merely wrong but arbitrary.
+			//
+			// Say so when it happens. TKKG 7's photofit transition hands over
+			// rect(-435907128, -2141073249, -435907128, 833351864), whose two
+			// horizontal corners are bit-identical, and it has not been shown
+			// which of the ways into this case produced it.
+			for (uint i = 0; i < 4; i++) {
+				if (d.u.farr->arr[i].type != INT) {
+					warning("Lingo::setTheSprite(): the rect of sprite %d has a %s in element %d, converting",
+							channel->_sprite->_spriteInfo.channelNum, d.u.farr->arr[i].type2str(), i + 1);
+					break;
+				}
+			}
+
 			score->updateSprites(kRenderForceUpdate);
 			channel->setBbox(
-				d.u.farr->arr[0].u.i, d.u.farr->arr[1].u.i,
-				d.u.farr->arr[2].u.i, d.u.farr->arr[3].u.i
+				d.u.farr->arr[0].asInt(), d.u.farr->arr[1].asInt(),
+				d.u.farr->arr[2].asInt(), d.u.farr->arr[3].asInt()
 			);
 			channel->setDirty();
 		}
