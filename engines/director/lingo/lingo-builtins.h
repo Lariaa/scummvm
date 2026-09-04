@@ -54,6 +54,7 @@ void b_addAt(int nargs);
 void b_addProp(int nargs);
 void b_append(int nargs);
 void b_count(int nargs);
+void b_delete(int nargs);
 void b_deleteAll(int nargs);
 void b_deleteAt(int nargs);
 void b_deleteOne(int nargs);
