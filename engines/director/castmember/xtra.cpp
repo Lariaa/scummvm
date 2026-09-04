@@ -29,6 +29,7 @@
 #include "director/castmember/digitalvideo.h"
 #include "director/lingo/lingo-the.h"
 #include "director/lingo/xtras-cast/cursorxtra.h"
+#include "director/lingo/xtras-cast/directmediaxtra.h"
 #include "director/lingo/xtras-cast/textxtra.h"
 
 namespace Director {
@@ -41,6 +42,9 @@ struct XtraCastMemberProto {
 static const XtraCastMemberProto xtraCastMemberProtos[] = {
 	{ "cursor", CursorXtra::createCastMember },
 	{ "quickTimeMedia", DigitalVideoCastMember::createFromXtra },
+	// Tabuleiro's DirectMedia Xtra. The symbolString in DIRECTME.X32 is
+	// "TBDIRECTMEDIA"; "DirectMedia" is its display name and the xlib side.
+	{ "TBDirectMedia", DirectMediaXtra::createCastMember },
 	{ "text", TextXtra::createCastMember },
 	{ "font", nullptr },
 	{ nullptr, nullptr },
@@ -104,6 +108,12 @@ CastMember *XtraCastMember::promote(Cast *cast, uint16 castId, XtraCastMember *x
 	if (!p || !p->promote)
 		return xtra;
 	CastMember *promoted = p->promote(cast, castId, xtra);
+	if (!promoted) {
+		// The Xtra recognised the symbol but could not make sense of the
+		// payload. Keep the generic member rather than losing it -- deleting it
+		// here and handing back nothing would drop the cast slot entirely.
+		return xtra;
+	}
 	delete xtra;
 	return promoted;
 }
