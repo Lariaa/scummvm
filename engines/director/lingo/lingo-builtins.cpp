@@ -79,6 +79,8 @@ static const BuiltinProto builtins[] = {
 	{ "offset",			LB::b_offset,		2, 3, 200, FBLTIN },	// D2 f
 	{ "string",			LB::b_string,		1, 1, 200, FBLTIN },	// D2 f
 	{ "value",		 	LB::b_value,		1, 1, 200, FBLTIN },	// D2 f
+	// Chunks
+	{ "delete",			LB::b_delete,		1, 1, 200, CBLTIN },	// D2 command, on a chunk reference
 	// Lists
 	{ "add",			LB::b_add,			2, 2, 400, HBLTIN_LIST },	//			D4 handler
 	{ "addAt",			LB::b_addAt,		3, 3, 400, HBLTIN_LIST },	//			D4 h
@@ -1805,6 +1807,20 @@ void LB::b_setAt(int nargs) {
 	default:
 		break;
 	}
+}
+
+void LB::b_delete(int nargs) {
+	// `delete <chunk> of <text>` already has an opcode: the compiler emits
+	// LC::c_delete for the tDELETE rule in the grammar, and that one handles
+	// nested chunk references and the delimiter rules (a word takes the spaces
+	// after it, an item or line one separator -- unless it is the whole text).
+	//
+	// Compiled bytecode does not use the opcode, though. It calls "delete" as a
+	// handler with the chunk reference as its argument, which reached nothing:
+	// Loewenzahn 5 ends its TNase scene on "Call to undefined handler 'delete'"
+	// from `delete xNam.char[1..5]`. c_delete() pops its own argument, so the
+	// two call shapes meet here rather than in a second implementation.
+	LC::c_delete();
 }
 
 void LB::b_setContents(int nargs) {
