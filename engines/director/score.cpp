@@ -2277,7 +2277,21 @@ BehaviorElement Score::loadSpriteBehavior(Common::MemoryReadStreamEndian *stream
 		Common::MemoryReadStreamEndian *stream1 = getSpriteDetailsStream(behavior.initializerIndex);
 
 		if (stream1) {
-			behavior.initializerParams = stream1->readString();
+			// The initializer is a Lingo literal that b_value() hands to the
+			// compiler, and its high bytes are stored the way every other
+			// Director string is -- Mac Roman, on Windows too. Left raw, the
+			// implicit U32String conversion in compileAnonymous() decodes it as
+			// UTF-8, and decodeUTF8()'s single-byte branch masks a stray
+			// continuation byte with & 0x7F. Loewenzahn Spielebox stores
+			// "kaefer" as 6b 8a 66 65 72, and 0x8A & 0x7F is 0x0A: a newline
+			// lands in the middle of a string literal, the lexer refuses it
+			// ("unexpected '\n': expected ',' or ']'"), pLabel stays void and
+			// the menu button jumps nowhere.
+			//
+			// Decode it the way the frame labels below already are, so both
+			// sides of `go(pLabel)` are UTF-8 and compare equal.
+			Common::String raw = stream1->readString();
+			behavior.initializerParams = _movie->getCast()->decodeString(raw).encode(Common::kUtf8);
 			delete stream1;
 		}
 	}
