@@ -89,6 +89,13 @@ public:
 
 	Common::String _filename;
 
+	// An Xtra-backed member names its media in its own payload rather than in a
+	// MooV child, so Cast::getVideoPath() finds nothing for it. Tabuleiro's
+	// DirectMedia Xtra also states the duration there, which is worth keeping:
+	// a script can ask for it before the file is ever opened.
+	Common::String _externalFilename;
+	uint32 _externalDurationMs;
+
 	uint32 _vflags;
 	bool _looping;
 	bool _pausedAtStart;
