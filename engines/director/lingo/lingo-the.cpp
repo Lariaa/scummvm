@@ -314,6 +314,12 @@ const TheEntityField fields[] = {
 	{ kTheSprite,	"trackPreviousSampleTime",	kTheTrackPreviousKeyTime, 500 },//D5 p
 	{ kTheSprite,	"trackText",	kTheTrackText, 500 },//						D5 p
 	{ kTheCast,		"video",		kTheVideo,		400 },//				D4 p
+	// Tabuleiro's DirectMedia Xtra states the media size on the member; its own
+	// msgTable lists "the videowidth of member" and "the videoheight of member"
+	// alongside duration. Loewenzahn 3 compares videowidth against 352 to decide
+	// whether to shrink the sprite to 320x240.
+	{ kTheCast,		"videoHeight",	kTheVideoHeight,600 },//						D6 p
+	{ kTheCast,		"videoWidth",	kTheVideoWidth,	600 },//						D6 p
 	{ kTheSprite,	"volume",		kTheVolume,		300 },//		D3.1 p
 	// track, scontains track type, seems to be unused
 	// tracks, number of track, seems to be unused

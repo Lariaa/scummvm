@@ -766,6 +766,8 @@ bool DigitalVideoCastMember::hasField(int field) {
 	case kTheSound:
 	case kTheTimeScale:
 	case kTheVideo:
+	case kTheVideoHeight:	// D6, DirectMedia Xtra
+	case kTheVideoWidth:	// D6, DirectMedia Xtra
 		return true;
 	default:
 		break;
@@ -801,7 +803,26 @@ Datum DigitalVideoCastMember::getField(int field) {
 	case kTheDuration:
 		// sometimes, we will get duration before we start video.
 		// _duration is initialized in startVideo, thus we will not get the correct number.
-		d = (int)getDuration();
+		//
+		// An Xtra-backed member states it in its own payload, so answer from
+		// there and leave the file shut -- Loewenzahn 5 reads `member.duration`
+		// in a beginSprite, long before anything plays.
+		if (_externalDurationMs && (!_video || !_video->isVideoLoaded()))
+			d = (int)_externalDurationMs;
+		else
+			d = (int)getDuration();
+		break;
+	case kTheVideoHeight:
+	case kTheVideoWidth:
+		{
+			// The authored size, which is what the Xtra reports: the member's
+			// rect is set from the payload when it is promoted. Fall back to the
+			// decoder only if that was missing.
+			Common::Rect rect = _initialRect;
+			if (rect.isEmpty() && _video)
+				rect = Common::Rect(_video->getWidth(), _video->getHeight());
+			d = (field == kTheVideoWidth) ? rect.width() : rect.height();
+		}
 		break;
 	case kTheFrameRate:
 		d = _frameRate;
