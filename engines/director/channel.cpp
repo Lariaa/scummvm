@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/hashmap.h"
+
 #include "director/director.h"
 #include "director/movie.h"
 #include "director/score.h"
@@ -159,19 +161,41 @@ DirectorPlotData Channel::getPlotData() {
 	if (pd.srf && _sprite->_ink == kInkTypeBackgndTrans && debugChannelSet(2, kDebugImages)) {
 		const Graphics::Surface &s = *pd.srf;
 		if (s.w > 0 && s.h > 0) {
+			// Counting the matches alone says a sprite lets nothing through, but
+			// not why. The commonest sampled colour and the surface format
+			// separate the two ways that happens: a back colour that names the
+			// wrong colour, and a comparison whose two sides are not even in the
+			// same representation. Loewenzahn 5 paints white blocks over its
+			// wagon doors while Loewenzahn 7 paints black ones around its keys,
+			// so one wrong constant cannot explain both.
 			const int kSteps = 32;
 			uint32 back = _sprite->getBackColor();
 			int clear = 0, total = 0;
+			Common::HashMap<uint32, int> histogram;
+
 			for (int gy = 0; gy < kSteps; gy++) {
 				for (int gx = 0; gx < kSteps; gx++) {
-					if (s.getPixel(gx * (s.w - 1) / (kSteps - 1), gy * (s.h - 1) / (kSteps - 1)) == back)
+					uint32 px = s.getPixel(gx * (s.w - 1) / (kSteps - 1), gy * (s.h - 1) / (kSteps - 1));
+					histogram[px]++;
+					if (px == back)
 						clear++;
 					total++;
 				}
 			}
-			debugC(2, kDebugImages, "Channel::getPlotData(): BackgndTrans %s on channel %d, %dx%d: backColor 0x%08x, %d of %d sampled pixels transparent",
+
+			uint32 commonest = 0;
+			int commonestCount = 0;
+			for (auto &it : histogram) {
+				if (it._value > commonestCount) {
+					commonestCount = it._value;
+					commonest = it._key;
+				}
+			}
+
+			debugC(2, kDebugImages, "Channel::getPlotData(): BackgndTrans %s on channel %d, %dx%d %s: backColor 0x%08x, %d of %d sampled pixels transparent; commonest 0x%08x (%d of %d), %d distinct",
 					_sprite->_castId.asString().c_str(), _sprite->_spriteInfo.channelNum,
-					s.w, s.h, back, clear, total);
+					s.w, s.h, s.format.toString().c_str(), back, clear, total,
+					commonest, commonestCount, total, (int)histogram.size());
 		}
 	}
 
