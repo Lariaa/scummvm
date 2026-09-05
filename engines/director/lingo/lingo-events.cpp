@@ -1011,9 +1011,9 @@ Datum Score::createScriptInstance(BehaviorElement *behavior) {
 	// "KP Checker" (script 33, `on new me, ...`) aborts the movie in frame 10
 	// that way. Drive the frame the way Lingo::executeHandler() does; with the
 	// builtin no frame is pushed and execute() returns at once.
-	int callFrame = g_lingo->_state->callstack.size();
+	int newFrame = g_lingo->_state->callstack.size();
 	LC::call("new", 1, true);
-	g_lingo->execute(callFrame);
+	g_lingo->execute(newFrame);
 
 	// An aborted handler (an uncaught Lingo error, say) unwinds without leaving
 	// a return value behind.
