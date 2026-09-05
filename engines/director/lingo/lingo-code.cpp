@@ -1776,6 +1776,16 @@ void LC::call(const Common::String &name, int nargs, bool allowRetVal) {
 		}
 	}
 
+	// A constant reached through a call, not through c_constpush. Compiled
+	// bytecode does that: Loewenzahn 4's Skelett chapter emits
+	// `c_argcpush 0 / cb_call "space"` for the SPACE constant, and KBLTIN
+	// symbols live in _builtinConsts alone, which nothing above consults --
+	// so the movie died on "Call to undefined handler 'space'". The lookup
+	// order still puts handlers first, so a game that defines its own `empty`
+	// or `quote` keeps winning.
+	if (funcSym.type == VOIDSYM && g_lingo->_builtinConsts.contains(name))
+		funcSym = g_lingo->_builtinConsts[name];
+
 	// use lingo-the as fallback. we can only use functions as fallback, not properties
 	if (funcSym.type == VOIDSYM && g_lingo->_theEntities.contains(name) && g_lingo->_theEntities[name]->isFunction) {
 		Datum id;
