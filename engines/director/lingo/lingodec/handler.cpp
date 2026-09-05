@@ -37,6 +37,14 @@ void Handler::readRecord(Common::SeekableReadStream &stream) {
 }
 
 void Handler::readData(Common::SeekableReadStream &stream) {
+	// A misread record yields a wild offset, and SeekableSubReadStream::seek() asserts
+	// on those - taking the whole engine down for what is only a decompiler hiccup.
+	// Skip the handler instead, so the rest of the script still decompiles.
+	if ((int64)compiledOffset + compiledLen > stream.size()) {
+		warning("LingoDec::Handler::readData(): bytecode at %u+%u lies outside the %d-byte script, skipping handler",
+				compiledOffset, compiledLen, (int)stream.size());
+		return;
+	}
 	stream.seek(compiledOffset);
 	while (stream.pos() < compiledOffset + compiledLen) {
 		uint32 pos = stream.pos() - compiledOffset;
