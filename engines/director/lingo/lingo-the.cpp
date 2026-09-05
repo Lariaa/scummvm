@@ -187,6 +187,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheStageRight,		"stageRight",		false, 200, true },	// D2 f
 	{ kTheStageTop,			"stageTop",			false, 200, true },	// D2 f
 	{ kTheStillDown,		"stillDown",		false, 200, true },	// D2 f
+	{ kTheSystemDate,		"systemDate",		false, 700, true },	//							D7 f
 	{ kTheSwitchColorDepth,	"switchColorDepth",	false, 200, false },// D2 p
 	{ kTheTicks,			"ticks",			false, 200, true },	// D2 f
 	{ kTheTime,				"time",				false, 300, true },	// 		D3 f
@@ -1206,6 +1207,9 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		} else {
 			d = _vm->_wm->_mouseDown;
 		}
+		break;
+	case kTheSystemDate:
+		d = getTheSystemDate();
 		break;
 	case kTheSwitchColorDepth:
 		getTheEntitySTUB(kTheSwitchColorDepth);
@@ -3023,6 +3027,43 @@ static const char *mfull[] = {
 static const char *wday[] = {
 	"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 };
+
+// `the systemDate` is a date object in Director; scripts read .year, .month and
+// .day off it. A property list answers exactly those three, which is the whole
+// surface the corpus uses -- Loewenzahn Adventskalender is the only user, and
+// its mainMovie and checkOstern touch nothing else.
+//
+// The difference that remains: `ilk()` calls this a proplist, not a date, and
+// two of them do not compare as dates would. Neither appears in any script.
+Datum Lingo::getTheSystemDate() {
+	TimeDate t;
+	g_system->getTimeAndDate(t);
+
+	// Honour --start-movie's date override, the way getTheDate() does, so a
+	// calendar that gates on the day can be tested out of season.
+	if (g_director->_forceDate.tm_year != -1) {
+		t.tm_year = g_director->_forceDate.tm_year;
+		t.tm_mon = g_director->_forceDate.tm_mon;
+		t.tm_wday = g_director->_forceDate.tm_wday;
+		t.tm_mday = g_director->_forceDate.tm_mday;
+	}
+
+	Datum d;
+	d.type = PARRAY;
+	d.u.parr = new PArray;
+
+	Datum key;
+	key.type = SYMBOL;
+
+	key.u.s = new Common::String("year");
+	d.u.parr->arr.push_back(PCell(key, Datum(t.tm_year + 1900)));
+	key.u.s = new Common::String("month");
+	d.u.parr->arr.push_back(PCell(key, Datum(t.tm_mon + 1)));
+	key.u.s = new Common::String("day");
+	d.u.parr->arr.push_back(PCell(key, Datum(t.tm_mday)));
+
+	return d;
+}
 
 Datum Lingo::getTheDate(int field) {
 	TimeDate t;
