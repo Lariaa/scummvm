@@ -169,6 +169,7 @@ enum TheEntityType {
 	kTheStageRight,
 	kTheStageTop,
 	kTheStillDown,
+	kTheSystemDate,
 	kTheSwitchColorDepth,
 	kTheTicks,
 	kTheTime,
