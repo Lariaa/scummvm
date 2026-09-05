@@ -799,20 +799,48 @@ void Cast::loadCast() {
 		delete r;
 	}
 
+	// External casts have a single library. Its resource id lives in the
+	// cast file's own KEY* table (1024 in D5/D6, e.g. 0x00010400 in D7+),
+	// so resolve it from the archive's CAS* resource instead of assuming 1024.
+	uint32 libResourceId = _libResourceId;
+	if (_isExternal) {
+		libResourceId = 1024;
+		Common::Array<uint16> casStar = _castArchive->getResourceIDList(MKTAG('C', 'A', 'S', '*'));
+		if (!casStar.empty())
+			libResourceId = _castArchive->getResourceDetail(MKTAG('C', 'A', 'S', '*'), casStar[0]).libResourceId;
+	}
+
+	// The font maps belong to the cast LIBRARY, not to the movie. In D7-style
+	// files the library has its own resource id -- 0x00010400 for the first
+	// internal one -- and the KEY* entry for Fmap hangs off that, while
+	// getMovieResourceIfPresent() only ever looks under the movie's hardcoded
+	// 1024. Where the two differ the map was silently never read, _fontMap
+	// stayed empty, and every text member handed the font manager its raw id:
+	//
+	//   MacFontManager: Requested font ID 32769 not found. Falling back to Geneva
+	//
+	// Kommissar Kugelblitz and the Loewenzahn Adventskalender lose their fonts
+	// that way (Fmap parent 0x10400), while movies whose Fmap sits under 1024
+	// are unaffected. Ask the library first and fall back to the movie.
+	auto castResource = [&](uint32 tag) -> Common::SeekableReadStreamEndian * {
+		Common::SeekableReadStreamEndian *res = _castArchive->getFirstResource(tag, libResourceId);
+		return res ? res : _castArchive->getMovieResourceIfPresent(tag);
+	};
+
 	// Font Mapping
-	if ((r = _castArchive->getMovieResourceIfPresent(MKTAG('V', 'W', 'F', 'M'))) != nullptr) {
+	if ((r = castResource(MKTAG('V', 'W', 'F', 'M'))) != nullptr) {
 		loadFontMap(*r);
 		delete r;
 	}
 
 	// Cross-Platform Font Mapping
-	if ((r = _castArchive->getMovieResourceIfPresent(MKTAG('F', 'X', 'm', 'p'))) != nullptr) {
+	if ((r = castResource(MKTAG('F', 'X', 'm', 'p'))) != nullptr) {
 		loadFXmp(*r);
 		delete r;
 	}
 
 	// Font Mapping D4
-	if ((r = _castArchive->getMovieResourceIfPresent(MKTAG('F', 'm', 'a', 'p'))) != nullptr) {
+	if ((r = castResource(MKTAG('F', 'm', 'a', 'p'))) != nullptr) {
 		loadFontMapV4(*r);
 		delete r;
 	}
@@ -862,17 +890,6 @@ void Cast::loadCast() {
 	Common::Array<uint16> cast = _castArchive->getResourceIDList(MKTAG('C', 'A', 'S', 't'));
 	if (!_loadedCast)
 		_loadedCast = new Common::HashMap<int, CastMember *>();
-
-	// External casts have a single library. Its resource id lives in the
-	// cast file's own KEY* table (1024 in D5/D6, e.g. 0x00010400 in D7+),
-	// so resolve it from the archive's CAS* resource instead of assuming 1024.
-	uint32 libResourceId = _libResourceId;
-	if (_isExternal) {
-		libResourceId = 1024;
-		Common::Array<uint16> casStar = _castArchive->getResourceIDList(MKTAG('C', 'A', 'S', '*'));
-		if (!casStar.empty())
-			libResourceId = _castArchive->getResourceDetail(MKTAG('C', 'A', 'S', '*'), casStar[0]).libResourceId;
-	}
 
 	if (cast.size() > 0) {
 		debugC(2, kDebugLoading, "****** Loading CASt resources for libId %d (%s), resourceId %d", _castLibID, _castName.c_str(), libResourceId);
