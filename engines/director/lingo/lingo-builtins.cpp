@@ -3680,7 +3680,7 @@ void LB::b_puppetPalette(int nargs) {
 
 	Score *score = movie->getScore();
 	if (!palette.isNull()) {
-		g_director->setPalette(palette);
+		g_director->setPalette(palette, "puppetPalette");
 		g_director->_lastPuppetPalette = palette;
 		score->_puppetPalette = true;
 	} else {
@@ -3691,9 +3691,9 @@ void LB::b_puppetPalette(int nargs) {
 		// FIXME: set system palette decided by platform, should be fixed after windows palette is working.
 		// try to set mac system palette if lastPalette is 0.
 		if (g_director->_lastPalette.isNull())
-			g_director->setPalette(CastMemberID(kClutSystemMac, -1));
+			g_director->setPalette(CastMemberID(kClutSystemMac, -1), "puppetPalette reset");
 		else
-			g_director->setPalette(g_director->_lastPalette);
+			g_director->setPalette(g_director->_lastPalette, "puppetPalette restore");
 	}
 
 	// TODO: Implement advanced features that use these.
