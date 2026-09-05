@@ -81,6 +81,7 @@ static const BuiltinProto builtins[] = {
 	{ "value",		 	LB::b_value,		1, 1, 200, FBLTIN },	// D2 f
 	// Chunks
 	{ "delete",			LB::b_delete,		1, 1, 200, CBLTIN },	// D2 command, on a chunk reference
+	{ "handlers",		LB::b_handlers,		1, 1, 800, FBLTIN },	//							D8 f
 	// Lists
 	{ "add",			LB::b_add,			2, 2, 400, HBLTIN_LIST },	//			D4 handler
 	{ "addAt",			LB::b_addAt,		3, 3, 400, HBLTIN_LIST },	//			D4 h
@@ -1807,6 +1808,34 @@ void LB::b_setAt(int nargs) {
 	default:
 		break;
 	}
+}
+
+void LB::b_handlers(int nargs) {
+	// handlers(object) lists the handler names an object answers to, as symbols.
+	// A D8 addition -- it is in the d8, d8.5 and d10.1 keyword lists and in none
+	// of the earlier ones.
+	//
+	// TKKG 10's login screen asks its scene object before setting a cursor:
+	//   call:handlers(script: 62 "Login_Obj" ...)
+	// and the undefined handler ended the movie under lingostrict.
+	Datum d = g_lingo->pop();
+
+	Datum res;
+	res.type = ARRAY;
+	res.u.farr = new FArray;
+
+	if (d.type == OBJECT && d.u.obj && (d.u.obj->getObjType() & kScriptObj)) {
+		ScriptContext *script = (ScriptContext *)d.u.obj;
+		for (auto &it : script->_functionHandlers) {
+			Datum name(it._key);
+			name.type = SYMBOL;
+			res.u.farr->arr.push_back(name);
+		}
+	} else {
+		warning("b_handlers(): expected a script object, got %s", d.type2str());
+	}
+
+	g_lingo->push(res);
 }
 
 void LB::b_delete(int nargs) {
