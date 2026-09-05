@@ -88,7 +88,12 @@ void Cursor::readFromCast(Datum cursorCasts) {
 	CastMember *cursorCast = g_director->getCurrentMovie()->getCastMember(cursorId);
 
 	if (!cursorCast || cursorCast->_type != kCastBitmap) {
-		warning("Cursor::readFromCast: No bitmap cast for cursor");
+		// Name the member and say which of the two ways this failed. TKKG 7's
+		// photofit screen hits this 90 times in one visit and the message said
+		// nothing about what it was looking for, so there was no way to tell a
+		// missing member from a member of the wrong type.
+		warning("Cursor::readFromCast: %s is %s, expected a bitmap", cursorId.asString().c_str(),
+				cursorCast ? castType2str(cursorCast->_type) : "not in the cast");
 		return;
 	}
 
