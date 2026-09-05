@@ -103,6 +103,21 @@ CastMember *createCastMember(Cast *cast, uint16 castId, XtraCastMember *xtra) {
 	dv->_externalFilename = info.filename;
 	dv->_externalDurationMs = info.durationMs;
 
+	// ...but it still has to say so when asked. `the type of member` on an Xtra-owned
+	// member is the Xtra's symbolString, and Peter entdeckt die Steinzeit tests exactly
+	// that before it touches the MPEG:
+	//     if sprite(20).member.type = #TBDIRECTMEDIA then
+	//         Lautstaerke = getVolume(sprite(20))
+	// in S_MpegLauterWin / S_MpegLeiserWin. Without the symbol the member answers
+	// #digitalVideo, the gate never opens and the volume buttons do nothing.
+	//
+	// Take it from the CASt record rather than hardcoding it, so the spelling is
+	// whatever the movie actually stored. Deliberately not done for the other entries
+	// in xtraCastMemberProtos: Loewenzahn 1 and 2 gate video handling on
+	// `.type = #digitalVideo`, and only DirectMedia has a corpus case proving the
+	// symbolString is what the scripts expect.
+	dv->_xtraSymbol = xtra->getXtraSymbol();
+
 	if (info.width && info.height)
 		dv->_initialRect = Common::Rect(info.width, info.height);
 
