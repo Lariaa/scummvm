@@ -1800,12 +1800,29 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 			d = 0;
 		break;
 	case kTheMediaBusy:
-		// Set while the video still has something to play. Loewenzahn 5 waits
-		// for it to drop before rewinding and re-arming its play button.
-		if (sprite->_cast && sprite->_cast->_type == kCastDigitalVideo)
-			d = !((DigitalVideoCastMember *)sprite->_cast)->endOfVideo();
-		else
+		// "Is playing", not "has something left to play". Tabuleiro's DirectMedia
+		// Xtra sets this only on its IMediaControl::Run path and clears it in both
+		// Pause and Stop -- all three write it through a pointer that aims straight
+		// at this sprite property -- so a paused video answers 0 with the movie
+		// still half unplayed. The games rely on exactly that, as a play/pause
+		// toggle and to decide whether to resume:
+		//
+		//   Peter entdeckt die Steinzeit, v_member BehaviorScript 30
+		//     if sprite(20).mediaBusy = 0 then videoplay(..) else videopause(..)
+		//   Loewenzahn 4 AdjMPEG, Loewenzahn 5-8 VideoThumbBH
+		//     oldRate = sprite(n).mediaBusy .. if oldRate = 1 then VideoPlay(..)
+		//
+		// Answering !endOfVideo() called a paused video busy, so the toggle paused
+		// again instead of resuming and the scrub handlers restarted a video the
+		// player had deliberately stopped. It also called a member whose file never
+		// loaded busy -- endOfVideo() reports false when there is no decoder at all
+		// -- which spins Loewenzahn 4's WaitMPEGFinish in `go(the frame)` forever.
+		if (sprite->_cast && sprite->_cast->_type == kCastDigitalVideo) {
+			DigitalVideoCastMember *video = (DigitalVideoCastMember *)sprite->_cast;
+			d = (channel->_movieRate != 0.0) && !video->endOfVideo();
+		} else {
 			d = 0;
+		}
 		break;
 	case kTheCursor:
 		d = channel->_cursor._cursorResId;
