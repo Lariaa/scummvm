@@ -35,6 +35,7 @@ class XtraCastMember;
 enum DigitalVideoType {
 	kDVQuickTime,
 	kDVVideoForWindows,
+	kDVMPEG,
 	kDVUnknown = -1,
 };
 
