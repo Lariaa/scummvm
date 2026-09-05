@@ -47,17 +47,23 @@ namespace DirectMediaXtra {
 //   cuepointtimes / cuepointnames of member
 //
 // The payload is the Xtra's private blob and is LITTLE-endian, even though the
-// CASt record around it is big-endian. Offsets below are verified against 68
-// members in Loewenzahn 3 and 5 -- every one of them 3692 bytes long -- and the
-// dimensions cross-checked against the MPEG sequence headers of the files they
-// name (LZ-intro.mpg 352x288, lz5_intro.mpg 288x320, both matching exactly).
+// CASt record around it is big-endian. The dimensions were cross-checked against
+// the MPEG sequence headers of the files they name -- LZ-intro.mpg 352x288,
+// lz5_intro.mpg 288x320, both matching exactly.
+//
+// Offsets are relative to getXtraData(), which starts AFTER the uint32 length
+// field that follows the symbol (see XtraCastMember's constructor). Measuring
+// them from the CASt record instead puts every one of them 4 bytes too high,
+// and the shift is quiet rather than fatal: Loewenzahn 3's 'ritt5.mpg' came out
+// as '5.mpg' at 288x0 and 0 ms, because the width field then reads the height
+// and the name starts four characters in.
 enum {
-	kOffDuration  = 8,		// uint32, milliseconds
-	kOffVolume    = 28,		// uint32, 0-100
-	kOffWidth     = 64,		// uint32
-	kOffHeight    = 68,		// uint32
-	kOffAuthorPath = 112,	// char[255], absolute path on the authoring machine
-	kOffFilename  = 367,	// char[255], bare file name -- kOffAuthorPath + 255
+	kOffDuration  = 4,		// uint32, milliseconds
+	kOffVolume    = 24,		// uint32, 0-100
+	kOffWidth     = 60,		// uint32
+	kOffHeight    = 64,		// uint32
+	kOffAuthorPath = 108,	// char[255], absolute path on the authoring machine
+	kOffFilename  = 363,	// char[255], bare file name -- kOffAuthorPath + 255
 	kFieldLen     = 255,
 	kMinPayload   = kOffFilename + 1
 };
@@ -102,6 +108,21 @@ CastMember *createCastMember(Cast *cast, uint16 castId, XtraCastMember *xtra) {
 	dv->_avimovie = false;
 	dv->_externalFilename = info.filename;
 	dv->_externalDurationMs = info.durationMs;
+
+	// ...but it still has to say so when asked. `the type of member` on an Xtra-owned
+	// member is the Xtra's symbolString, and Peter entdeckt die Steinzeit tests exactly
+	// that before it touches the MPEG:
+	//     if sprite(20).member.type = #TBDIRECTMEDIA then
+	//         Lautstaerke = getVolume(sprite(20))
+	// in S_MpegLauterWin / S_MpegLeiserWin. Without the symbol the member answers
+	// #digitalVideo, the gate never opens and the volume buttons do nothing.
+	//
+	// Take it from the CASt record rather than hardcoding it, so the spelling is
+	// whatever the movie actually stored. Deliberately not done for the other entries
+	// in xtraCastMemberProtos: Loewenzahn 1 and 2 gate video handling on
+	// `.type = #digitalVideo`, and only DirectMedia has a corpus case proving the
+	// symbolString is what the scripts expect.
+	dv->_xtraSymbol = xtra->getXtraSymbol();
 
 	if (info.width && info.height)
 		dv->_initialRect = Common::Rect(info.width, info.height);
