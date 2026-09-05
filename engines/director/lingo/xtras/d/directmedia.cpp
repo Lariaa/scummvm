@@ -20,8 +20,14 @@
  */
 
 #include "common/system.h"
+#include "common/util.h"
 
 #include "director/director.h"
+#include "director/channel.h"
+#include "director/movie.h"
+#include "director/score.h"
+#include "director/sprite.h"
+#include "director/castmember/digitalvideo.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-utils.h"
@@ -146,12 +152,104 @@ void DirectMediaXtra::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-XOBJSTUB(DirectMediaXtra::m_videoplay, 0)
-XOBJSTUB(DirectMediaXtra::m_videopause, 0)
-XOBJSTUB(DirectMediaXtra::m_videoseek, 0)
-XOBJSTUB(DirectMediaXtra::m_videoplaysegment, 0)
-XOBJSTUB(DirectMediaXtra::m_setvolume, 0)
-XOBJSTUB(DirectMediaXtra::m_getvolume, 0)
+// The msgTable spells every one of these "(sprite me, ...)", so the first
+// argument is the sprite the media plays in. Resolve it to the channel and its
+// cast member; everything the Xtra can do is something DigitalVideoCastMember
+// already offers, since a DirectMedia member is promoted to one on load.
+static DigitalVideoCastMember *resolveVideo(int nargs, Channel **outChannel = nullptr) {
+	if (nargs < 1) {
+		warning("DirectMediaXtra: called without a sprite");
+		return nullptr;
+	}
+
+	Movie *movie = g_director->getCurrentMovie();
+	Score *score = movie ? movie->getScore() : nullptr;
+	if (!score)
+		return nullptr;
+
+	Channel *channel = score->getChannelById(g_lingo->peek(nargs - 1).asInt());
+	if (!channel || !channel->_sprite || !channel->_sprite->_cast)
+		return nullptr;
+
+	if (channel->_sprite->_cast->_type != kCastDigitalVideo) {
+		warning("DirectMediaXtra: sprite %d is not a media member", g_lingo->peek(nargs - 1).asInt());
+		return nullptr;
+	}
+
+	DigitalVideoCastMember *video = (DigitalVideoCastMember *)channel->_sprite->_cast;
+	video->setChannel(channel);
+	if (outChannel)
+		*outChannel = channel;
+
+	return video;
+}
+
+// videoseek() and videoplaysegment() are documented in milliseconds, while
+// seekMovie()/setStopTime() take the movie's own time scale (600 units a second
+// by default, cf. getTimeScale()).
+static int msToUnits(DigitalVideoCastMember *video, int ms) {
+	return (int)((int64)ms * video->getTimeScale() / 1000);
+}
+
+void DirectMediaXtra::m_videoplay(int nargs) {
+	DigitalVideoCastMember *video = resolveVideo(nargs);
+	g_lingo->dropStack(nargs);
+
+	if (video)
+		video->setMovieRate(1.0);
+}
+
+void DirectMediaXtra::m_videopause(int nargs) {
+	DigitalVideoCastMember *video = resolveVideo(nargs);
+	g_lingo->dropStack(nargs);
+
+	if (video)
+		video->setMovieRate(0.0);
+}
+
+void DirectMediaXtra::m_videoseek(int nargs) {
+	DigitalVideoCastMember *video = resolveVideo(nargs);
+	int ms = (nargs >= 2) ? g_lingo->peek(0).asInt() : 0;
+	g_lingo->dropStack(nargs);
+
+	if (video)
+		video->seekMovie(msToUnits(video, ms));
+}
+
+void DirectMediaXtra::m_videoplaysegment(int nargs) {
+	DigitalVideoCastMember *video = resolveVideo(nargs);
+	int startMs = (nargs >= 3) ? g_lingo->peek(1).asInt() : 0;
+	int endMs = (nargs >= 3) ? g_lingo->peek(0).asInt() : 0;
+	g_lingo->dropStack(nargs);
+
+	if (!video)
+		return;
+
+	video->seekMovie(msToUnits(video, startMs));
+	video->setStopTime(msToUnits(video, endMs));
+	video->setMovieRate(1.0);
+}
+
+void DirectMediaXtra::m_setvolume(int nargs) {
+	Channel *channel = nullptr;
+	DigitalVideoCastMember *video = resolveVideo(nargs, &channel);
+	int volume = (nargs >= 2) ? g_lingo->peek(0).asInt() : 0;
+	g_lingo->dropStack(nargs);
+
+	// Same store `the volume of sprite` uses, so the two agree -- Loewenzahn 3
+	// sets the sprite property directly and reads it back through this Xtra.
+	if (video && channel)
+		channel->_sprite->_volume = CLIP(volume, 0, 255);
+}
+
+void DirectMediaXtra::m_getvolume(int nargs) {
+	Channel *channel = nullptr;
+	DigitalVideoCastMember *video = resolveVideo(nargs, &channel);
+	g_lingo->dropStack(nargs);
+
+	g_lingo->push(Datum((video && channel) ? channel->_sprite->_volume : 0));
+}
+
 XOBJSTUB(DirectMediaXtra::m_setbalance, 0)
 XOBJSTUB(DirectMediaXtra::m_getbalance, 0)
 XOBJSTUB(DirectMediaXtra::m_isPastCuePoint, 0)
