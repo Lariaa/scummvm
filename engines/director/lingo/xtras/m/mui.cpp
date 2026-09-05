@@ -206,8 +206,36 @@ XOBJSTUB(MuiXtra::m_Run, 0)
 XOBJSTUB(MuiXtra::m_Stop, 0)
 XOBJSTUB(MuiXtra::m_WindowOperation, 0)
 XOBJSTUB(MuiXtra::m_ItemUpdate, 0)
-XOBJSTUB(MuiXtra::m_GetWindowPropList, 0)
-XOBJSTUB(MuiXtra::m_GetItemPropList, 0)
+// Both are documented as returning a property list the caller then fills in:
+// "returns a property list in the standard format for initing window" and
+// "returns a default itemPropList". As stubs they returned 0, and the very next
+// line of every caller assigns into it -- TKKG 10's login ends there:
+//
+//   pWindowProperties = GetWindowPropList(MUIObject)
+//   pWindowProperties.name = "Choose Clou"
+//   Uncaught Lingo error: Lingo::setObjectProp: Invalid object: 0
+//
+// An EMPTY list is enough, because setObjectProp() appends a key a property
+// list does not have yet, and the scripts assign every field they go on to use.
+// Deliberately not filled with the Xtra's documented defaults: those would have
+// to be guessed, and a script reading one it never set is a case the corpus does
+// not show. The dialog still does not appear -- this only keeps the movie alive.
+static void pushEmptyPropList() {
+	Datum d;
+	d.type = PARRAY;
+	d.u.parr = new PArray;
+	g_lingo->push(d);
+}
+
+void MuiXtra::m_GetWindowPropList(int nargs) {
+	g_lingo->dropStack(nargs);
+	pushEmptyPropList();
+}
+
+void MuiXtra::m_GetItemPropList(int nargs) {
+	g_lingo->dropStack(nargs);
+	pushEmptyPropList();
+}
 XOBJSTUB(MuiXtra::m_GetWidgetList, 0)
 XOBJSTUB(MuiXtra::m_Alert, 0)
 XOBJSTUB(MuiXtra::m_GetUrl, 0)
