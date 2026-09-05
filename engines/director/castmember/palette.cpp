@@ -77,7 +77,7 @@ CastMemberID PaletteCastMember::getPaletteId() {
 void PaletteCastMember::activatePalette() {
 	load();
 	if (_palette)
-		g_director->setPalette(_palette->id);
+		g_director->setPalette(_palette->id, "activatePalette");
 }
 
 Common::String PaletteCastMember::formatInfo() {
