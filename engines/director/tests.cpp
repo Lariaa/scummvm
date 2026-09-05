@@ -52,7 +52,7 @@ void Window::testFontScaling() {
 	int w = g_system->getWidth();
 	int h = g_system->getHeight();
 
-	_vm->setPalette(CastMemberID(kClutSystemMac, -1));
+	_vm->setPalette(CastMemberID(kClutSystemMac, -1), "test harness");
 
 	Graphics::ManagedSurface surface;
 

@@ -1186,7 +1186,7 @@ bool Score::renderPrePaletteCycle(RenderMode mode) {
 				// On click, stop loop and reset palette
 				if (_vm->processSysEvents(true)) {
 					debugC(2, kDebugImages, "Score::renderPrePaletteCycle(): interrupted, setting palette to %s", currentPalette.asString().c_str());
-					_vm->setPalette(currentPalette);
+					_vm->setPalette(currentPalette, "palette fade end");
 					return true;
 				}
 				uint32 endTime = g_system->getMillis();
@@ -1229,7 +1229,7 @@ bool Score::renderPrePaletteCycle(RenderMode mode) {
 				// On click, stop loop and reset palette
 				if (_vm->processSysEvents(true)) {
 					debugC(2, kDebugImages, "Score::renderPrePaletteCycle(): interrupted, setting palette to %s", currentPalette.asString().c_str());
-					_vm->setPalette(currentPalette);
+					_vm->setPalette(currentPalette, "palette fade end");
 					return true;
 				}
 				uint32 endTime = g_system->getMillis();
@@ -1300,7 +1300,7 @@ void Score::setLastPalette() {
 		// "member 1 of castLib 2" walks into the scene).
 		if (_currentFrame->_mainChannels.palette.colorCycling || isCachedPalette
 				|| _currentFrame->_mainChannels.palette.normal) {
-			_vm->setPalette(_vm->_lastPalette);
+			_vm->setPalette(_vm->_lastPalette, "frame palette change");
 			// Force a full-stage redraw so the background is re-rendered with the
 			// new palette, not just the dirty rectangles.
 			_window->_resetScreen = true;
@@ -1373,7 +1373,7 @@ void Score::renderPaletteCycle(RenderMode mode) {
 		} else {
 			// Short circuit for few frames renderer
 			if (debugChannelSet(-1, kDebugFast)) {
-				_vm->setPalette(currentPalette);
+				_vm->setPalette(currentPalette, "colour cycling end");
 				return;
 			}
 
@@ -1390,7 +1390,7 @@ void Score::renderPaletteCycle(RenderMode mode) {
 					}
 					// On click, stop loop and reset palette
 					if (_vm->processSysEvents(true)) {
-						_vm->setPalette(currentPalette);
+						_vm->setPalette(currentPalette, "colour cycling end");
 						return;
 					}
 					uint32 endTime = g_system->getMillis();
@@ -1407,7 +1407,7 @@ void Score::renderPaletteCycle(RenderMode mode) {
 						}
 						// On click, stop loop and reset palette
 						if (_vm->processSysEvents(true)) {
-							_vm->setPalette(currentPalette);
+							_vm->setPalette(currentPalette, "colour cycling end");
 							return;
 						}
 						uint32 endTime = g_system->getMillis();
@@ -1487,7 +1487,7 @@ void Score::renderPaletteCycle(RenderMode mode) {
 			// Short circuit for fast renderer
 			if (debugChannelSet(-1, kDebugFast)) {
 				debugC(2, kDebugImages, "Score::renderPaletteCycle(): setting palette to %s", currentPalette.asString().c_str());
-				_vm->setPalette(currentPalette);
+				_vm->setPalette(currentPalette, "palette transition end");
 				return;
 			}
 
@@ -1529,7 +1529,7 @@ void Score::renderPaletteCycle(RenderMode mode) {
 					// On click, stop loop and reset palette
 					if (_vm->processSysEvents(true)) {
 						debugC(2, kDebugImages, "Score::renderPaletteCycle(): interrupted, setting palette to %s", currentPalette.asString().c_str());
-						_vm->setPalette(currentPalette);
+						_vm->setPalette(currentPalette, "palette fade end");
 						return;
 					}
 					uint32 endTime = g_system->getMillis();
@@ -1556,7 +1556,7 @@ void Score::renderPaletteCycle(RenderMode mode) {
 					// On click, stop loop and reset palette
 					if (_vm->processSysEvents(true)) {
 						debugC(2, kDebugImages, "Score::renderPaletteCycle(): interrupted, setting palette to %s", currentPalette.asString().c_str());
-						_vm->setPalette(currentPalette);
+						_vm->setPalette(currentPalette, "palette transition end");
 						return;
 					}
 					uint32 endTime = g_system->getMillis();
