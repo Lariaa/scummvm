@@ -67,11 +67,19 @@ mostRecentCuePoint (sprite me) -- Returns the index of the last cuepoint passed
 namespace Director {
 
 const char *DirectMediaXtra::xlibName = "DirectMedia";
+// Window::loadXtrasFromPath() opens an Xtra under the name it has ON DISK, so every
+// spelling Tabuleiro shipped has to be listed here. The movies' own Xtra dependency
+// record always says "DirectMediaXtra.x32" -- that name never reaches openXLib(), so
+// it is the file names that matter:
+//   DIRECTME.X32 / Directme.x32   Loewenzahn 3-8, Adventskalender, Spielebox
+//   DirectMe.x32                  Willy Werkel (shipped but unused)
+//   DirectMediaXtra.x32           Janosch Panama, Peter/Steinzeit
 const XlibFileDesc DirectMediaXtra::fileNames[] = {
-	{ "Directme",      nullptr },	// on-disk Xtra filename (DIRECTME.X32)
-	{ "directmedia",   nullptr },
-	{ "TBDirectMedia", nullptr },	// Tabuleiro's own name for it; Loewenzahn 5 ships this one
-	{ nullptr,        nullptr },
+	{ "Directme",        nullptr },	// on-disk Xtra filename (DIRECTME.X32)
+	{ "directmedia",     nullptr },
+	{ "DirectMediaXtra", nullptr },	// Janosch Panama ships xtras/DirectMedia_PC/DirectMediaXtra.x32
+	{ "TBDirectMedia",   nullptr },	// Tabuleiro's own name for it; Loewenzahn 5 ships this one
+	{ nullptr,           nullptr },
 };
 
 static MethodProto xlibMethods[] = {
@@ -109,7 +117,20 @@ static BuiltinProto xlibBuiltins[] = {
 	{ "getvolume",			DirectMediaXtra::m_getvolume,			1, 1, 500, HBLTIN },
 	{ "setbalance",			DirectMediaXtra::m_setbalance,			2, 2, 500, HBLTIN },
 	{ "getbalance",			DirectMediaXtra::m_getbalance,			1, 1, 500, HBLTIN },
-	{ "isPastCuePoint",		DirectMediaXtra::m_isPastCuePoint,		2, 2, 500, HBLTIN },
+
+	// isPastCuePoint is deliberately NOT registered as a builtin. Director already
+	// has one with the same name and the same arity (LB::b_isPastCuePoint, D6+), and
+	// it accepts a sound channel as well as a sprite -- the Xtra only adds its own
+	// sprites to the same call. initBuiltIns() assigns _builtinFuncs[name]
+	// unconditionally, so registering it here would replace the core function for the
+	// whole movie once the Xtra opens. Loewenzahn 3 does exactly that: it loads
+	// DIRECTME.X32 and then calls `isPastCuePoint(sound(2), "w1")` in DATA\I1HASE
+	// (BehaviorScript 27/28/29, and 81/82 "warten"). Those are the only six
+	// isPastCuePoint calls in the whole corpus, and all six are the sound form; the
+	// Xtra's `isPastCuePoint(sprite me, index)` is never used. Leave the core builtin
+	// in place -- BehaviorScript 28/29 has no soundBusy() fallback and spins in
+	// `go(the frame)` forever if the answer never turns true. The object method below
+	// stays registered, so an object-style call is unaffected.
 	{ "mostRecentCuePoint",	DirectMediaXtra::m_mostRecentCuePoint,	1, 1, 500, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
@@ -230,24 +251,59 @@ void DirectMediaXtra::m_videoplaysegment(int nargs) {
 	video->setMovieRate(1.0);
 }
 
+// setvolume()/getvolume() do NOT speak Director's linear 0-255. The argument is an
+// attenuation in DECIBELS, 0 being full volume, and two independent games say so:
+//
+//   Loewenzahn 5/6/7/8, Adventskalender, Spielebox -- BHVideoSprite converts the
+//   Director volume before handing it over, on the Windows branch only:
+//       case v of
+//         64: dB = -12   128: dB = -6   192: dB = -2.5   otherwise: dB = 0
+//       end case
+//       setVolume(sprite(sn), dB)
+//   which is 20*log10(v/255) to two decimals (64/255 -> -12.04, 128/255 -> -5.99,
+//   192/255 -> -2.47).
+//
+//   Peter entdeckt die Steinzeit -- S_MpegLauterWin / S_MpegLeiserWin step the value
+//   returned by getVolume() by +-5 and clamp it with `<= 0` and `>= -50`, i.e. a
+//   -50..0 dB scale. Those two also read the value back, so get/set must round-trip
+//   exactly; going through the sprite's byte-sized linear volume would quantize
+//   -45 dB and -50 dB onto the same byte and stall the "quieter" button.
+//
+// Keep the decibel figure verbatim on the cast member and mirror an equivalent linear
+// value into the sprite, so `the volume of sprite` still reads sensibly.
+static byte dbToLinearVolume(double db) {
+	if (db <= -60.0)
+		return 0;
+
+	return (byte)CLIP((int)(255.0 * pow(10.0, db / 20.0) + 0.5), 0, 255);
+}
+
 void DirectMediaXtra::m_setvolume(int nargs) {
 	Channel *channel = nullptr;
 	DigitalVideoCastMember *video = resolveVideo(nargs, &channel);
-	int volume = (nargs >= 2) ? g_lingo->peek(0).asInt() : 0;
+	double db = (nargs >= 2) ? g_lingo->peek(0).asFloat() : 0.0;
 	g_lingo->dropStack(nargs);
 
-	// Same store `the volume of sprite` uses, so the two agree -- Loewenzahn 3
-	// sets the sprite property directly and reads it back through this Xtra.
-	if (video && channel)
-		channel->_sprite->_volume = CLIP(volume, 0, 255);
+	if (!video)
+		return;
+
+	video->_externalVolumeDb = CLIP(db, -100.0, 0.0);
+
+	if (channel)
+		channel->_sprite->_volume = dbToLinearVolume(video->_externalVolumeDb);
 }
 
 void DirectMediaXtra::m_getvolume(int nargs) {
-	Channel *channel = nullptr;
-	DigitalVideoCastMember *video = resolveVideo(nargs, &channel);
+	DigitalVideoCastMember *video = resolveVideo(nargs);
 	g_lingo->dropStack(nargs);
 
-	g_lingo->push(Datum((video && channel) ? channel->_sprite->_volume : 0));
+	double db = video ? video->_externalVolumeDb : 0.0;
+
+	// The Xtra answers with IBasicAudio::get_Volume divided by 100, so the result is
+	// always a whole number of decibels -- a fractional value handed to setvolume is
+	// already flattened by the time DirectShow sees it. Round rather than truncate so
+	// that -2.5 does not drift towards silence.
+	g_lingo->push(Datum((int)(db < 0.0 ? db - 0.5 : db + 0.5)));
 }
 
 XOBJSTUB(DirectMediaXtra::m_setbalance, 0)

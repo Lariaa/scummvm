@@ -113,6 +113,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId)
 	_dirty = false;
 	_emptyFile = false;
 	_externalDurationMs = 0;
+	_externalVolumeDb = 0.0;
 
 	memset(_ditheringPalette, 0, 256*3);
 }
@@ -151,6 +152,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Common
 	_dirty = false;
 	_emptyFile = false;
 	_externalDurationMs = 0;
+	_externalVolumeDb = 0.0;
 
 	memset(_ditheringPalette, 0, 256*3);
 
@@ -179,7 +181,9 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Digita
 
 	_filename = source._filename;
 	_externalFilename = source._externalFilename;
+	_xtraSymbol = source._xtraSymbol;
 	_externalDurationMs = source._externalDurationMs;
+	_externalVolumeDb = source._externalVolumeDb;
 
 	_vflags = source._vflags;
 	_looping = source._looping;
@@ -870,6 +874,23 @@ Datum DigitalVideoCastMember::getField(int field) {
 		// quicktime defaults to 600
 		// happens irrespective of what the digitalVideoTimeScale is set to
 		d = Datum(600);
+		break;
+	case kTheType:
+		// A member the Xtra owns reports the Xtra's symbolString, not the Director
+		// type it stands in for. Peter entdeckt die Steinzeit gates its MPEG volume
+		// buttons on `sprite(20).member.type = #TBDIRECTMEDIA`
+		// (S_MpegLauterWin / S_MpegLeiserWin), and Loewenzahn 4 asks the same
+		// question of the QuickTime side with #quickTimeMedia -- which is QT3Asset's
+		// symbolString, so the rule is the Xtra's, not this Xtra's alone. Only
+		// members that set _xtraSymbol take this path; everything else keeps
+		// answering #digitalVideo, which Loewenzahn 1 and 2 rely on and which
+		// neither of them could reach through an Xtra anyway.
+		if (!_xtraSymbol.empty()) {
+			d = Datum(_xtraSymbol);
+			d.type = SYMBOL;
+			break;
+		}
+		d = CastMember::getField(field);
 		break;
 	case kTheVideo:
 		d = _enableVideo;

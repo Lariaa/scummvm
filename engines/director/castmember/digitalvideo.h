@@ -97,6 +97,18 @@ public:
 	Common::String _externalFilename;
 	uint32 _externalDurationMs;
 
+	// An Xtra-backed member answers `the type of member` with the Xtra's symbolString,
+	// not with the Director type it behaves like. Set this to the symbol from the CASt
+	// record to get that; leave it empty and the member reports #digitalVideo as before.
+	// See DirectMediaXtra::createCastMember for who opts in and why.
+	Common::String _xtraSymbol;
+
+	// DirectMedia's setvolume()/getvolume() work in decibels of attenuation, not in
+	// Director's linear 0-255 (see xtras/d/directmedia.cpp). Games read the value back,
+	// change it and write it again, so keep the decibel figure verbatim rather than
+	// round-tripping it through the sprite's byte-sized linear volume. 0.0 = full.
+	double _externalVolumeDb;
+
 	uint32 _vflags;
 	bool _looping;
 	bool _pausedAtStart;
