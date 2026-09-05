@@ -30,6 +30,7 @@
 
 #include "video/video_decoder.h"
 #include "video/avi_decoder.h"
+#include "video/mpegps_decoder.h"
 #include "video/qt_decoder.h"
 
 #include "director/director.h"
@@ -321,6 +322,26 @@ bool DigitalVideoCastMember::loadVideo(Common::String path) {
 
 	} else if (magic2 == MKTAG('m', 'o', 'o', 'v') || magic2 == MKTAG('m', 'd', 'a', 't')) {
 		tryQuickTime = true;
+	} else if (magic1 == 0x000001BA || magic1 == 0x000001B3) {
+		// MPEG: 0x1BA is a program stream pack header, 0x1B3 a bare video
+		// sequence header. Loewenzahn 3, 4 and 5 play their clips this way,
+		// through Tabuleiro's DirectMedia Xtra.
+		//
+		// Note that the picture needs libmpeg2 and the sound libmad. Without
+		// them MPEGPSDecoder still loads, reports the right dimensions (it reads
+		// the sequence header itself) and keeps time -- so the scripts that wait
+		// on `the currentTime of sprite` and `mediaBusy` still come unstuck,
+		// only the frames stay blank.
+		_video = new Video::MPEGPSDecoder();
+		result = _video->loadFile(location);
+		if (!result) {
+			warning("DigitalVideoCastMember::loadVideo(): could not open MPEG '%s'", path.c_str());
+			delete _video;
+			_video = nullptr;
+			return false;
+		} else {
+			_videoType = kDVMPEG;
+		}
 	} else if (magic1 == MKTAG('R', 'I', 'F', 'F') && (magic3 == MKTAG('A', 'V', 'I', ' '))) {
 		_video = new Video::AVIDecoder();
 		result = _video->loadFile(location);
