@@ -1843,7 +1843,11 @@ public:
 		Common::SeekableReadStreamEndian *r;
 
 		r = _cast->_castArchive->getResource(MKTAG('L', 's', 'c', 'r'), id);
-		_scripts[id] = new LingoDec::Script(g_director->getVersion());
+		// The chunks come out of this cast's own file, so they follow that file's
+		// version, not the main movie's. Löwenzahn 4 loads the D7 cast TS/MPEG_W.DIR
+		// into a D9 movie at runtime; reading its handler records as D8.5+ ate four
+		// bytes of stackHeight per handler and walked the offsets off the end.
+		_scripts[id] = new LingoDec::Script(_cast->_version);
 		_scripts[id]->read(*r);
 		delete r;
 
