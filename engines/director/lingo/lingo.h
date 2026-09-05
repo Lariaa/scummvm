@@ -514,6 +514,7 @@ public:
 	void getObjectProp(Datum &obj, Common::String &propName);
 	void setObjectProp(Datum &obj, Common::String &propName, Datum &d);
 	Datum getTheDate(int field);
+	Datum getTheSystemDate();
 	Datum getTheTime(int field);
 	Datum getTheDeskTopRectList();
 
