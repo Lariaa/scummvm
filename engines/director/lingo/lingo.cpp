@@ -1448,6 +1448,8 @@ const char *Datum::type2str(bool ilk) const {
 		return "PROPREF";
 	case RECT:
 		return ilk ? "rect" : "RECT";
+	case SPRITEREF:
+		return "SPRITEREF";
 	case STRING:
 		return ilk ? "string" : "STRING";
 	case SYMBOL:
