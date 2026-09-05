@@ -918,12 +918,19 @@ bool Lingo::processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int
 		error("processEvent: Unknown event %d", event);
 
 
+	// Run only down to the depth we came in at. execute() with no target keeps going
+	// until the callstack is empty, so an event raised from inside a running handler
+	// used to unwind its caller too: in Löwenzahn 6 a `go` inside a sendAllSprites
+	// behavior reaches killScriptInstances(), whose endSprite events drained the
+	// sendAllSprites frame and left the caller popping an empty stack.
+	int callerFrame = _state->callstack.size();
+
 	if (g_director->getVersion() >= 600 && st == kScoreScript && obj) {
 		if (obj->getMethod(_eventHandlerTypes[event]).type != VOIDSYM) {
 			g_director->getCurrentMovie()->_currentSpriteNum = channelId;
 			push(Datum(obj));
 			LC::call(_eventHandlerTypes[event], 1, false);
-			return execute();
+			return execute(callerFrame);
 		} else {
 			return true;
 		}
@@ -945,7 +952,7 @@ bool Lingo::processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int
 		}
 
 		LC::call(script->_eventHandlers[event], nargs, false);
-		return execute();
+		return execute(callerFrame);
 	} else {
 		debugC(9, kDebugEvents, "Lingo::processEvent(%s, %s, %s): no handler", _eventHandlerTypes[event], scriptType2str(st), scriptId.asString().c_str());
 	}
