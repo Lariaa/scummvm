@@ -221,6 +221,7 @@ const TheEntityField fields[] = {
 	{ kTheSprite,	"color",		kTheColor,		700 },//							D7 p
 	{ kTheSprite,	"constraint",	kTheConstraint, 200 },// D2 p
 	{ kTheSprite,	"currentTime",	kTheCurrentTime,600 },//						D6 p
+	{ kTheSprite,	"mediaBusy",	kTheMediaBusy,	600 },//						D6 p
 	{ kTheSprite,	"cursor",		kTheCursor,		200 },// D2 p
 	{ kTheSprite,	"editableText", kTheEditableText,400 },//				D4 p
 	{ kTheSprite,	"flipH",		kTheFlipH,		700 },// 							D7 p
@@ -1786,6 +1787,25 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 		break;
 	case kTheConstraint:
 		d = (int)channel->_constraint;
+		break;
+	case kTheCurrentTime:
+		// Tabuleiro's DirectMedia Xtra: "the currenttime of sprite -- Returns
+		// the current time in milliseconds", straight from the msgTable in
+		// DIRECTME.X32. Loewenzahn 5 writes the two platforms side by side --
+		// `currentTime < 48000` on Windows against `movieTime < 48 * 60` on Mac,
+		// the same 48 seconds -- so milliseconds it is, not ticks.
+		if (sprite->_cast && sprite->_cast->_type == kCastDigitalVideo)
+			d = (int)((DigitalVideoCastMember *)sprite->_cast)->getMovieCurrentTimeMillis();
+		else
+			d = 0;
+		break;
+	case kTheMediaBusy:
+		// Set while the video still has something to play. Loewenzahn 5 waits
+		// for it to drop before rewinding and re-arming its play button.
+		if (sprite->_cast && sprite->_cast->_type == kCastDigitalVideo)
+			d = !((DigitalVideoCastMember *)sprite->_cast)->endOfVideo();
+		else
+			d = 0;
 		break;
 	case kTheCursor:
 		d = channel->_cursor._cursorResId;
