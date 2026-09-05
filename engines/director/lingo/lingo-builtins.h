@@ -70,6 +70,7 @@ void b_getPos(int nargs);
 void b_getProp(int nargs);
 void b_getPropRef(int nargs);
 void b_getPropAt(int nargs);
+void b_handlers(int nargs);
 void b_list(int nargs);
 void b_listP(int nargs);
 void b_max(int nargs);
