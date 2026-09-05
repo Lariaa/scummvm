@@ -177,16 +177,21 @@ void DirectorEngine::addPalette(CastMemberID &id, const byte *palette, int lengt
 	_loadedPalettes[id] = PaletteV4(id, palCopy, length);
 }
 
-bool DirectorEngine::setPalette(const CastMemberID &id) {
+bool DirectorEngine::setPalette(const CastMemberID &id, const char *reason) {
 	if (id.isNull()) {
 		// Palette id of 0 is unused
 		return false;
 	}
 
 	PaletteV4 *pal = getPalette(id);
-	if (!pal)
+	if (!pal) {
+		// Silent failure used to be invisible, yet the caller normally records the
+		// palette as current anyway - so the log showed a palette in effect that was
+		// never applied. Say so.
+		debugC(3, kDebugImages, "DirectorEngine::setPalette(): %s asked for %s, which is not loaded", reason, id.asString().c_str());
 		return false;
-	debugC(5, kDebugImages, "DirectorEngine::setPalettes(): setting palette %d, %d", id.member, id.castLib);
+	}
+	debugC(5, kDebugImages, "DirectorEngine::setPalettes(): setting palette %d, %d (%s)", id.member, id.castLib, reason);
 	setPalette(pal->palette, pal->length);
 	return true;
 }
