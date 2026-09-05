@@ -2207,6 +2207,19 @@ void LB::b_abort(int nargs) {
 	g_lingo->_abort = true;
 }
 
+// Helper: take the return value of a handler we just ran.
+// execute() gives up without pushing anything whenever the script under it disappears
+// mid-run: a nested `go` reaches killScriptInstances(), which tears down the very
+// behavior being called (Löwenzahn 6, sendAllSprites #mouseDown). Popping regardless
+// asserts on an empty stack and kills the engine, so hand back VOID instead.
+static Datum popCallResult(const Common::String &msgName) {
+	if (g_lingo->_state->stack.empty()) {
+		warning("popCallResult(): handler '%s' returned nothing, its script vanished mid-call", msgName.c_str());
+		return Datum();
+	}
+	return g_lingo->pop();
+}
+
 // Helper: call a named handler on a single behavior instance with extra args.
 // extraArgs is stored in reverse order (as popped from stack).
 static Datum callBehaviorHandler(Datum &instance, const Common::String &msgName, const Common::Array<Datum> &extraArgs) {
@@ -2221,7 +2234,7 @@ static Datum callBehaviorHandler(Datum &instance, const Common::String &msgName,
 	int frame = g_lingo->_state->callstack.size();
 	LC::call(sym, 1 + (int)extraArgs.size(), true);
 	g_lingo->execute(frame);
-	return g_lingo->pop();
+	return popCallResult(msgName);
 }
 
 void LB::b_call(int nargs) {
@@ -4007,7 +4020,7 @@ void LB::b_sendAllSprites(int nargs) {
 				int frame = g_lingo->_state->callstack.size();
 				LC::call(h, numExtraArgs, true);
 				g_lingo->execute(frame);
-				result = g_lingo->pop();
+				result = popCallResult(msgName);
 			}
 		}
 	}
@@ -4076,7 +4089,7 @@ void LB::b_sendSprite(int nargs) {
 				int frame = g_lingo->_state->callstack.size();
 				LC::call(h, numExtraArgs, true);
 				g_lingo->execute(frame);
-				result = g_lingo->pop();
+				result = popCallResult(msgName);
 			}
 		}
 	}
