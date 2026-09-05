@@ -47,17 +47,23 @@ namespace DirectMediaXtra {
 //   cuepointtimes / cuepointnames of member
 //
 // The payload is the Xtra's private blob and is LITTLE-endian, even though the
-// CASt record around it is big-endian. Offsets below are verified against 68
-// members in Loewenzahn 3 and 5 -- every one of them 3692 bytes long -- and the
-// dimensions cross-checked against the MPEG sequence headers of the files they
-// name (LZ-intro.mpg 352x288, lz5_intro.mpg 288x320, both matching exactly).
+// CASt record around it is big-endian. The dimensions were cross-checked against
+// the MPEG sequence headers of the files they name -- LZ-intro.mpg 352x288,
+// lz5_intro.mpg 288x320, both matching exactly.
+//
+// Offsets are relative to getXtraData(), which starts AFTER the uint32 length
+// field that follows the symbol (see XtraCastMember's constructor). Measuring
+// them from the CASt record instead puts every one of them 4 bytes too high,
+// and the shift is quiet rather than fatal: Loewenzahn 3's 'ritt5.mpg' came out
+// as '5.mpg' at 288x0 and 0 ms, because the width field then reads the height
+// and the name starts four characters in.
 enum {
-	kOffDuration  = 8,		// uint32, milliseconds
-	kOffVolume    = 28,		// uint32, 0-100
-	kOffWidth     = 64,		// uint32
-	kOffHeight    = 68,		// uint32
-	kOffAuthorPath = 112,	// char[255], absolute path on the authoring machine
-	kOffFilename  = 367,	// char[255], bare file name -- kOffAuthorPath + 255
+	kOffDuration  = 4,		// uint32, milliseconds
+	kOffVolume    = 24,		// uint32, 0-100
+	kOffWidth     = 60,		// uint32
+	kOffHeight    = 64,		// uint32
+	kOffAuthorPath = 108,	// char[255], absolute path on the authoring machine
+	kOffFilename  = 363,	// char[255], bare file name -- kOffAuthorPath + 255
 	kFieldLen     = 255,
 	kMinPayload   = kOffFilename + 1
 };
