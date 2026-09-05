@@ -325,7 +325,7 @@ Common::Error DirectorEngine::run() {
 	_wm->setScreen(_surface);
 	_wm->addWindowInitialized(_stage->getMacWindow());
 	_wm->setActiveWindow(_stage->getId());
-	setPalette(CastMemberID(kClutSystemMac, -1));
+	setPalette(CastMemberID(kClutSystemMac, -1), "engine startup");
 
 	setCurrentWindow(_stage);
 

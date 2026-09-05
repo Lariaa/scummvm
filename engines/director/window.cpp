@@ -791,7 +791,7 @@ bool Window::step() {
 				// movies with a real custom default palette (e.g. TKKG ausweis.dir,
 				// member 42) rendering against the previous movie's physical palette.
 				CastMemberID defPal = _currentMovie->getCast()->_defaultPalette;
-				g_director->setPalette(defPal);
+				g_director->setPalette(defPal, "movie default on entry");
 				g_director->_lastPalette = defPal;
 
 				// If we came in a loop, then skip as requested

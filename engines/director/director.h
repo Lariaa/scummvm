@@ -198,7 +198,10 @@ public:
 	bool hasFeature(EngineFeature f) const override;
 
 	void addPalette(CastMemberID &id, const byte *palette, int length);
-	bool setPalette(const CastMemberID &id);
+	// `reason` only names the call site in the debug log. A dozen places switch the
+	// physical palette and the log could not tell them apart, which left the one
+	// switch to the Windows system palette in TKKG 7 Sz28a3 unattributable.
+	bool setPalette(const CastMemberID &id, const char *reason = "unknown");
 	void setPalette(const byte *palette, uint16 count);
 	void shiftPalette(int startIndex, int endIndex, bool reverse);
 	void syncPalette();
