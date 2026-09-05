@@ -615,6 +615,43 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 			// but in the wrong palette order.
 			const byte *palPtr = _external ? _picture->_palette : srcPal.palette;
 			int palCount = _external ? _picture->getPaletteCount() : srcPal.length;
+
+			// Which palette actually got used, and is it the one the member asked
+			// for? The line above this one only says which ID was picked; two
+			// different libraries can hold a member 42 and only one of them is a
+			// palette at all. TKKG 7 renders faces red in Sz09, where the bitmaps
+			// carry clut (0, 42) -- "the default palette cast" -- castLib 5 holds a
+			// bitmap at 42 and castLib 4 the real "TKKG-Palette".
+			//
+			// A checksum settles it in one run: same sum for wanted and used means
+			// the mix-up is harmless and the fault lies elsewhere; different sums
+			// name the wrong palette as the cause. The first entries are printed
+			// too, because a palette is recognisable by them.
+			if (debugChannelSet(4, kDebugImages)) {
+				uint32 sum = 0;
+				for (int i = 0; i < palCount * 3; i++)
+					sum = sum * 31 + palPtr[i];
+
+				Common::String head;
+				for (int i = 0; i < MIN(4, palCount); i++)
+					head += Common::String::format(" %d,%d,%d", palPtr[i * 3], palPtr[i * 3 + 1], palPtr[i * 3 + 2]);
+
+				// The score's palette too, so one line carries both sides of the
+				// comparison. Equal sums mean the two IDs name the same colours
+				// and the conversion is a no-op worth skipping.
+				uint32 curSum = 0;
+				for (int i = 0; i < currentPalette->length * 3; i++)
+					curSum = curSum * 31 + currentPalette->palette[i];
+
+				debugC(4, kDebugImages, "BitmapCastMember::getDitherImg(): cast %d wanted %s (loaded: %s), used %s%s, %d entries, sum 0x%08x, first%s; score palette %s sum 0x%08x%s",
+						_castId, castPaletteId.asString().c_str(),
+						pals.contains(castPaletteId) ? "yes" : "NO",
+						_external ? "the image's own palette" : palIndex.asString().c_str(),
+						(!_external && palIndex != castPaletteId) ? " (SUBSTITUTED)" : "",
+						palCount, sum, head.c_str(),
+						currentPaletteId.asString().c_str(), curSum,
+						(curSum == sum) ? " -- IDENTICAL" : "");
+			}
 			dither = _picture->_surface.convertTo(g_director->_wm->_pixelformat, palPtr, palCount, dstPalette, dstPaletteCount, Graphics::kDitherNaive);
 		}
 		break;
