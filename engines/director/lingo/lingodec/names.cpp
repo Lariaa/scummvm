@@ -9,6 +9,7 @@
 #include "common/util.h"
 #include "./enums.h"
 #include "./names.h"
+#include "./util.h"
 
 namespace LingoDec {
 
@@ -345,8 +346,9 @@ void ScriptNames::read(Common::SeekableReadStream &stream) {
 	namesOffset = stream.readUint16BE();
 	namesCount = stream.readUint16BE();
 
-	stream.seek(namesOffset);
 	names.resize(namesCount);
+	if (!safeSeek(stream, namesOffset, "Lnam name table"))
+		return;
 	for (auto &name : names) {
 		name = stream.readPascalString();
 	}
