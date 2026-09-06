@@ -755,8 +755,12 @@ bool Lingo::execute(int targetFrame) {
 		debugC(5, kDebugLingoExec, "Lingo::execute(): Context is frozen, pausing execution");
 		freezeState();
 	} else if (_abort || _vm->getCurrentMovie()->getScore()->_playState == kPlayStopped) {
-		// Clean up call stack
-		while (_state->callstack.size()) {
+		// Clean up our own frames, and only ours. A targetFrame is a promise to run
+		// down to that depth and no further; unwinding past it leaves the caller with
+		// no script and no return value, which is how Loewenzahn 6 still reached
+		// "PANIC: No script to execute (2)" after the processEvent fix.
+		uint floor = (targetFrame == -1) ? 0 : (uint)targetFrame;
+		while (_state->callstack.size() > floor) {
 			popContext(true);
 		}
 	}
