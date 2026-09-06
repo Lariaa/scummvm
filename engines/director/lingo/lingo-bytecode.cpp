@@ -1163,6 +1163,15 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		sc = _assemblyContext = new ScriptContext(!castName.empty() ? castName : Common::String::format("%d", _assemblyId), scriptType, _assemblyId, archive->cast->_castLibID, parentNumber, scriptId);
 	}
 
+	// A script with no handlers can never run, and Director leaves the property
+	// and global name id arrays of such a script filled with uninitialised
+	// memory -- the ids are the low halves of heap pointers, which the same
+	// files also leak into the unused field of every Lctx entry. Skipping those
+	// entries is right, but warning about each one is pure noise: a census of
+	// 10109 scripts across eight Loewenzahn titles from D7 to D10 found all
+	// 2343 bad ids in handler-less stubs and not one in a script that can run.
+	bool scriptCanRun = functionsCount > 0;
+
 	// initialise each property
 	if ((uint32)stream.size() < propertiesOffset + propertiesCount * 2) {
 		warning("Lscr properties store missing");
@@ -1182,8 +1191,10 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 			const char *name = archive->names[index].c_str();
 			debugC(5, kDebugLoading, "%d: %s", i, name);
 			_assemblyContext->setProp(name, Datum(), true);
-		} else {
+		} else if (scriptCanRun) {
 			warning("Property %d has unknown name id %d, skipping define", i, index);
+		} else {
+			debugC(1, kDebugCompile, "Property %d of handler-less script %d has unknown name id %d, skipping define", i, scriptId, index);
 		}
 	}
 
@@ -1208,8 +1219,10 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 			} else {
 				debugC(5, kDebugLoading, "%d: %s (already defined)", i, name);
 			}
-		} else {
+		} else if (scriptCanRun) {
 			warning("Global %d has unknown name id %d, skipping define", i, index);
+		} else {
+			debugC(1, kDebugCompile, "Global %d of handler-less script %d has unknown name id %d, skipping define", i, scriptId, index);
 		}
 	}
 
