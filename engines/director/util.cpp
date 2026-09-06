@@ -1917,7 +1917,11 @@ const byte equalityTableD5win[256] = {
 
 
 //
-// Director 6, 7, 8 Win, cp1252 encoding
+// Director 6, 7, 8, 9 Win, cp1252 encoding
+//
+// D9 measured 2026-09-06 in Macromedia Director MX (9.0) with the generator from
+// director-tests/stringequality: byte for byte the same table as D6, which the
+// upstream README already reports for D7 and D8. Unchanged since D6, then.
 //
 
 const byte equalityTableD6win[256] = {
@@ -2065,7 +2069,11 @@ static int getCharEquality(Common::u32char_type_t ch) {
 	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 600)
 		return equalityTableD5win[num];
 
-	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 900)
+	// Up to and including D9. Without a table this function returns the character
+	// itself, which makes `=` byte-exact and therefore case sensitive -- "Peter"
+	// would stop matching "PETER" in every D9 game. D10 is deliberately still
+	// unmeasured and keeps warning.
+	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 1000)
 		return equalityTableD6win[num];
 
 	warning("BUILDBOT: No equality table for Director version: %d-%s", version, Common::getLanguageCode(lang));
