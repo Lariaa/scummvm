@@ -135,6 +135,7 @@ void b_spriteBox(int nargs);
 void b_unLoad(int nargs);
 void b_unLoadCast(int nargs);
 void b_unLoadMovie(int nargs);
+void b_flushInputEvents(int nargs);
 void b_updateStage(int nargs);
 void b_zoomBox(int nargs);
 void b_immediateSprite(int nargs);
