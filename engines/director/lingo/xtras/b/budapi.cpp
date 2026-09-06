@@ -85,6 +85,7 @@ new object me
 * baSetWallpaper string FileName, integer Tile -- sets FileName as the desktop wallpaper
 * baSetPattern string Name, string Pattern -- sets Pattern as the desktop pattern
 * baSetDisplay integer Width, integer Height, integer Depth, string Mode, integer Force -- changes the screen display settings
+* baSetDisplayEx integer Width, integer Height, integer Depth, integer Refresh, string Mode, integer Force -- as baSetDisplay, with a refresh rate
 * baExitWindows string Option -- shuts down Windows
 * baRunProgram string FileName, string State, integer Wait -- runs external program
 * baWinHelp string Command, string FileName, string Data -- shows windows help file
@@ -241,6 +242,7 @@ static BuiltinProto xlibBuiltins[] = {
 	{ "baSetWallpaper", BudAPIXtra::m_baSetWallpaper, 2, 2, 500, HBLTIN },
 	{ "baSetPattern", BudAPIXtra::m_baSetPattern, 2, 2, 500, HBLTIN },
 	{ "baSetDisplay", BudAPIXtra::m_baSetDisplay, 5, 5, 500, HBLTIN },
+	{ "baSetDisplayEx", BudAPIXtra::m_baSetDisplayEx, 6, 6, 500, HBLTIN },
 	{ "baExitWindows", BudAPIXtra::m_baExitWindows, 1, 1, 500, HBLTIN },
 	{ "baRunProgram", BudAPIXtra::m_baRunProgram, 3, 3, 500, HBLTIN },
 	{ "baWinHelp", BudAPIXtra::m_baWinHelp, 3, 3, 500, HBLTIN },
@@ -400,7 +402,6 @@ void BudAPIXtra::m_baFindDrive(int nargs) {
 	g_lingo->push(Datum(result));
 }
 
-XOBJSTUB(BudAPIXtra::m_baVersion, 0)
 
 void BudAPIXtra::m_baSysFolder(int nargs) {
 	Common::String folderType = g_lingo->pop().asString();
@@ -511,6 +512,30 @@ XOBJSTUB(BudAPIXtra::m_baFontList, 0)
 XOBJSTUB(BudAPIXtra::m_baFontStyleList, 0)
 XOBJSTUB(BudAPIXtra::m_baCommandArgs, 0)
 XOBJSTUB(BudAPIXtra::m_baPrevious, 0)
+void BudAPIXtra::m_baVersion(int nargs) {
+	// baVersion(type): a version string. TKKG 11, 13 and 14 ask for "os" and hand the
+	// answer to clsScreen.new(), which branches on `versionOS = "Mac8"` or `"Mac9"`.
+	// As a stub returning 0 that comparison was false, so the Windows branch was taken
+	// by accident -- right answer, wrong reason, and it would flip the moment a game
+	// tested for a Windows string instead.
+	Common::String versionType = (nargs >= 1) ? g_lingo->pop().asString() : Common::String();
+	versionType.toLowercase();
+
+	Datum result(0);
+
+	if (versionType == "os") {
+		// The names the Xtra uses for the host system. Nothing in the corpus asks for
+		// a finer distinction than Mac versus Windows.
+		result = Datum(g_director->getPlatform() == Common::kPlatformMacintosh
+				? Common::String("Mac9") : Common::String("Win2000"));
+	} else {
+		warning("BudAPIXtra::m_baVersion: unhandled version type '%s'", versionType.c_str());
+	}
+
+	debugC(3, kDebugXObj, "BudAPIXtra::m_baVersion: '%s' -> %s", versionType.c_str(), result.asString().c_str());
+	g_lingo->push(result);
+}
+
 void BudAPIXtra::m_baScreenInfo(int nargs) {
 	// baScreenInfo(infoType): one figure about the display. TKKG 13 and 14 ask for
 	// exactly three of them -- "width", "height" and "depth" -- from clsScreen.getInfo(),
@@ -546,6 +571,7 @@ XOBJSTUB(BudAPIXtra::m_baSetScreenSaver, 0)
 XOBJSTUB(BudAPIXtra::m_baSetWallpaper, 0)
 XOBJSTUB(BudAPIXtra::m_baSetPattern, 0)
 XOBJSTUB(BudAPIXtra::m_baSetDisplay, 0)
+XOBJSTUB(BudAPIXtra::m_baSetDisplayEx, 0)
 XOBJSTUB(BudAPIXtra::m_baExitWindows, 0)
 XOBJSTUB(BudAPIXtra::m_baRunProgram, 0)
 XOBJSTUB(BudAPIXtra::m_baWinHelp, 0)
