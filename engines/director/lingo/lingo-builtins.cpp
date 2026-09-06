@@ -222,6 +222,7 @@ static const BuiltinProto builtins[] = {
 	{ "unLoadCast",		LB::b_unLoadCast,	0, 2, 300, CBLTIN },	//		D3.1 c
 	{ "unLoadMember",	LB::b_unLoadCast,	0, 2, 500, CBLTIN },	//				D5 c
 	{ "unLoadMovie",	LB::b_unLoadMovie,	1, 1, 500, CBLTIN },	//				D5 c
+	{ "flushInputEvents",	LB::b_flushInputEvents,	0, 0, 700, CBLTIN },	// D7 c
 	{ "updateStage",	LB::b_updateStage,	0, 0, 200, CBLTIN },	// D2 c
 	{ "zoomBox",		LB::b_zoomBox,		-1,0, 200, CBLTIN },	// D2 c
 	{"immediateSprite", LB::b_immediateSprite,-1,0,200,CBLTIN },	// D2 c
@@ -4239,6 +4240,26 @@ void LB::b_zoomBox(int nargs) {
 	box->nextTime  = g_system->getMillis() + 1000 * box->step / 60;
 
 	g_director->_wm->addZoomBox(box);
+}
+
+// Throws away mouse and key events queued but not yet delivered, so a handler that
+// took a while does not get a burst of stale clicks when it finishes. TKKG 10 calls it
+// on the login screen just before `go("Login")`, and an undefined handler ends the movie
+// under lingostrict.
+//
+// Not in the D4-D7 dictionaries, but the corpus settles both open questions: 84 call
+// sites across 43 scripts, every one of them the bare `flushInputEvents()` whose return
+// value nobody reads, and the earliest is a D7 title.
+void LB::b_flushInputEvents(int nargs) {
+	Movie *movie = g_director->getCurrentMovie();
+	if (!movie)
+		return;
+
+	int dropped = movie->_inputEventQueue.size();
+	while (!movie->_inputEventQueue.empty())
+		movie->_inputEventQueue.pop();
+
+	debugC(3, kDebugEvents, "b_flushInputEvents(): dropped %d queued input events", dropped);
 }
 
 void LB::b_updateStage(int nargs) {
