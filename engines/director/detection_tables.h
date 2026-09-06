@@ -10652,16 +10652,16 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	// Mac OS X versions of these TKKG games are D9
 	// Ein Fall für TKKG: Film ab! (bilingual DE/EN)
-	MACGAME1("tkkg11", "Classic", "TKKG11", "789536da81694518f494945bb161ace9", 182599, 909),
+	MACGAME1f("tkkg11", "Classic", "TKKG11", "789536da81694518f494945bb161ace9", 182599, 909, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Alarm in der Geisterbahn (bilingual DE/EN)
 	MACGAME1("tkkg12", "Classic", "TKKG12", "789536da81694518f494945bb161ace9", 182599, 909),
 
 	// Ein Fall für TKKG: Zelle 13 (bilingual DE/EN)
-	MACGAME1("tkkg13", "Classic", "TKKG13", "789536da81694518f494945bb161ace9", 180795, 909),
+	MACGAME1f("tkkg13", "Classic", "TKKG13", "789536da81694518f494945bb161ace9", 180795, 909, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Gefährliche Ferien (bilingual DE/EN)
-	MACGAME1("tkkg14", "Classic", "TKKG14", "789536da81694518f494945bb161ace9", 182599, 909),
+	MACGAME1f("tkkg14", "Classic", "TKKG14", "789536da81694518f494945bb161ace9", 182599, 909, GF_TRUECOLOR),
 
 	// Original Mac filename is ときメモタイピング
 	MACGAME1_l("tokimemotype1", "", "Tokimemo Typing", "80b8d1697b18f6f2d8a2813a594cead2", 255114, Common::JA_JPN, 851),
@@ -10874,20 +10874,20 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	// Classic Mac OS versions of these TKKG games are D8
 	// Ein Fall für TKKG: Film ab! (bilingual DE/EN)
-	MACGAME1("tkkg11", "", "TKKG11", "d483e955df901222145267d2ad729ea2", 232402, 909),
-	WINGAME1t("tkkg11", "", "TKKG11.exe", "96863b7ac45787b41881ab7bc7a39e06", 107935, 900),
+	MACGAME1f("tkkg11", "", "TKKG11", "d483e955df901222145267d2ad729ea2", 232402, 909, GF_TRUECOLOR),
+	WINGAME1tf("tkkg11", "", "TKKG11.exe", "96863b7ac45787b41881ab7bc7a39e06", 107935, 900, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Alarm in der Geisterbahn (bilingual DE/EN)
 	MACGAME1("tkkg12", "", "TKKG12", "d483e955df901222145267d2ad729ea2", 232402, 909),
 	WINGAME1t("tkkg12", "", "TKKG12.exe", "bc9668350bf745cfc843e9cc4ae08e13", 110780, 909),
 
 	// Ein Fall für TKKG: Zelle 13 (bilingual DE/EN)
-	MACGAME1("tkkg13", "", "TKKG13", "d483e955df901222145267d2ad729ea2", 230598, 909),
-	WINGAME1t("tkkg13", "", "TKKG13.exe", "c4f4d41f3260223edbc6e0df93649189", 152784, 900),
+	MACGAME1f("tkkg13", "", "TKKG13", "d483e955df901222145267d2ad729ea2", 230598, 909, GF_TRUECOLOR),
+	WINGAME1tf("tkkg13", "", "TKKG13.exe", "c4f4d41f3260223edbc6e0df93649189", 152784, 900, GF_TRUECOLOR),
 
 	// Ein Fall für TKKG: Gefährliche Ferien (bilingual DE/EN)
-	MACGAME1("tkkg14", "", "TKKG14", "d483e955df901222145267d2ad729ea2", 298739, 909),
-	WINGAME1t("tkkg14", "", "TKKG14.exe", "cf8679b4408b4a079e498cc42961ab43", 107813, 900),
+	MACGAME1f("tkkg14", "", "TKKG14", "d483e955df901222145267d2ad729ea2", 298739, 909, GF_TRUECOLOR),
+	WINGAME1tf("tkkg14", "", "TKKG14.exe", "cf8679b4408b4a079e498cc42961ab43", 107813, 900, GF_TRUECOLOR),
 
 //////////////////////////////////////////////////
 //
