@@ -10,6 +10,7 @@
 #include "./context.h"
 #include "./handler.h"
 #include "./script.h"
+#include "./util.h"
 
 double readAppleFloat80(void *ptr);
 
@@ -64,27 +65,30 @@ void Script::read(Common::SeekableReadStream &stream) {
 		handlers[0].isGenericEvent = true;
 	}
 
-	stream.seek(handlersOffset);
-	for (auto &handler : handlers) {
-		handler.readRecord(stream);
-	}
-	for (auto &handler : handlers) {
-		handler.readData(stream);
+	if (safeSeek(stream, handlersOffset, "handler records")) {
+		for (auto &handler : handlers) {
+			handler.readRecord(stream);
+		}
+		for (auto &handler : handlers) {
+			handler.readData(stream);
+		}
 	}
 
-	stream.seek(literalsOffset);
 	literals.resize(literalsCount);
-	for (auto &literal : literals) {
-		literal.readRecord(stream, version);
-	}
-	for (auto &literal : literals) {
-		literal.readData(stream, literalsDataOffset);
+	if (safeSeek(stream, literalsOffset, "literal records")) {
+		for (auto &literal : literals) {
+			literal.readRecord(stream, version);
+		}
+		for (auto &literal : literals) {
+			literal.readData(stream, literalsDataOffset);
+		}
 	}
 }
 
 Common::Array<int16> Script::readVarnamesTable(Common::SeekableReadStream &stream, uint16 count, uint32 offset) {
-	stream.seek(offset);
 	Common::Array<int16> nameIDs(count);
+	if (!safeSeek(stream, offset, "script varnames table"))
+		return nameIDs;
 	for (uint16 i = 0; i < count; i++) {
 		nameIDs[i] = stream.readSint16BE();
 	}
@@ -229,7 +233,10 @@ void LiteralStore::readData(Common::SeekableReadStream &stream, uint32 startOffs
 	if (type == kLiteralInt) {
 		value = Common::SharedPtr<LingoDec::Datum>(new LingoDec::Datum((int)offset));
 	} else {
-		stream.seek(startOffset + offset);
+		if (!safeSeek(stream, (int64)startOffset + offset, "literal data")) {
+			value = Common::SharedPtr<LingoDec::Datum>(new LingoDec::Datum(0));
+			return;
+		}
 		auto length = stream.readUint32BE();
 		if (type == kLiteralString) {
 			char *buf = new char[length];
