@@ -527,6 +527,13 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 		currentPaletteId = movie->_defaultPalette;
 	PaletteV4 *currentPalette = g_director->getPalette(currentPaletteId);
 	if (!currentPalette) {
+		// Last resort, and a bad one: the Mac system palette is not what a Windows
+		// game's art was drawn against, so everything converted here comes out
+		// recoloured. Say when it happens instead of doing it silently -- this path
+		// is what actually painted TKKG 7's outro, long after the palette itself
+		// looked correct on screen.
+		warning("BitmapCastMember::getDitherImg(): cast %d has no usable target palette (%s), falling back to the Mac system palette",
+				_castId, currentPaletteId.asString().c_str());
 		currentPaletteId = CastMemberID(kClutSystemMac, -1);
 		currentPalette = g_director->getPalette(currentPaletteId);
 	}
