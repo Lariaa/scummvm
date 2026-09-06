@@ -10,6 +10,7 @@
 #include "./names.h"
 #include "./resolver.h"
 #include "./script.h"
+#include "./util.h"
 
 namespace LingoDec {
 
@@ -33,8 +34,11 @@ void ScriptContext::read(Common::SeekableReadStream &stream) {
 	flags = stream.readUint16BE();
 	freePointer = stream.readSint16BE();
 
-	stream.seek(entriesOffset);
 	sectionMap.resize(entryCount);
+	// Bail out entirely rather than fall through: ScriptContextMapEntry has no default
+	// initialisation, so an unread map would hand garbage sectionIDs to getScript().
+	if (!safeSeek(stream, entriesOffset, "Lctx section map"))
+		return;
 	for (auto &entry : sectionMap) {
 		entry.read(stream);
 	}
