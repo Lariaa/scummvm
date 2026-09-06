@@ -177,6 +177,19 @@ void DirectMediaXtra::m_new(int nargs) {
 // argument is the sprite the media plays in. Resolve it to the channel and its
 // cast member; everything the Xtra can do is something DigitalVideoCastMember
 // already offers, since a DirectMedia member is promoted to one on load.
+// The Xtra's own signatures take a sprite reference -- "videoseek (sprite me, whichtime)" --
+// and that is exactly what the games pass: `videoseek(sprite(gVideoSprite), CT)`. Datum::asInt()
+// has no case for SPRITEREF, so it warned and handed back 0; getChannelById(0) then found no
+// video and every call became a silent no-op. That was the whole video player in Loewenzahn 5
+// and 6 -- 155 and 102 of those warnings in one session each. Accept the reference as well as
+// the bare number older scripts pass.
+static int spriteNumOf(const Datum &d) {
+	if (d.type == SPRITEREF)
+		return d.u.i;
+
+	return d.asInt();
+}
+
 static DigitalVideoCastMember *resolveVideo(int nargs, Channel **outChannel = nullptr) {
 	if (nargs < 1) {
 		warning("DirectMediaXtra: called without a sprite");
@@ -188,12 +201,17 @@ static DigitalVideoCastMember *resolveVideo(int nargs, Channel **outChannel = nu
 	if (!score)
 		return nullptr;
 
-	Channel *channel = score->getChannelById(g_lingo->peek(nargs - 1).asInt());
-	if (!channel || !channel->_sprite || !channel->_sprite->_cast)
+	int spriteNum = spriteNumOf(g_lingo->peek(nargs - 1));
+	Channel *channel = score->getChannelById(spriteNum);
+	if (!channel || !channel->_sprite || !channel->_sprite->_cast) {
+		// Say so rather than returning quietly. A silent miss here is invisible in a log,
+		// which is how the coercion above went unnoticed for so long.
+		warning("DirectMediaXtra: sprite %d holds no cast member", spriteNum);
 		return nullptr;
+	}
 
 	if (channel->_sprite->_cast->_type != kCastDigitalVideo) {
-		warning("DirectMediaXtra: sprite %d is not a media member", g_lingo->peek(nargs - 1).asInt());
+		warning("DirectMediaXtra: sprite %d is not a media member", spriteNum);
 		return nullptr;
 	}
 
