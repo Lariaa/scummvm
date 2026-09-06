@@ -9882,7 +9882,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 	// Ein Fall für TKKG: Wer stoppt den Feuerteufel? (bilingual DE/EN)
 	MACGAME2f("tkkg7", "", "TKKG-Start", "0944b962ebb00f4b5d5149d220f8449b", 113458,
 						  "Score.dxr", "c1a18f5a5a71148ef469841ccb253771", 16804, 702, GF_TRUECOLOR),
-	WINGAME1tf("tkkg7", "", "TKKG 7.exe", "96593e22c401be8551764b51f6f68c62", 1892382, 702, GF_TRUECOLOR),
+	WINGAME1t("tkkg7", "", "TKKG 7.exe", "96593e22c401be8551764b51f6f68c62", 1892382, 702),
 
 	// Windows installer is also Director
 	MACGAME1_l("tkkgkit", "", "Phantombild Start", "0944b962ebb00f4b5d5149d220f8449b", 115498, Common::DE_DEU, 702),
