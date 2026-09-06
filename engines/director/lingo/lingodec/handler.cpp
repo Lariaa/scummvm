@@ -11,6 +11,7 @@
 #include "./handler.h"
 #include "./names.h"
 #include "./script.h"
+#include "./util.h"
 
 namespace LingoDec {
 
@@ -37,15 +38,16 @@ void Handler::readRecord(Common::SeekableReadStream &stream) {
 }
 
 void Handler::readData(Common::SeekableReadStream &stream) {
-	// A misread record yields a wild offset, and SeekableSubReadStream::seek() asserts
-	// on those - taking the whole engine down for what is only a decompiler hiccup.
-	// Skip the handler instead, so the rest of the script still decompiles.
+	// The length is checked as well as the offset: the loop below runs until pos()
+	// reaches compiledOffset + compiledLen, and reads past the end never advance pos(),
+	// so an oversized length spins forever instead of asserting.
 	if ((int64)compiledOffset + compiledLen > stream.size()) {
-		warning("LingoDec::Handler::readData(): bytecode at %u+%u lies outside the %d-byte script, skipping handler",
+		warning("LingoDec: bytecode at %u+%u lies outside the %d-byte chunk, skipping handler",
 				compiledOffset, compiledLen, (int)stream.size());
 		return;
 	}
-	stream.seek(compiledOffset);
+	if (!safeSeek(stream, compiledOffset, "handler bytecode"))
+		return;
 	while (stream.pos() < compiledOffset + compiledLen) {
 		uint32 pos = stream.pos() - compiledOffset;
 		byte op = stream.readByte();
@@ -84,9 +86,10 @@ void Handler::readData(Common::SeekableReadStream &stream) {
 }
 
 Common::Array<int16> Handler::readVarnamesTable(Common::SeekableReadStream &stream, uint16 count, uint32 offset) {
-	stream.seek(offset);
 	Common::Array<int16> nameIDs;
 	nameIDs.resize(count);
+	if (!safeSeek(stream, offset, "handler varnames table"))
+		return nameIDs;
 	for (size_t i = 0; i < count; i++) {
 		nameIDs[i] = stream.readUint16BE();
 	}
