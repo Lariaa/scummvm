@@ -74,6 +74,7 @@ void m_baSetScreenSaver(int nargs);
 void m_baSetWallpaper(int nargs);
 void m_baSetPattern(int nargs);
 void m_baSetDisplay(int nargs);
+void m_baSetDisplayEx(int nargs);
 void m_baExitWindows(int nargs);
 void m_baRunProgram(int nargs);
 void m_baWinHelp(int nargs);
