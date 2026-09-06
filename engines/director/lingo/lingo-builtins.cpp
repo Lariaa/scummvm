@@ -1326,6 +1326,14 @@ void LB::b_getAt(int nargs) {
 		return;
 	}
 
+	// The read side of the object case b_setAt() handles: `me[#prop]` reaches here as
+	// getAt(me, #prop) and names a property of the instance.
+	if (list.type == OBJECT && list.u.obj && (indexD.type == SYMBOL || indexD.type == STRING)) {
+		Common::String propName = indexD.asString();
+		g_lingo->push(list.u.obj->hasProp(propName) ? list.u.obj->getProp(propName) : Datum());
+		return;
+	}
+
 	TYPECHECK2(indexD, INT, FLOAT);
 	int index = indexD.asInt();
 
@@ -1778,6 +1786,26 @@ void LB::b_setAt(int nargs) {
 			list.u.parr->arr[found - 1].v = value;
 		else
 			list.u.parr->arr.push_back(PCell(indexD, value));
+		return;
+	}
+
+	// A script instance answers list-style access over its own properties, and
+	// Director compiles `me[#prop] = value` into setAt(me, #prop, value). That is
+	// how clsScreen fills itself in TKKG 13 and 14:
+	//     repeat with i = 1 to me.count
+	//       _property = me.getPropAt(i)
+	//       me[_property] = me.getDefault(_property)
+	//     end repeat
+	// count() and getPropAt() already answer for objects; only setAt() refused, so
+	// p_lstTypes and p_lstDefParam stayed empty, checkRes() found no screen modes and
+	// the resolution dialog came up with two blank buttons.
+	if (list.type == OBJECT && list.u.obj && (indexD.type == SYMBOL || indexD.type == STRING)) {
+		Common::String propName = indexD.asString();
+		if (!list.u.obj->hasProp(propName)) {
+			warning("b_setAt(): %s has no property %s", list.u.obj->getName().c_str(), propName.c_str());
+			return;
+		}
+		list.u.obj->setProp(propName, value);
 		return;
 	}
 
