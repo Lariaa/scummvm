@@ -770,7 +770,13 @@ bool Window::step() {
 			return (_vm->getGameGID() == GID_TESTALL);
 
 		g_lingo->resetLingo();
-		g_director->_lastPalette = CastMemberID();
+		// _lastPalette is not cleared here. It names the palette physically loaded,
+		// and loading a movie does not by itself change that -- the entry code below
+		// overwrites it as soon as the new movie has a usable default. Clearing it
+		// only mattered for movies whose default is unusable, and there it did harm:
+		// getCurrentPalette() then answered null, getDitherImg() fell through to the
+		// Mac system palette, and every bitmap in the movie was converted against it.
+		// That is the noise over TKKG 7's outro and Sz28a3.
 	}
 
 	// play current movie
