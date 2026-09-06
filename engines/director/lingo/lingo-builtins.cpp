@@ -100,7 +100,7 @@ static const BuiltinProto builtins[] = {
 	{ "getLast",		LB::b_getLast,		1, 1, 400, FBLTIN_LIST },	//			D4 f
 	{ "getOne",			LB::b_getOne,		2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPos",			LB::b_getPos,		2, 2, 400, FBLTIN_LIST },	//			D4 f
-	{ "getProp",		LB::b_getProp,		2, 3, 400, FBLTIN_LIST },	//			D4 f
+	{ "getProp",		LB::b_getProp,		2, 4, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPropRef",		LB::b_getPropRef,	2, 3, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPropAt",		LB::b_getPropAt,	2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "list",			LB::b_list,			-1,0, 400, FBLTIN_LIST },	//			D4 f
@@ -1492,6 +1492,28 @@ void LB::b_getProp(int nargs) {
 	//   getProp(str, #char|#word|#item|#line, n)  ==  `the <chunk> n of str`
 	// Kommissar Kugelblitz reads cd_pfad.ini that way in GetCDPath(), with the
 	// itemDelimiter set to "=".
+	// With four it is the range form: `str.char[a..b]` compiles to
+	// getProp(str, #char, a, b), so the fourth argument is the end of the range.
+	// "Peter endeckt die Steinzeit" splits the install path that way in
+	// Dateienkopieren: Systemverzeichnis.char[1..offset(slash, Systemverzeichnis)].
+	// The argument used to be dropped as excess, which silently turned the range
+	// into a single chunk.
+	if (nargs == 4) {
+		Datum indexEnd = g_lingo->pop();
+		Datum indexStart = g_lingo->pop();
+		Datum chunk = g_lingo->pop();
+		Datum src = g_lingo->pop();
+
+		ChunkType chunkType = kChunkChar;
+		if (chunk.type == SYMBOL && chunkTypeFromSymbol(*chunk.u.s, chunkType)) {
+			g_lingo->push(LC::chunkRef(chunkType, indexStart.asInt(), indexEnd.asInt(), src).eval());
+			return;
+		}
+
+		g_lingo->lingoError("b_getProp: four arguments need a chunk symbol, got %s", chunk.type2str());
+		return;
+	}
+
 	if (nargs == 3) {
 		Datum index = g_lingo->pop();
 		Datum chunk = g_lingo->pop();
