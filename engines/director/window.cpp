@@ -790,9 +790,23 @@ bool Window::step() {
 				// setLastPalette(), which the D4 scene-palette fix removed -- leaving
 				// movies with a real custom default palette (e.g. TKKG ausweis.dir,
 				// member 42) rendering against the previous movie's physical palette.
+				// Only a real cast palette counts. Cast::_defaultPalette starts life as
+				// {-1, -1} and stays there when the config carries no usable value, and
+				// some movies hold a built-in system palette instead -- neither is what
+				// the scene was drawn against. Applying those repainted whole scenes in
+				// the Mac or Windows system ramp: TKKG 7 spent all of Sz28a3 on
+				// kClutSystemWinD5 and the whole outro on kClutSystemMac, dithering
+				// 8-bit artwork authored for the game's own palette into a foreign one.
+				// Keep the palette in effect instead, the way setLastPalette() already
+				// does for the analogous bogus {castLib 0, negative member}.
 				CastMemberID defPal = _currentMovie->getCast()->_defaultPalette;
-				g_director->setPalette(defPal, "movie default on entry");
-				g_director->_lastPalette = defPal;
+				if (defPal.castLib > 0 && defPal.member > 0) {
+					g_director->setPalette(defPal, "movie default on entry");
+					g_director->_lastPalette = defPal;
+				} else {
+					debugC(2, kDebugImages, "Window::step(): movie default palette %s is not a cast palette, keeping %s",
+							defPal.asString().c_str(), g_director->_lastPalette.asString().c_str());
+				}
 
 				// If we came in a loop, then skip as requested
 				if (!_nextMovie.frameS.empty()) {
