@@ -23,6 +23,7 @@
 #include "common/system.h"
 
 #include "director/director.h"
+#include "director/movie.h"
 #include "director/util.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
@@ -510,7 +511,31 @@ XOBJSTUB(BudAPIXtra::m_baFontList, 0)
 XOBJSTUB(BudAPIXtra::m_baFontStyleList, 0)
 XOBJSTUB(BudAPIXtra::m_baCommandArgs, 0)
 XOBJSTUB(BudAPIXtra::m_baPrevious, 0)
-XOBJSTUB(BudAPIXtra::m_baScreenInfo, 0)
+void BudAPIXtra::m_baScreenInfo(int nargs) {
+	// baScreenInfo(infoType): one figure about the display. TKKG 13 and 14 ask for
+	// exactly three of them -- "width", "height" and "depth" -- from clsScreen.getInfo(),
+	// which takes this branch on Windows (`the machineType = 256`) and the Mac
+	// desktopRectList otherwise. As a stub returning 0 it offered a screen of 0x0 in
+	// 0 colours, so the "set my monitor to the best resolution?" dialog had nothing to
+	// put on its buttons.
+	Common::String infoType = (nargs >= 1) ? g_lingo->pop().asString() : Common::String();
+	infoType.toLowercase();
+
+	Datum result(0);
+	Movie *movie = g_director->getCurrentMovie();
+
+	if (infoType == "width")
+		result = Datum(movie ? movie->_movieRect.width() : 640);
+	else if (infoType == "height")
+		result = Datum(movie ? movie->_movieRect.height() : 480);
+	else if (infoType == "depth")
+		result = Datum((int)g_director->_colorDepth);
+	else
+		warning("BudAPIXtra::m_baScreenInfo: unhandled info type '%s'", infoType.c_str());
+
+	debugC(3, kDebugXObj, "BudAPIXtra::m_baScreenInfo: '%s' -> %d", infoType.c_str(), result.asInt());
+	g_lingo->push(result);
+}
 XOBJSTUB(BudAPIXtra::m_baDisableDiskErrors, 0)
 XOBJSTUB(BudAPIXtra::m_baDisableKeys, 0)
 XOBJSTUB(BudAPIXtra::m_baDisableMouse, 0)
