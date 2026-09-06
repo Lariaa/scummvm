@@ -110,7 +110,7 @@ static const BuiltinProto builtins[] = {
 	{ "setaProp",		LB::b_setaProp,		3, 3, 400, HBLTIN_LIST },	//			D4 h
 	{ "setAt",			LB::b_setAt,		3, 3, 400, HBLTIN_LIST },	//			D4 h
 	{ "setContents",	LB::b_setContents,	2, 2, 400, HBLTIN },		//			D4 h, undocumented
-	{ "setProp",		LB::b_setProp,		3, 3, 400, HBLTIN_LIST },	//			D4 h
+	{ "setProp",		LB::b_setProp,		3, 4, 400, HBLTIN_LIST },	//			D4 h, 4 args = chunk form
 	{ "sort",			LB::b_sort,			1, 1, 400, HBLTIN_LIST },	//			D4 h
 	// Files
 	{ "closeDA",	 	LB::b_closeDA, 		0, 0, 200, CBLTIN },	// D2 c
@@ -1900,8 +1900,30 @@ void LB::b_setContents(int nargs) {
 
 void LB::b_setProp(int nargs) {
 	Datum value = g_lingo->pop();
+	Datum index;
+	if (nargs >= 4)
+		index = g_lingo->pop();
 	Datum prop = g_lingo->pop();
 	Datum list = g_lingo->pop();
+
+	// The chunk form, and the write side of what b_getPropRef() already reads:
+	//   setProp(member("x"), #line, n, value)  ==  `line n of member "x" = value`
+	// Director compiles chunk assignment this way, receiver first. "Peter entdeckt
+	// die Steinzeit" saves its progress with it, writing a property list into line 1
+	// of member "highscore"; the fourth argument used to be dropped as excess and
+	// b_setProp then refused the CASTREF it was left holding.
+	//
+	// varAssign() does the real work and even grows the text when the chunk does not
+	// exist yet, so a first save into an empty member works.
+	if (nargs >= 4 && prop.type == SYMBOL) {
+		ChunkType chunkType = kChunkChar;
+		if (chunkTypeFromSymbol(*prop.u.s, chunkType)) {
+			int n = index.asInt();
+			Datum ref = LC::chunkRef(chunkType, n, n, list);
+			g_lingo->varAssign(ref, value);
+			return;
+		}
+	}
 
 	switch (list.type) {
 	case PARRAY:
