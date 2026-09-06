@@ -1954,7 +1954,18 @@ void LC::call(const Symbol &funcSym, int nargs, bool allowRetVal) {
 			if (stackSize == stackSizeBefore + 1) {
 				if (!allowRetVal) {
 					Datum extra = g_lingo->pop();
-					warning("Builtin '%s' dropping return value: %s", funcSym.name->c_str(), extra.asString(true).c_str());
+					// Director keeps the return value of a command-form call in
+					// `the result`, and it makes no difference whether the call went
+					// to a handler or to a builtin -- popContext() already does this
+					// for handlers. Throwing it away here broke games that use the
+					// documented two-line idiom: "Peter entdeckt die Steinzeit" calls
+					// isDirectShowInstalled(member "StZtlied.mpg") as a command and
+					// reads `the result` on the next line, so discarding the 1 sent it
+					// to the "please install DirectShow" frame on a working install.
+					debugC(5, kDebugLingoExec, "Builtin '%s' returned %s in command form, storing as the result",
+							funcSym.name->c_str(), extra.asString(true).c_str());
+					if (extra.type != VOID)
+						g_lingo->_theResult = extra;
 				}
 			} else if (stackSize == stackSizeBefore) {
 				if (allowRetVal)
