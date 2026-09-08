@@ -197,6 +197,14 @@ public:
 	int _nextEventId;
 	Common::Queue<LingoEvent> _inputEventQueue;
 
+	// D8+ timeout objects, what `the timeOutList` answers. Kept per movie so a
+	// timer cannot fire into a movie that no longer holds its handler; the
+	// manual does not say either way, and this is the safer reading.
+	Common::Array<Datum> _timeOutList;
+	// Called once per frame; fires whichever timers are due.
+	void tickTimeouts();
+	bool _inTimeoutTick = false;
+
 	int _selStart;
 	int _selEnd;
 
