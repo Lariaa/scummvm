@@ -194,6 +194,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheTimeoutKeyDown,	"timeoutKeyDown",	false, 200, false },// D2 p
 	{ kTheTimeoutLapsed,	"timeoutLapsed",	false, 200, false },// D2 p
 	{ kTheTimeoutLength,	"timeoutLength",	false, 200, false },// D2 p
+	{ kTheTimeoutList,		"timeOutList",		false, 800, false },//						D8 p
 	{ kTheTimeoutMouse,		"timeoutMouse",		false, 200, false },// D2 p
 	{ kTheTimeoutPlay,		"timeoutPlay",		false, 200, false },// D2 p
 	{ kTheTimeoutScript,	"timeoutScript",	false, 200, false },// D2 p
@@ -1238,6 +1239,14 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 	case kTheTimeoutPlay:
 		d = movie->_timeOutPlay;
 		break;
+	case kTheTimeoutList:
+		// A fresh list every time: Director hands out a copy, so a script that
+		// walks it while a handler adds or forgets a timer does not trip over
+		// its own feet.
+		d.type = ARRAY;
+		d.u.farr = new FArray;
+		d.u.farr->arr = movie->_timeOutList;
+		break;
 	case kTheTimeoutScript:
 		d.type = STRING;
 		if (mainArchive->primaryEventHandlers.contains(kEventTimeout))
@@ -1629,6 +1638,22 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		break;
 	case kTheTimeoutPlay:
 		movie->_timeOutPlay = d.asInt();
+		break;
+	case kTheTimeoutList:
+		// `the timeOutList = []` is how a movie cancels every timer at once, and
+		// several titles open with exactly that. Anything dropped from the list
+		// stops firing, because tickTimeouts() only walks the list.
+		movie->_timeOutList.clear();
+		if (d.type == ARRAY && d.u.farr) {
+			for (auto &it : d.u.farr->arr) {
+				if (it.type == OBJECT && it.u.obj && it.u.obj->getObjType() == kTimeoutObj)
+					movie->_timeOutList.push_back(it);
+				else
+					warning("Lingo::setTheEntity(): non-timeout entry in the timeOutList, ignoring");
+			}
+		} else if (d.type != VOID) {
+			warning("Lingo::setTheEntity(): the timeOutList expects a list, got %s", d.type2str());
+		}
 		break;
 	case kTheTimeoutScript:
 		movie->setPrimaryEventHandler(kEventTimeout, d.asString());

@@ -242,6 +242,13 @@ static const struct PredefinedProto {
 	{ nullptr, nullptr, 0, 0, 0, 0 }
 };
 
+static const MethodProto timeoutMethods[] = {
+	// timeout object -- D8
+	{ "new",					LM::m_timeoutNew,			-1, 0,	800 },			// D8
+	{ "forget",					LM::m_timeoutForget,		 0, 0,	800 },			// D8
+	{ nullptr, nullptr, 0, 0, 0 }
+};
+
 static const MethodProto windowMethods[] = {
 	// window / stage
 	{ "close",					LM::m_close,				 0, 0,	400 },			// D4
@@ -267,11 +274,13 @@ void Lingo::initMethods() {
 		_methods[mtd->name] = sym;
 	}
 	Window::initMethods(windowMethods);
+	TimeoutObject::initMethods(timeoutMethods);
 }
 
 void Lingo::cleanupMethods() {
 	_methods.clear();
 	Window::cleanupMethods();
+	TimeoutObject::cleanupMethods();
 }
 
 #define XLIBDEF(class, flags, version) \
@@ -1289,5 +1298,189 @@ void LM::m_moveToFront(int nargs) {
   updateRect
 */
 
+
+/* TimeoutObject */
+
+TimeoutObject::TimeoutObject(const Common::String &name) : Object<TimeoutObject>(name) {
+	_objType = kTimeoutObj;
+}
+
+Common::String TimeoutObject::asString() {
+	return Common::String::format("timeout(\"%s\")", _name.c_str());
+}
+
+bool TimeoutObject::hasProp(const Common::String &propName) {
+	return propName.equalsIgnoreCase("name")
+		|| propName.equalsIgnoreCase("period")
+		|| propName.equalsIgnoreCase("time")
+		|| propName.equalsIgnoreCase("timeoutHandler")
+		|| propName.equalsIgnoreCase("target");
+}
+
+Datum TimeoutObject::getProp(const Common::String &propName) {
+	if (propName.equalsIgnoreCase("name"))
+		return Datum(_name);
+	if (propName.equalsIgnoreCase("period"))
+		return Datum(_period);
+	// #time is the absolute millisecond at which the next message goes out, not
+	// the remaining wait -- "Using Director MX", ch. 16.
+	if (propName.equalsIgnoreCase("time"))
+		return Datum((int)_time);
+	if (propName.equalsIgnoreCase("timeoutHandler")) {
+		Datum d(_timeoutHandler);
+		d.type = SYMBOL;
+		return d;
+	}
+	if (propName.equalsIgnoreCase("target"))
+		return _target;
+
+	warning("TimeoutObject::getProp(): unknown property '%s'", propName.c_str());
+	return Datum();
+}
+
+Common::String TimeoutObject::getPropAt(uint32 index) {
+	static const char *props[] = { "name", "period", "time", "timeoutHandler", "target" };
+	return (index >= 1 && index <= 5) ? props[index - 1] : Common::String();
+}
+
+uint32 TimeoutObject::getPropCount() {
+	return 5;
+}
+
+void TimeoutObject::setProp(const Common::String &propName, const Datum &value, bool force) {
+	if (propName.equalsIgnoreCase("period")) {
+		// Changing the period reschedules from now, which is what a game
+		// expects when it speeds a timer up or slows it down mid-run.
+		_period = value.asInt();
+		_time = g_system->getMillis() + _period;
+		return;
+	}
+	if (propName.equalsIgnoreCase("time")) {
+		_time = (uint32)value.asInt();
+		return;
+	}
+	if (propName.equalsIgnoreCase("timeoutHandler")) {
+		_timeoutHandler = value.asString();
+		return;
+	}
+	if (propName.equalsIgnoreCase("target")) {
+		_target = value;
+		return;
+	}
+	if (propName.equalsIgnoreCase("name")) {
+		_name = value.asString();
+		return;
+	}
+
+	warning("TimeoutObject::setProp(): unknown property '%s'", propName.c_str());
+}
+
+void TimeoutObject::tick(uint32 now) {
+	if (!_armed || _period <= 0 || now < _time)
+		return;
+
+	// Reschedule before calling: the handler may forget() this very object, and
+	// it may also take longer than one period, in which case Director does not
+	// queue up the missed calls.
+	_time = now + _period;
+
+	if (_timeoutHandler.empty())
+		return;
+
+	debugC(5, kDebugLingoExec, "TimeoutObject::tick(): firing %s on \"%s\"", _timeoutHandler.c_str(), _name.c_str());
+
+	if (_target.type == OBJECT && _target.u.obj) {
+		Symbol sym = _target.u.obj->getMethod(_timeoutHandler);
+		if (sym.type == VOIDSYM) {
+			warning("TimeoutObject::tick(): target of \"%s\" has no handler %s", _name.c_str(), _timeoutHandler.c_str());
+			return;
+		}
+		g_lingo->push(_target);
+		int frame = g_lingo->_state->callstack.size();
+		LC::call(sym, 1, false);
+		g_lingo->execute(frame);
+		return;
+	}
+
+	// No target: the manual says Director then looks for the handler in the
+	// movie scripts.
+	Symbol sym = g_lingo->getHandler(_timeoutHandler);
+	if (sym.type == VOIDSYM) {
+		warning("TimeoutObject::tick(): no movie script handler %s for \"%s\"", _timeoutHandler.c_str(), _name.c_str());
+		return;
+	}
+	int frame = g_lingo->_state->callstack.size();
+	LC::call(sym, 0, false);
+	g_lingo->execute(frame);
+}
+
+void LM::m_timeoutNew(int nargs) {
+	TimeoutObject *me = static_cast<TimeoutObject *>(g_lingo->_state->me.u.obj);
+
+	// timeOut("name").new(period, #handler) or .new(period, #handler, target)
+	Datum target, handler, period;
+
+	if (nargs > 3) {
+		warning("LM::m_timeoutNew(): expected 2 or 3 arguments for \"%s\", got %d, dropping the surplus",
+				me->getName().c_str(), nargs);
+		while (nargs > 3) {
+			g_lingo->pop();
+			nargs--;
+		}
+	}
+	// Arguments were pushed left to right, so they come off in reverse.
+	if (nargs >= 3)
+		target = g_lingo->pop();
+	if (nargs >= 2)
+		handler = g_lingo->pop();
+	if (nargs >= 1)
+		period = g_lingo->pop();
+
+	me->_period = period.asInt();
+	me->_timeoutHandler = (handler.type == VOID) ? Common::String() : handler.asString();
+	me->_target = target;
+	me->_time = g_system->getMillis() + me->_period;
+	me->_armed = true;
+
+	Movie *movie = g_director->getCurrentMovie();
+	if (movie) {
+		// A movie may call new() twice on the same name -- that restarts the one
+		// timer, it does not make a second one.
+		bool listed = false;
+		for (auto &it : movie->_timeOutList) {
+			if (it.type == OBJECT && it.u.obj == me) {
+				listed = true;
+				break;
+			}
+		}
+		if (!listed)
+			movie->_timeOutList.push_back(Datum(me));
+	}
+
+	debugC(3, kDebugLingoExec, "LM::m_timeoutNew(): armed \"%s\" every %d ms -> %s",
+			me->getName().c_str(), me->_period, me->_timeoutHandler.c_str());
+
+	g_lingo->push(g_lingo->_state->me);
+}
+
+void LM::m_timeoutForget(int nargs) {
+	TimeoutObject *me = static_cast<TimeoutObject *>(g_lingo->_state->me.u.obj);
+
+	// Disarm first: tickTimeouts() works on a snapshot, so a timer that forgets
+	// itself from inside its own handler must stop by the flag as well as by
+	// leaving the list.
+	me->_armed = false;
+
+	Movie *movie = g_director->getCurrentMovie();
+	if (!movie)
+		return;
+
+	for (uint i = 0; i < movie->_timeOutList.size(); i++) {
+		if (movie->_timeOutList[i].type == OBJECT && movie->_timeOutList[i].u.obj == me) {
+			movie->_timeOutList.remove_at(i);
+			return;
+		}
+	}
+}
 
 } // End of namespace Director

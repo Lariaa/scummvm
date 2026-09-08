@@ -292,6 +292,44 @@ public:
 	int _paletteIndex = 0;
 };
 
+// A D8+ timeout object: a named timer that calls a handler every `period`
+// milliseconds, either on a child object or, with no target, in the movie
+// scripts. Director keeps the live ones in `the timeOutList`.
+//
+// Documented in "Using Director MX", ch. 16 "Creating timeout objects":
+//     myTimer = timeOut("timer1").new(2000, #accelerate, car1)
+// with the properties #name, #period, #timeOutHandler, #target and #time,
+// the last being the absolute millisecond at which it next fires.
+//
+// Gated at D8 rather than D6: the D6 and D7 references ("Lingo in a Nutshell",
+// "Director in a Nutshell", "Director 7 and Lingo authorized") document only
+// the unrelated D2-era `the timeoutLength` family, the string "timeOutList"
+// appears in Director MX's Dirapi.dll but not in Director 7's, and the earliest
+// title in the corpus to call timeOut() is a D8.00 one (TKKG 10).
+class TimeoutObject : public Object<TimeoutObject> {
+public:
+	TimeoutObject(const Common::String &name);
+
+	Common::String asString() override;
+
+	bool hasProp(const Common::String &propName) override;
+	Datum getProp(const Common::String &propName) override;
+	Common::String getPropAt(uint32 index) override;
+	uint32 getPropCount() override;
+	void setProp(const Common::String &propName, const Datum &value, bool force = false) override;
+
+	// Is it due, and if so run the handler and schedule the next call.
+	void tick(uint32 now);
+
+	int _period = 0;
+	Common::String _timeoutHandler;
+	Datum _target;
+	uint32 _time = 0;
+	// A timeOut("name") that never had new() called on it is only a handle used
+	// to reach an existing timer or to create one; it must not fire by itself.
+	bool _armed = false;
+};
+
 namespace LM {
 
 // predefined methods
@@ -312,6 +350,10 @@ void m_forget(int nargs);
 void m_moveToBack(int nargs);
 void m_moveToFront(int nargs);
 void m_open(int nargs);
+
+// timeout object
+void m_timeoutNew(int nargs);
+void m_timeoutForget(int nargs);
 
 } // End of namespace LM
 
