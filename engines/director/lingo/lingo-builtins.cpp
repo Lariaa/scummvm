@@ -1943,6 +1943,11 @@ void LB::b_setProp(int nargs) {
 			int n = index.asInt();
 			Datum ref = LC::chunkRef(chunkType, n, n, list);
 			g_lingo->varAssign(ref, value);
+			// Unlike the list forms below, this one is compiled as an expression:
+			// Steinzeit emits `c_argcpush 4`, not the noret variant, so a value has
+			// to come back or LC::call reports "did not return value". Hand back
+			// what was assigned; in command form it lands in `the result`.
+			g_lingo->push(value);
 			return;
 		}
 	}
