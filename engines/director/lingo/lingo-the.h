@@ -176,6 +176,7 @@ enum TheEntityType {
 	kTheTimeoutKeyDown,
 	kTheTimeoutLapsed,
 	kTheTimeoutLength,
+	kTheTimeoutList,
 	kTheTimeoutMouse,
 	kTheTimeoutPlay,
 	kTheTimeoutScript,

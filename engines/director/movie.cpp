@@ -97,6 +97,51 @@ Movie::Movie(Window *window) {
 	_isBeepOn = false; // Beep is off by default in the original
 }
 
+void Movie::tickTimeouts() {
+	if (_timeOutList.empty())
+		return;
+
+	// A timeout handler runs Lingo, and Lingo pumps events every hundred opcodes,
+	// which can come back round through Score::update(). Without this guard a
+	// slow handler would be re-entered before it returned.
+	if (_inTimeoutTick)
+		return;
+
+	// Lingo can be frozen mid-handler -- a `go` from inside an event leaves the
+	// callstack parked until the new frame is up. Starting a timer handler on
+	// top of that would run it against a state that is waiting to be resumed.
+	if (_lingo->_freezeState || _lingo->_freezePlay || _lingo->_abort)
+		return;
+
+	_inTimeoutTick = true;
+
+	uint32 now = g_system->getMillis();
+
+	// A handler is free to forget() timers, its own included, so work on a copy
+	// and re-check membership before firing.
+	Common::Array<Datum> snapshot = _timeOutList;
+	for (uint i = 0; i < snapshot.size(); i++) {
+		if (snapshot[i].type != OBJECT || !snapshot[i].u.obj)
+			continue;
+		if (snapshot[i].u.obj->getObjType() != kTimeoutObj)
+			continue;
+
+		bool stillListed = false;
+		for (uint j = 0; j < _timeOutList.size(); j++) {
+			if (_timeOutList[j].type == OBJECT && _timeOutList[j].u.obj == snapshot[i].u.obj) {
+				stillListed = true;
+				break;
+			}
+		}
+		if (!stillListed)
+			continue;
+
+		((TimeoutObject *)snapshot[i].u.obj)->tick(now);
+	}
+
+	_inTimeoutTick = false;
+}
+
 Movie::~Movie() {
 	if (_sharedCast && _sharedCast->getArchive()) {
 		debug(0, "@@   Clearing shared cast '%s'", _sharedCast->getArchive()->getPathName().toString().c_str());

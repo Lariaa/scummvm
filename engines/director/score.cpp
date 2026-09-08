@@ -653,6 +653,12 @@ void Score::update() {
 		}
 	}
 
+	// D8+ timeout objects are a separate mechanism from `the timeoutLength`
+	// above: each carries its own period in milliseconds, which can be shorter
+	// than a frame, so they are checked here rather than once per frame.
+	if (!_window->_playbackPaused)
+		_movie->tickTimeouts();
+
 	// Don't process frozen script if we use jump instructions
 	// like "go to frame", or open a new movie.
 	bool hasJump = (_nextFrame != 0) || !_window->_nextMovie.movie.empty();
