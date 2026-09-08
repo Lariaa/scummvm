@@ -268,6 +268,7 @@ static const BuiltinProto builtins[] = {
 	{ "member",			LB::b_member,		1, 2, 500, FBLTIN },	//				D5 f
 	{ "script",			LB::b_script,		1, 2, 400, FBLTIN },	//			D4 f
 	{ "sprite",			LB::b_sprite,		1, 1, 500, FBLTIN },	//				D5 f
+	{ "timeOut",		LB::b_timeOut,		1, 1, 800, FBLTIN },	//						D8 f
 	{ "window",			LB::b_window,		1, 1, 400, FBLTIN },	//			D4 f
 	{ "windowPresent",	LB::b_windowPresent,1, 1, 500, FBLTIN },	//				D5 f
 	// Field operations
@@ -4985,6 +4986,43 @@ void LB::b_sprite(int nargs) {
 	Datum res(d.asInt());
 	res.type = SPRITEREF;
 	g_lingo->push(res);
+}
+
+void LB::b_timeOut(int nargs) {
+	Datum d = g_lingo->pop();
+	Movie *movie = g_director->getCurrentMovie();
+
+	// A timer can also be addressed by its position in the timeOutList:
+	// "Using Director MX", ch. 16, gives `timeOut(2).forget` as the way to drop
+	// the second one.
+	if (d.type == INT || d.type == FLOAT) {
+		int index = d.asInt() - 1;
+		if (movie && index >= 0 && index < (int)movie->_timeOutList.size()) {
+			g_lingo->push(movie->_timeOutList[index]);
+			return;
+		}
+		warning("LB::b_timeOut(): no timeout object at position %d", d.asInt());
+		g_lingo->pushVoid();
+		return;
+	}
+
+	// timeOut("name") names a timer; it does not start one. If a timer of that
+	// name is already running this is the way to reach it, otherwise the caller
+	// gets a fresh handle to call new() on. Only new() puts it in the
+	// timeOutList, so a handle that is never armed simply goes away again.
+	Common::String name = d.asString();
+	if (movie) {
+		for (auto &it : movie->_timeOutList) {
+			if (it.type != OBJECT || !it.u.obj || it.u.obj->getObjType() != kTimeoutObj)
+				continue;
+			if (it.u.obj->getName().equalsIgnoreCase(name)) {
+				g_lingo->push(it);
+				return;
+			}
+		}
+	}
+
+	g_lingo->push(Datum(new TimeoutObject(name)));
 }
 
 void LB::b_window(int nargs) {
