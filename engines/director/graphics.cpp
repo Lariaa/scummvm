@@ -124,10 +124,6 @@ void DirectorEngine::loadDefaultPalettes() {
 	_loadedPalettes[CastMemberID(kClutMetallic, -1)] = PaletteV4(CastMemberID(kClutMetallic, -1), metallicPalette, 256);
 	_loadedPalettes[CastMemberID(kClutSystemWin, -1)] = PaletteV4(CastMemberID(kClutSystemWin, -1), winPalette, 256);
 	_loadedPalettes[CastMemberID(kClutSystemWinD5, -1)] = PaletteV4(CastMemberID(kClutSystemWinD5, -1), winD5Palette, 256);
-	// No 4-bit counterpart below: Director offers none for this one, and the 4bpp
-	// path in getDitherImg() already falls back to the Mac palette when a builtin
-	// has no 16-entry version.
-	_loadedPalettes[CastMemberID(kClutWeb216, -1)] = PaletteV4(CastMemberID(kClutWeb216, -1), web216Palette, 256);
 
 	_loaded16Palettes[CastMemberID(kClutSystemMac, -1)] = PaletteV4(CastMemberID(kClutSystemMac, -1), mac16Palette, 16);
 	_loaded16Palettes[CastMemberID(kClutRainbow, -1)] = PaletteV4(CastMemberID(kClutRainbow, -1), rainbow16Palette, 16);
