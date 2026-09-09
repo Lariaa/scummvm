@@ -1167,8 +1167,12 @@ void Score::createScriptInstances(int frameNum) {
 		if (sprite->_behaviors.size() == 0)
 			continue;
 
+		// `_channels[i]` IS Lingo channel i -- Frame::_sprites is sized
+		// numChannels + 1 with a dummy at index 0 -- so printing i + 1 named a
+		// channel one higher than the one being set up, and every other line in
+		// the log (the hit test, beginSprite's targetId, spriteNum) uses i.
 		debugC(1, kDebugLingoExec, "Score::createScriptInstances(): Creating script instances for channel %d, %d behaviors, frames [%d-%d]",
-			i + 1, sprite->_behaviors.size(), channel->_startFrame, channel->_endFrame);
+			i, sprite->_behaviors.size(), channel->_startFrame, channel->_endFrame);
 
 		for (uint j = 0; j < sprite->_behaviors.size(); j++) {
 			Datum instance = createScriptInstance(&sprite->_behaviors[j]);
