@@ -951,7 +951,29 @@ bool Lingo::processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int
 			nargs = 1;
 		}
 
-		LC::call(script->_eventHandlers[event], nargs, false);
+		Symbol sym = script->_eventHandlers[event];
+
+		// A cast member script owns properties, and ScriptContext::define() leaves
+		// sym.target empty, so `me` was VOID for the whole handler: cb_theassign
+		// dropped every property write and every later read came back VOID.
+		// Loewenzahn 4's quit dialog opens each of its handlers with
+		// `sn = the currentSpriteNum` and then addresses `sprite(sn + 1)`, which
+		// with sn VOID is sprite 1 -- the wrong sprite, on every hover.
+		//
+		// One instance per member, not per sprite: the member holds the script, and
+		// these handlers re-read the sprite number on entry anyway. Movie scripts
+		// have no properties and must keep me VOID, so they are left alone.
+		if (st == kCastScript) {
+			sym.target = script;
+
+			// `the currentSpriteNum` was only ever filled in for the D6+ behavior
+			// path above, so a cast script read it as 0 and the sprite arithmetic
+			// above stayed wrong even once me was bound.
+			if (channelId)
+				g_director->getCurrentMovie()->_currentSpriteNum = channelId;
+		}
+
+		LC::call(sym, nargs, false);
 		return execute(callerFrame);
 	} else {
 		debugC(9, kDebugEvents, "Lingo::processEvent(%s, %s, %s): no handler", _eventHandlerTypes[event], scriptType2str(st), scriptId.asString().c_str());
