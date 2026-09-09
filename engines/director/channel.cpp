@@ -515,6 +515,22 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				warning("Channel::getMask(): Requested cast mask %s, but no picture found", maskID.asString().c_str());
 				return nullptr;
 			}
+		} else if (_sprite->_cast->_type == kCastBitmap &&
+				((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 32) {
+			// A 32-bit bitmap carries the artist's own alpha channel, and that is
+			// composited whatever the ink says. Returning nullptr here drew
+			// TKKG 13 and 14's 800x213 login strip -- resolution.cxt member 6
+			// "login0005", Mask ink, and member 7 simply does not exist -- as a
+			// solid rectangle, although a third of its pixels are marked fully
+			// clear in the alpha plane, with soft edges in between.
+			//
+			// Fall back to the matte, which createMatte() takes from the alpha
+			// channel for a 32-bit source. A bitmap without an alpha channel is
+			// left alone: there the flood fill would be a guess, and drawing it
+			// opaque is what Director does with an unusable mask.
+			debugC(4, kDebugImages, "Channel::getMask(): cast mask %s not found, using the alpha channel of %s instead",
+					maskID.asString().c_str(), _sprite->_castId.asString().c_str());
+			return ((BitmapCastMember *)_sprite->_cast)->getMatte(bbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 		} else {
 			warning("Channel::getMask(): Requested cast mask %s, but was not found", maskID.asString().c_str());
 			return nullptr;
