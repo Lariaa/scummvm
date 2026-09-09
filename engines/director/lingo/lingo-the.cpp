@@ -1442,6 +1442,21 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		// -1 gives the focus back to the Score, 0 takes it off every sprite.
 		int focus = d.asInt();
 		movie->_currentEditableTextChannel = focus > 0 ? (uint16)focus : 0;
+
+		// Storing the number is not enough. Key events are routed by
+		// Score::getSpriteIDOfActiveWidget(), which asks the window manager which
+		// widget holds focus, and _currentEditableTextChannel is otherwise only
+		// ever written *from* that widget state (Score::updateSprites), never back
+		// to it. So a movie that moves the caret with `the keyboardFocusSprite`
+		// kept typing into whichever field was clicked last -- or, with none
+		// clicked, no sprite saw keyDown/keyUp at all.
+		if (focus > 0) {
+			Channel *channel = score->getChannelById((uint16)focus);
+			if (channel && channel->_widget)
+				g_director->_wm->setActiveWidget(channel->_widget);
+		} else if (focus == 0) {
+			g_director->_wm->setActiveWidget(nullptr);
+		}
 		break;
 	}
 	case kTheKeyDownScript:
