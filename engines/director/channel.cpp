@@ -376,6 +376,28 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 		} else {
 			return nullptr;
 		}
+	} else if (_sprite->_ink == kInkTypeBackgndTrans && _sprite->_cast->_type == kCastBitmap &&
+			((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 32) {
+		// Background Transparent on a 32-bit source does two things in Director,
+		// measured in Director MX with a 32-bit probe: the alpha channel is
+		// composited *and* the sprite's background colour is keyed out. ScummVM
+		// only ever did the second, because this ink is not in the needsMatte
+		// list above, so the blitter fell through to `src == backColor` and the
+		// alpha plane was never looked at.
+		//
+		// That is what leaves the black boxes around Loewenzahn 8's treasure
+		// chests. Its artwork is 32-bit (5510 of 5758 bitmaps) with the
+		// background already marked clear by alpha (0x00f0f0f0 in the probe
+		// data), and 31042 of its sprites use this ink. The colour key cannot
+		// help there: the score stores background colour *index 0* for 30834 of
+		// them, which transformColor() turns into white, while the opaque
+		// artwork behind it is 240-grey, black or wood brown.
+		//
+		// Only 32-bit sources: at 1 and 8 bits there is no alpha plane, and a
+		// flood-fill matte would be a guess where the colour key is the real
+		// mechanism. The key itself is kept -- see the srfMask branch of
+		// kInkTypeBackgndTrans in graphics.cpp.
+		return ((BitmapCastMember *)_sprite->_cast)->getMatte(bbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 	} else if (_sprite->_ink == kInkTypeMask) {
 		// castLib -1 reaches this lookup and matches no cast, so no mask is found
 		// and the sprite is drawn opaque. Fall back to the cast the sprite's own
