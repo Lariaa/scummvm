@@ -380,8 +380,12 @@ void InkPrimitives<T>::drawPoint(int x, int y, uint32 src, void *data) {
  	switch (p->ink) {
 	case kInkTypeBackgndTrans:
 		if (p->srfMask) {
-			// If there's a mask, we already dealing with transparency, so just copy the pixel.
-			 *dst = src;
+			// Director does both here, measured in Director MX with a 32-bit
+			// probe: the alpha channel decides which pixels arrive at all (that
+			// is the mask), and the background colour is still keyed out of the
+			// ones that do -- an opaque white block vanished alongside the
+			// alpha-cleared area. So keep the key rather than copying blind.
+			*dst = (src == p->backColor) ? *dst : src;
 		} else {
 			if (p->oneBitImage) {
 				// One-bit images have a slightly different rendering algorithm for BackgndTrans.
