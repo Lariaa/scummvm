@@ -9707,8 +9707,8 @@ static const DirectorGameDescription gameDescriptions[] = {
 	MACGAME1f_l("loewe4", "", "xn--Lwenzahn 4-ecb",		"rt:6f75666ef42bcd1d34bd120d011b42b1",  114029, Common::DE_DEU, 702, GF_TRUECOLOR),
 	WINGAME1f_l("loewe4", "", "SETUP/WIN95/LOEWE4.exe",	"t:4766360be9f3067a9f314b3b3a454fa7",  1818036, Common::DE_DEU, 702, GF_TRUECOLOR),
 
-	WINGAME2_l("loewesteinzeit", "","START.EXE",	  "t:13918e51d2093b5cdc92795b36454112", 1960654,
-									"data/131Koch.dxr", "80b7913156e36d8806b2dcdcbcd7d288", 817625, Common::DE_DEU, 702),
+	WINGAME2f_l("loewesteinzeit", "","START.EXE",	  "t:13918e51d2093b5cdc92795b36454112", 1960654,
+									"data/131Koch.dxr", "80b7913156e36d8806b2dcdcbcd7d288", 817625, Common::DE_DEU, 702, GF_TRUECOLOR),
 
 	MACGAME1("maisybday", "", "Maisy BDay",		"r:0944b962ebb00f4b5d5149d220f8449b", 113458,  702),
 	WINGAME1("maisybday", "", "Maisy BDay.exe", "t:26fc28194d1991645a9a42794bcb1b36", 2619122, 702),
