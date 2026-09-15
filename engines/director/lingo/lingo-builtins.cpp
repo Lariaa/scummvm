@@ -4122,6 +4122,12 @@ void LB::b_sendAllSprites(int nargs) {
 
 		if (!anyHandled) {
 			Symbol h = g_lingo->getHandler(msgName);
+			// As in b_sendSprite(): getHandler() also finds behavior handlers, and one
+			// run from here has no instance and so no `me`. Loewenzahn Spielebox sends
+			// #updateLoop from a drag handler while no sprite on stage carries
+			// BHLoop_SE, and that handler's first property read ended the movie.
+			if (h.type != VOIDSYM && h.ctx && h.ctx->_scriptType == kScoreScript)
+				h.type = VOIDSYM;
 			if (h.type != VOIDSYM) {
 				for (int j = (int)extraArgs.size() - 1; j >= 0; j--)
 					g_lingo->push(extraArgs[j]);
