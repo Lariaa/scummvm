@@ -1938,7 +1938,7 @@ void LB::b_setProp(int nargs) {
 	//
 	// varAssign() does the real work and even grows the text when the chunk does not
 	// exist yet, so a first save into an empty member works.
-	if (nargs >= 4 && prop.type == SYMBOL) {
+	if (nargs >= 4 && prop.type == SYMBOL && list.type != PARRAY && list.type != ARRAY) {
 		ChunkType chunkType = kChunkChar;
 		if (chunkTypeFromSymbol(*prop.u.s, chunkType)) {
 			int n = index.asInt();
@@ -1951,6 +1951,35 @@ void LB::b_setProp(int nargs) {
 			g_lingo->push(value);
 			return;
 		}
+	}
+
+	// The other four-argument form is `list.prop[index] = value`, the write side of
+	// getPropRef(list, #prop, index): the property holds a list or an object, and
+	// the element inside it is what changes. Loewenzahn 6's lock game assigns
+	// gSchleuse.ship[player] that way; the inner list used to be replaced by the
+	// value outright, and nothing came back although the call is compiled as an
+	// expression, which under lingostrict ended the movie.
+	if (nargs >= 4) {
+		Datum inner;
+		if (list.type == PARRAY) {
+			int found = LC::compareArrays(LC::eqData, list, prop, true).u.i;
+			if (found > 0)
+				inner = list.u.parr->arr[found - 1].v;
+		} else if (list.type == OBJECT && prop.type == SYMBOL && list.u.obj->hasProp(*prop.u.s)) {
+			inner = list.u.obj->getProp(*prop.u.s);
+		}
+
+		if (inner.type == ARRAY || inner.type == PARRAY || inner.type == OBJECT) {
+			g_lingo->push(inner);
+			g_lingo->push(index);
+			g_lingo->push(value);
+			b_setAt(3);
+		} else {
+			warning("b_setProp(): property %s of a %s holds a %s, which cannot be subscripted",
+					prop.asString().c_str(), list.type2str(), inner.type2str());
+		}
+		g_lingo->push(value);
+		return;
 	}
 
 	switch (list.type) {
