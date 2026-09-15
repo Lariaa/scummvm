@@ -176,6 +176,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheShiftDown,		"shiftDown",		false, 200, true },	// D2 f
 	{ kTheSoundEnabled,		"soundEnabled",		false, 200, false },// D2 p
 	{ kTheSoundDevice,		"soundDevice",		false, 700, false },//					D7 p
+	{ kTheSoundDeviceList,	"soundDeviceList",	false, 700, false },//					D7 p
 	{ kTheSoundEntity,		"sound",			true,  300, false },// 		D3 p
 	{ kTheSoundKeepDevice,	"soundKeepDevice",	false, 600, false },//					D6 p, documented in D7
 	{ kTheSoundLevel,		"soundLevel",		false, 200, false },// D2 p
@@ -1170,6 +1171,17 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		break;
 	case kTheSoundDevice:
 		d = _soundDevice;
+		break;
+	case kTheSoundDeviceList:
+		// The installed sound mixers, read-only (Director in a Nutshell: new in D7,
+		// e.g. ["MacroMix", "QT3Mix", "DirectSound"]). Answer the machine behind the
+		// "DirectSound" reported above, without QuickTime 3: MacroMix is always
+		// installed. TKKG 9 walks this list on NT and 2000 looking for QT3Mix and
+		// counted a VOID when it was missing, which ended the movie.
+		d.type = ARRAY;
+		d.u.farr = new FArray;
+		d.u.farr->arr.push_back(Datum("MacroMix"));
+		d.u.farr->arr.push_back(Datum("DirectSound"));
 		break;
 	case kTheSoundKeepDevice:
 		// System property; for Windows only, prevents the sound driver from unloading
