@@ -48,9 +48,23 @@ struct FadeParams {
 	int lapsedTicks;
 	bool fadeIn;
 	bool autoStop;
+	// Set for the sound channel object's fadeIn(), fadeOut() and fadeTo(): the
+	// channel keeps the volume the fade arrives at, where the older `sound fadeIn`
+	// and `sound fadeOut` commands have it put back once the fade is cancelled.
+	bool persist;
 
-	FadeParams(int sv, int tv, int tt, int st, bool f, bool as) :
-		startVol(sv), targetVol(tv), totalTicks(tt), startTicks(st), lapsedTicks(0), fadeIn(f), autoStop(as) {}
+	FadeParams(int sv, int tv, int tt, int st, bool f, bool as, bool p = false) :
+		startVol(sv), targetVol(tv), totalTicks(tt), startTicks(st), lapsedTicks(0), fadeIn(f), autoStop(as), persist(p) {}
+};
+
+// One entry of a sound channel object's play list, as queue() and setPlayList()
+// take it (D8). Of the property list only #member and #loopCount are kept.
+struct SoundQueueEntry {
+	CastMemberID member;
+	int loopCount; // how often the sound plays; 0 repeats it until breakLoop()
+
+	SoundQueueEntry() : loopCount(1) {}
+	SoundQueueEntry(CastMemberID m, int loops) : member(m), loopCount(loops) {}
 };
 
 const uint16 kMinSampledMenu = 10;
@@ -160,9 +174,17 @@ struct SoundChannel {
 	// a stop at the end of a loop.
 	Audio::LoopableAudioStream *loopPtr;
 
+	// The sound channel object's play list (D8): what queue() and setPlayList()
+	// hold and play() works through. current is the entry playing now.
+	Common::Array<SoundQueueEntry> playList;
+	SoundQueueEntry current;
+	int loopsRemaining;
+	bool playListActive;
+	bool paused;
+
 	SoundChannel(): handle(), lastPlayedSound(SoundID()), stopOnZero(true), fromLastMovie(false), volume(255), originalRate(-1),
 		pitchShiftPercent(100), fade(nullptr), puppet(SoundID()), newPuppet(false), movieChanged(false), loopPtr(nullptr),
-		lastCuePointIndex(-1) {}
+		lastCuePointIndex(-1), loopsRemaining(0), playListActive(false), paused(false) {}
 };
 
 class DirectorSound {
@@ -216,6 +238,23 @@ public:
 	void registerFade(int soundChannel, bool fadeIn, int ticks, bool autoStop = false);
 	bool fadeChannels();
 
+	// The sound channel object (D8): a play list per channel, pausing, and fades
+	// that leave the channel at the volume they arrive at.
+	void queueSound(int soundChannel, const SoundQueueEntry &entry);
+	void setPlayList(int soundChannel, const Common::Array<SoundQueueEntry> &playList);
+	Common::Array<SoundQueueEntry> getPlayList(int soundChannel);
+	bool isQueuePaused(int soundChannel);
+	void playQueue(int soundChannel);
+	void playNow(int soundChannel, const SoundQueueEntry &entry);
+	void playNext(int soundChannel);
+	void stopQueue(int soundChannel);
+	void pauseQueue(int soundChannel);
+	void rewindQueue(int soundChannel);
+	void breakLoop(int soundChannel);
+	void fadeChannelTo(int soundChannel, int targetVol, int ticks);
+	void fadeChannelIn(int soundChannel, int ticks);
+	void updatePlayLists();
+
 	bool isChannelActive(int soundChannel);
 	uint32 getChannelElapsedTime(int soundChannel);
 	SoundID getChannelLastPlayed(int soundChannel);
@@ -242,6 +281,10 @@ private:
 	void setChannelVolumeInternal(int soundChannel, uint8 volume);
 	bool assertChannel(int soundChannel);
 	void cancelFade(int soundChannel);
+	int fadeVolume(const FadeParams *fade);
+
+	void startQueueEntry(int soundChannel, const SoundQueueEntry &entry);
+	void registerPersistentFade(int soundChannel, int startVol, int targetVol, int ticks);
 };
 
 class AudioDecoder {
