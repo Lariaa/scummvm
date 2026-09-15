@@ -2083,6 +2083,8 @@ void Score::playSoundChannel(bool puppetOnly, bool sound1Changed, bool sound2Cha
 void Score::playQueuedSound() {
 	DirectorSound *sound = _window->getSoundManager();
 	sound->playFPlaySound();
+	// The sound channel objects' play lists move on when a sound ends.
+	sound->updatePlayLists();
 }
 
 void Score::loadFrames(Common::SeekableReadStreamEndian &stream, uint16 version, bool loadSprites) {

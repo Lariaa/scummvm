@@ -49,6 +49,20 @@ void close(ObjectType type);
 void m_new(int nargs);
 void m_sound(int nargs);
 
+void m_breakLoop(int nargs);
+void m_fadeIn(int nargs);
+void m_fadeOut(int nargs);
+void m_fadeTo(int nargs);
+void m_getPlayList(int nargs);
+void m_isBusy(int nargs);
+void m_pause(int nargs);
+void m_play(int nargs);
+void m_playNext(int nargs);
+void m_queue(int nargs);
+void m_rewind(int nargs);
+void m_setPlayList(int nargs);
+void m_stop(int nargs);
+
 } // End of namespace SoundChannelXtra
 
 } // End of namespace Director
