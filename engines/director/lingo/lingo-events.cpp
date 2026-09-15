@@ -985,6 +985,24 @@ bool Lingo::processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int
  * Script Instances
  ***********************/
 
+// Run the frame behavior's own handler for beginSprite or endSprite. The event
+// queue cannot address the frame script alone: in D6+ a sprite event without a
+// channel goes to whatever sprite is under the mouse.
+static void callFrameBehaviorEvent(Datum &instance, LEvent event) {
+	if (instance.type != OBJECT)
+		return;
+
+	Symbol sym = instance.u.obj->getMethod(g_lingo->_eventHandlerTypes[event]);
+	if (sym.type == VOIDSYM)
+		return;
+
+	debugC(1, kDebugLingoExec, "Score: sending %s to the frame behavior", g_lingo->_eventHandlerTypes[event]);
+	g_lingo->push(instance);
+	int callerFrame = g_lingo->_state->callstack.size();
+	LC::call(sym, 1, false);
+	g_lingo->execute(callerFrame);
+}
+
 void Score::killScriptInstances(int frameNum) {
 	if (_version < kFileVer600) // No-op for early Directors
 		return;
@@ -992,7 +1010,14 @@ void Score::killScriptInstances(int frameNum) {
 	if (frameNum < _currentFrame->_mainChannels.scriptSpriteInfo.startFrame ||
 	    frameNum > _currentFrame->_mainChannels.scriptSpriteInfo.endFrame) {
 		if (_scriptChannelScriptInstance.type == OBJECT) {
+			// Cleared before the handler runs, so a `go` inside endSprite that
+			// comes back through here finds nothing left to end.
+			Datum frameInstance = _scriptChannelScriptInstance;
 			_scriptChannelScriptInstance = Datum();
+			bool prevDis = _disableGoPlayUpdateStage;
+			_disableGoPlayUpdateStage = true;
+			callFrameBehaviorEvent(frameInstance, kEventEndSprite);
+			_disableGoPlayUpdateStage = prevDis;
 			debugC(1, kDebugLingoExec, "Score::killScriptInstances(): Killed script instances for script channel. frame %d [%d-%d]",
 				frameNum,
 				_currentFrame->_mainChannels.scriptSpriteInfo.startFrame,
@@ -1148,6 +1173,18 @@ void Score::createScriptInstances(int frameNum) {
 					_currentFrame->_mainChannels.scriptSpriteInfo.startFrame,
 					_currentFrame->_mainChannels.scriptSpriteInfo.endFrame);
 				_scriptChannelScriptInstance = createScriptInstance(&_currentFrame->_mainChannels.behaviors[0]);
+
+				// beginSprite "is also sent to the frame script if the frame script
+				// span begins anew" (Director in a Nutshell, D7). Loewenzahn 7's piano
+				// sets up its autoplay lists in the frame behavior's beginSprite and
+				// crashed on the first exitFrame without them. Sprites entering in the
+				// same frame are set up below; a sendAllSprites from the handler
+				// instantiates them itself.
+				bool prevDis = _disableGoPlayUpdateStage;
+				_disableGoPlayUpdateStage = true;
+				Datum frameInstance = _scriptChannelScriptInstance;
+				callFrameBehaviorEvent(frameInstance, kEventBeginSprite);
+				_disableGoPlayUpdateStage = prevDis;
 			}
 		}
 	}
