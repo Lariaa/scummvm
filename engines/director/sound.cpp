@@ -320,17 +320,21 @@ bool DirectorSound::fadeChannels() {
 
 		fade->lapsedTicks = _window->getVM()->getMacTicks() - fade->startTicks;
 		if (fade->lapsedTicks > fade->totalTicks) {
+			if (fade->persist) {
+				// Arrived: the target is the channel's volume from now on.
+				_mixer->setChannelVolume(it._value->handle, fade->targetVol);
+				it._value->volume = fade->targetVol;
+				_volumes[it._key] = fade->targetVol;
+				delete fade;
+				it._value->fade = nullptr;
+				continue;
+			}
 			if (fade->autoStop)
 				stopSound(it._key);
 			continue;
 		}
 
-		int fadeVol;
-		if (fade->fadeIn) {
-			fadeVol = MIN(fade->lapsedTicks * ((float)fade->targetVol / fade->totalTicks), (float)Audio::Mixer::kMaxChannelVolume);
-		} else {
-			fadeVol = MAX((fade->totalTicks - fade->lapsedTicks) * ((float)fade->startVol / fade->totalTicks), (float)0);
-		}
+		int fadeVol = fadeVolume(fade);
 
 		debugC(5, kDebugSound, "DirectorSound::fadeChannel(): fading channel %d volume to %d", it._key, fadeVol);
 		_mixer->setChannelVolume(it._value->handle, fadeVol);
@@ -341,6 +345,18 @@ bool DirectorSound::fadeChannels() {
 	return ongoing;
 }
 
+// Where a fade stands after its lapsed ticks: a straight line from the start
+// volume to the target. This used to take one end for silence, which is all the
+// `sound fadeIn` and `sound fadeOut` commands ask for, but would have taken
+// sound(1).fadeTo(128) from full volume all the way down to nothing.
+int DirectorSound::fadeVolume(const FadeParams *fade) {
+	if (fade->totalTicks <= 0 || fade->lapsedTicks >= fade->totalTicks)
+		return fade->targetVol;
+
+	int vol = fade->startVol + (fade->targetVol - fade->startVol) * fade->lapsedTicks / fade->totalTicks;
+	return CLIP<int>(vol, 0, Audio::Mixer::kMaxChannelVolume);
+}
+
 void DirectorSound::cancelFade(int soundChannel) {
 	if (!assertChannel(soundChannel))
 		return;
@@ -348,11 +364,18 @@ void DirectorSound::cancelFade(int soundChannel) {
 	// why this method is private.
 
 	if (_channels[soundChannel]->fade) {
-		int restoreVol = _channels[soundChannel]->fade->fadeIn ? _channels[soundChannel]->fade->targetVol : _channels[soundChannel]->fade->startVol;
+		FadeParams *fade = _channels[soundChannel]->fade;
+		int restoreVol = fade->fadeIn ? fade->targetVol : fade->startVol;
+		if (fade->persist) {
+			// A sound channel object's fade stands for the channel's new volume.
+			restoreVol = fade->targetVol;
+			_channels[soundChannel]->volume = restoreVol;
+			_volumes[soundChannel] = restoreVol;
+		}
 		debugC(5, kDebugSound, "DirectorSound::cancelFade(): resetting channel %d volume to %d", soundChannel, restoreVol);
 		_mixer->setChannelVolume(_channels[soundChannel]->handle, restoreVol);
 
-		delete _channels[soundChannel]->fade;
+		delete fade;
 		_channels[soundChannel]->fade = nullptr;
 	}
 }
@@ -631,6 +654,207 @@ void DirectorSound::playPuppetSound(int soundChannel) {
 
 	_channels[soundChannel]->newPuppet = false;
 	playSound(_channels[soundChannel]->puppet, soundChannel, true);
+}
+
+void DirectorSound::queueSound(int soundChannel, const SoundQueueEntry &entry) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	_channels[soundChannel]->playList.push_back(entry);
+}
+
+void DirectorSound::setPlayList(int soundChannel, const Common::Array<SoundQueueEntry> &playList) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	// Replaces what is queued; the sound playing now carries on.
+	_channels[soundChannel]->playList = playList;
+}
+
+Common::Array<SoundQueueEntry> DirectorSound::getPlayList(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return Common::Array<SoundQueueEntry>();
+
+	return _channels[soundChannel]->playList;
+}
+
+bool DirectorSound::isQueuePaused(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return false;
+
+	return _channels[soundChannel]->paused;
+}
+
+void DirectorSound::startQueueEntry(int soundChannel, const SoundQueueEntry &entry) {
+	SoundChannel *channel = _channels[soundChannel];
+	channel->current = entry;
+	channel->loopsRemaining = entry.loopCount;
+	channel->paused = false;
+
+	// A fade started before play() -- queue(), fadeIn(), play() is the order the
+	// Director 8.5 reference gives -- belongs to the channel, not to the sound, so
+	// it has to outlive playStream() cancelling fades and resetting the volume.
+	FadeParams *fade = channel->fade;
+	channel->fade = nullptr;
+
+	// Lingo owns the channel while its list plays, so the score's sound channels
+	// leave it alone, as they do for puppetSound.
+	setPuppetSound(SoundID(entry.member), soundChannel);
+	playPuppetSound(soundChannel);
+
+	if (fade) {
+		channel->fade = fade;
+		fade->lapsedTicks = _window->getVM()->getMacTicks() - fade->startTicks;
+		int vol = fadeVolume(fade);
+		_mixer->setChannelVolume(channel->handle, vol);
+		channel->volume = vol;
+	}
+
+	if (!isChannelActive(soundChannel)) {
+		// Not a playable sound: move on rather than retry it every frame.
+		warning("DirectorSound::startQueueEntry(): %s did not start in channel %d", entry.member.asString().c_str(), soundChannel);
+		channel->current = SoundQueueEntry();
+		channel->loopsRemaining = 0;
+	}
+}
+
+void DirectorSound::playQueue(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	SoundChannel *channel = _channels[soundChannel];
+	if (channel->paused) {
+		_mixer->pauseHandle(channel->handle, false);
+		channel->paused = false;
+		return;
+	}
+
+	channel->playListActive = true;
+	if (!isChannelActive(soundChannel) && !channel->playList.empty())
+		startQueueEntry(soundChannel, channel->playList.remove_at(0));
+}
+
+void DirectorSound::playNow(int soundChannel, const SoundQueueEntry &entry) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	// play(member) puts the sound ahead of anything queued and starts it at once.
+	_channels[soundChannel]->playListActive = true;
+	startQueueEntry(soundChannel, entry);
+}
+
+void DirectorSound::playNext(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	SoundChannel *channel = _channels[soundChannel];
+	if (channel->playList.empty()) {
+		stopQueue(soundChannel);
+		return;
+	}
+
+	channel->playListActive = true;
+	startQueueEntry(soundChannel, channel->playList.remove_at(0));
+}
+
+void DirectorSound::stopQueue(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	// Stops the sound playing now. What is queued stays queued for the next
+	// play(); setPlayList([]) is what empties the queue (Director MX manual).
+	SoundChannel *channel = _channels[soundChannel];
+	channel->playListActive = false;
+	channel->paused = false;
+	channel->current = SoundQueueEntry();
+	channel->loopsRemaining = 0;
+	stopSound(soundChannel);
+	disablePuppetSound(soundChannel);
+}
+
+void DirectorSound::pauseQueue(int soundChannel) {
+	if (!assertChannel(soundChannel) || !isChannelActive(soundChannel))
+		return;
+
+	_mixer->pauseHandle(_channels[soundChannel]->handle, true);
+	_channels[soundChannel]->paused = true;
+}
+
+void DirectorSound::rewindQueue(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	SoundChannel *channel = _channels[soundChannel];
+	if (channel->current.member.member == 0)
+		return;
+
+	// Back to the start of the sound playing now, keeping its remaining loops.
+	SoundQueueEntry entry = channel->current;
+	int loops = channel->loopsRemaining;
+	startQueueEntry(soundChannel, entry);
+	if (channel->current.member.member != 0)
+		channel->loopsRemaining = loops;
+}
+
+void DirectorSound::breakLoop(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	// The pass playing now is the last one; then the list moves on.
+	SoundChannel *channel = _channels[soundChannel];
+	channel->loopsRemaining = 1;
+	if (channel->loopPtr)
+		channel->loopPtr->setRemainingIterations(1);
+}
+
+void DirectorSound::registerPersistentFade(int soundChannel, int startVol, int targetVol, int ticks) {
+	registerFade(soundChannel, startVol, targetVol, MAX(ticks, 1));
+	if (_channels[soundChannel]->fade)
+		_channels[soundChannel]->fade->persist = true;
+}
+
+void DirectorSound::fadeChannelTo(int soundChannel, int targetVol, int ticks) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	registerPersistentFade(soundChannel, _channels[soundChannel]->volume, targetVol, ticks);
+}
+
+void DirectorSound::fadeChannelIn(int soundChannel, int ticks) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	// Silent at once, then back up to the channel's volume.
+	int target = _volumes.getValOrDefault(soundChannel, g_director->_defaultVolume);
+	registerPersistentFade(soundChannel, 0, target, ticks);
+}
+
+void DirectorSound::updatePlayLists() {
+	for (auto &it : _channels) {
+		SoundChannel *channel = it._value;
+		if (!channel || !channel->playListActive || channel->paused || isChannelActive(it._key))
+			continue;
+
+		// A pass has just ended. Play it again while loops remain -- a loopCount of
+		// 0 repeats until breakLoop() -- then carry on down the list.
+		if (channel->current.member.member != 0 && channel->loopsRemaining != 1) {
+			int loops = channel->loopsRemaining > 1 ? channel->loopsRemaining - 1 : 0;
+			SoundQueueEntry entry = channel->current;
+			startQueueEntry(it._key, entry);
+			if (channel->current.member.member != 0)
+				channel->loopsRemaining = loops;
+			continue;
+		}
+
+		if (!channel->playList.empty()) {
+			startQueueEntry(it._key, channel->playList.remove_at(0));
+			continue;
+		}
+
+		channel->playListActive = false;
+		channel->current = SoundQueueEntry();
+		disablePuppetSound(it._key);
+	}
 }
 
 void DirectorSound::playFPlaySound() {
