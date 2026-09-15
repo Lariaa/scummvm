@@ -156,6 +156,7 @@ enum TheEntityType {
 	kTheSerialNumber,
 	kTheShiftDown,
 	kTheSoundDevice,
+	kTheSoundDeviceList,
 	kTheSoundEntity,
 	kTheSoundEnabled,
 	kTheSoundKeepDevice,
