@@ -333,9 +333,9 @@ bool Movie::loadArchive() {
 	if (g_director->hasPalette(_cast->_defaultPalette)) {
 		_defaultPalette = _cast->_defaultPalette;
 	} else {
-		// A Windows game was never drawn against the Mac system palette, so this is a
-		// guess, and getDitherImg() converts every bitmap of the movie through it when
-		// the score has no palette of its own. Say so rather than substituting silently.
+		// This is a guess, and getDitherImg() converts every bitmap of the movie that
+		// names no palette of its own through it when the score has none either. Say
+		// so rather than substituting silently.
 		warning("Movie::loadArchive(): default palette %s is not loaded, falling back to the Mac system palette",
 				_cast->_defaultPalette.asString().c_str());
 		_defaultPalette = CastMemberID(kClutSystemMac, -1);
@@ -343,9 +343,7 @@ bool Movie::loadArchive() {
 	// _lastPalette is deliberately left alone. It names the palette physically loaded,
 	// and loading a movie does not change that -- Window::step() sets it as soon as the
 	// new movie has a usable default. Clearing it here made getCurrentPalette() answer
-	// null for movies without one, which sent getDitherImg() to _defaultPalette above:
-	// TKKG 7's outro kept coming out in the Mac ramp even after window.cpp stopped
-	// clearing it, because this second site still did.
+	// null for movies without one, which sent getDitherImg() to _defaultPalette above.
 
 	bool recenter = false;
 	// A movie may carry an empty (0x0) stage rect in its config -- e.g. TKKG 7's
