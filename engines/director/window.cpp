@@ -774,10 +774,9 @@ bool Window::step() {
 		// _lastPalette is not cleared here. It names the palette physically loaded,
 		// and loading a movie does not by itself change that -- the entry code below
 		// overwrites it as soon as the new movie has a usable default. Clearing it
-		// only mattered for movies whose default is unusable, and there it did harm:
-		// getCurrentPalette() then answered null, getDitherImg() fell through to the
-		// Mac system palette, and every bitmap in the movie was converted against it.
-		// That is the noise over TKKG 7's outro and Sz28a3.
+		// only mattered for movies whose default is unusable: getCurrentPalette()
+		// then answered null and getDitherImg() fell through to the Mac system
+		// palette instead of the one still on screen.
 	}
 
 	// play current movie
@@ -797,21 +796,23 @@ bool Window::step() {
 				// setLastPalette(), which the D4 scene-palette fix removed -- leaving
 				// movies with a real custom default palette (e.g. TKKG ausweis.dir,
 				// member 42) rendering against the previous movie's physical palette.
-				// Only a real cast palette counts. Cast::_defaultPalette starts life as
-				// {-1, -1} and stays there when the config carries no usable value, and
-				// some movies hold a built-in system palette instead -- neither is what
-				// the scene was drawn against. Applying those repainted whole scenes in
-				// the Mac or Windows system ramp: TKKG 7 spent all of Sz28a3 on
-				// kClutSystemWinD5 and the whole outro on kClutSystemMac, dithering
-				// 8-bit artwork authored for the game's own palette into a foreign one.
-				// Keep the palette in effect instead, the way setLastPalette() already
-				// does for the analogous bogus {castLib 0, negative member}.
-				CastMemberID defPal = _currentMovie->getCast()->_defaultPalette;
-				if (defPal.castLib > 0 && defPal.member > 0) {
+				//
+				// A built-in palette is a real default too: "If no palette is set in the
+				// Palette channel, the movie's default palette is used" (Director in a
+				// Nutshell, D7). The outros of TKKG 6, 7 and 8 declare System - Mac and
+				// are drawn in it; keeping the previous scene's palette instead turned
+				// them into noise. Only movies from before D4 carry no such field, and
+				// for those Cast::_defaultPalette is merely its initial {-1, -1}.
+				Cast *entryCast = _currentMovie->getCast();
+				CastMemberID defPal = entryCast->_defaultPalette;
+				bool castPalette = defPal.castLib > 0 && defPal.member > 0;
+				bool builtinPalette = defPal.castLib == -1 && defPal.member < 0 &&
+						entryCast->_version >= kFileVer400 && g_director->hasPalette(defPal);
+				if (castPalette || builtinPalette) {
 					g_director->setPalette(defPal, "movie default on entry");
 					g_director->_lastPalette = defPal;
 				} else {
-					debugC(2, kDebugImages, "Window::step(): movie default palette %s is not a cast palette, keeping %s",
+					debugC(2, kDebugImages, "Window::step(): movie default palette %s is not usable, keeping %s",
 							defPal.asString().c_str(), g_director->_lastPalette.asString().c_str());
 				}
 
