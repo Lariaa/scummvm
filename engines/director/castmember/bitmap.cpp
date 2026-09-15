@@ -279,8 +279,18 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 						}
 					}
 					_clut = CastMemberID(clutId, clutCastLib);
+				} else if (clutCastLib == -1) {
+					// Built-in palettes count down from 0 in this field, as they do in the
+					// config's default palette: -101 is System - Win, and 0 is System - Mac,
+					// not "no palette". On a 16- or 32-bit display Director shows every 8-bit
+					// bitmap through its own palette. Director MX shows TKKG 14's intro, whose
+					// artwork all carries (-1, 0), in the Mac colours although the movie
+					// default is System - Win; the outros of TKKG 6, 7 and 8 (the red TKKG
+					// card, the Macromedia logo) are pictures through the Mac palette and
+					// noise through the game's own.
+					_clut = CastMemberID(kClutSystemMac, -1);
 				}
-				// clutId == 0 means "use movie's current palette"; leave _clut as null CastMemberID(0,0)
+				// clutId == 0 with any other cast lib is left null: "use movie's current palette"
 			} else {
 				_bitsPerPixel = 1;
 			}
