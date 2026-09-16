@@ -487,6 +487,12 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 	Graphics::Surface *srcSurface = _ditheredImg ? _ditheredImg : &_picture->_surface;
 	if ((srcSurface->w <= 0) || (srcSurface->h <= 0)) {
 		// We're copying from a zero-sized surface; fill widget with white so transparent ink works
+		//
+		// Say which member it was: with any ink but Background Transparent this is a
+		// white rectangle on the stage, and the Loewenzahn titles show several of
+		// those with nothing in the log to name them.
+		debugC(2, kDebugImages, "BitmapCastMember::createWidget(): cast %d has a %dx%d surface, filling the widget white",
+				_castId, srcSurface->w, srcSurface->h);
 		Common::Rect dims = widget->getDimensions();
 		widget->getSurface()->fillRect(Common::Rect(dims.width(), dims.height()), g_director->_wm->_colorWhite);
 	} else {
