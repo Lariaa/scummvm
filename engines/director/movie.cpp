@@ -638,6 +638,14 @@ CastMember *Movie::getCastMember(CastMemberID memberID) {
 		if (result == nullptr && _sharedCast) {
 			result = _sharedCast->getCastMember(memberID.member);
 		}
+	} else if (memberID.castLib == -1) {
+		// Film loop cells name their cast library as -1: "the cast the loop itself
+		// lives in". FilmLoopCastMember::getSubChannels() resolves them there, but
+		// the cells are ordinary Sprites first, and building one asks here. Nothing
+		// is wrong, and saying so drowns the log -- TKKG 9 alone produced 243k of
+		// these lines, Loewenzahn 7 2493 in one run.
+		debugC(5, kDebugLoading, "Movie::getCastMember(): %s names no cast library; the film loop resolves it against its own cast",
+				memberID.asString().c_str());
 	} else if (memberID.castLib != 0) {
 		warning("Movie::getCastMember: Unknown castLib %d", memberID.castLib);
 	}
