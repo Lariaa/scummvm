@@ -579,6 +579,9 @@ CastMember *Movie::getCastMember(CastMemberID memberID) {
 		if (result == nullptr && _sharedCast) {
 			result = _sharedCast->getCastMember(memberID.member);
 		}
+	} else if (memberID.castLib == -1) {
+		// Film loop cells use -1 for the loop's own cast; getSubChannels() resolves it
+		debugC(5, kDebugLoading, "Movie::getCastMember(): %s is a film loop cell", memberID.asString().c_str());
 	} else if (memberID.castLib != 0) {
 		warning("Movie::getCastMember: Unknown castLib %d", memberID.castLib);
 	}
