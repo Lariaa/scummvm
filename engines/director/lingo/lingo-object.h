@@ -24,6 +24,10 @@
 
 #include "director/lingo/lingo.h"
 
+namespace Graphics {
+class ManagedSurface;
+}
+
 namespace Director {
 
 struct MethodProto {
@@ -330,7 +334,57 @@ public:
 	bool _armed = false;
 };
 
+// Lingo's image object (D8). Every image is held in the screen's pixel format so
+// that copying between the stage, a cast member and a scratch image never has to
+// convert -- the games treat them as one pool.
+class ImageObject : public Object<ImageObject> {
+public:
+	ImageObject(Graphics::ManagedSurface *surface, bool owned);
+	// Copying an image copies its pixels -- two objects must never own one
+	// surface, and the base class's clone() goes through here.
+	ImageObject(const ImageObject &obj);
+	~ImageObject() override;
+
+	Common::String asString() override;
+	AbstractObject *clone() override;
+
+	bool hasProp(const Common::String &propName) override;
+	Datum getProp(const Common::String &propName) override;
+	Common::String getPropAt(uint32 index) override;
+	uint32 getPropCount() override;
+	void setProp(const Common::String &propName, const Datum &value, bool force = false) override;
+
+	// A copy of the pixels, owned by the object that comes back.
+	ImageObject *duplicate() const;
+	// A member's image is a live reference in Director -- painting into it
+	// changes the member ("Director 8 Demystified", the image property). Ours is
+	// a copy, so every method that paints writes it back here. An image taken
+	// from a window or the stage is a snapshot in Director too and has no member.
+	void flush();
+
+	Graphics::ManagedSurface *_surface = nullptr;
+	bool _owned = false;
+	CastMemberID _member;
+	int _alphaThreshold = 0;
+	bool _useAlpha = true;
+};
+
 namespace LM {
+
+// image object -- D8
+void m_imageCopyPixels(int nargs);
+void m_imageCreateMask(int nargs);
+void m_imageCreateMatte(int nargs);
+void m_imageCrop(int nargs);
+void m_imageDraw(int nargs);
+void m_imageDuplicate(int nargs);
+void m_imageExtractAlpha(int nargs);
+void m_imageFill(int nargs);
+void m_imageGetPixel(int nargs);
+void m_imageSetAlpha(int nargs);
+void m_imageSetPixel(int nargs);
+void m_imageTrimWhiteSpace(int nargs);
+
 
 // predefined methods
 void m_describe(int nargs);

@@ -156,6 +156,10 @@ public:
 	int getWindowType() const { return _windowType; }
 	void setTitleVisible(bool titleVisible);
 	Graphics::ManagedSurface *getSurface();
+	// A script painted straight into the window's surface through its image
+	// object. Put that on screen as it stands -- adding a dirty rect instead
+	// would have the score compose the frame over it again.
+	void markSurfaceDirty();
 	void addDirtyRect(const Common::Rect &r);
 	void resizeInner(int w, int h);
 	int getId();
