@@ -278,6 +278,7 @@ const TheEntityField fields[] = {
 	{ kTheCast,		"filename",		kTheFileName,	400 },//				D4 p
 	{ kTheCast,		"foreColor",	kTheForeColor,	400 },//				D4 p
 	{ kTheCast,		"height",		kTheHeight,		400 },//				D4 p
+	{ kTheCast,		"image",		kTheImage,		800 },//							D8 p
 	{ kTheCast,		"loaded",		kTheLoaded,		400 },//				D4 p
 	{ kTheCast,		"media",		kTheMedia,		500 },//					D5 p
 	{ kTheCast,		"mediaReady",	kTheMediaReady,	600 },//						D6 p
@@ -432,6 +433,7 @@ const TheEntityField fields[] = {
 
 	{ kTheWindow,	"drawRect",		kTheDrawRect,	400 },//				D4 p
 	{ kTheWindow,	"fileName",		kTheFileName,	400 },//				D4 p
+	{ kTheWindow,	"image",		kTheImage,		800 },//							D8 p
 	{ kTheWindow,	"modal",		kTheModal,		400 },//				D4 p
 	{ kTheWindow,	"picture",		kThePicture,	700 },//							D7 p
 	{ kTheWindow,	"rect",			kTheRect,		400 },//				D4 p
