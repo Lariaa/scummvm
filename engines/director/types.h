@@ -112,7 +112,8 @@ enum ObjectType {
 	kWindowObj = 1 << 4,
 	kCastMemberObj = 1 << 5,
 	kColorObj = 1 << 6,
-	kTimeoutObj = 1 << 7
+	kTimeoutObj = 1 << 7,
+	kImageObj = 1 << 8
 };
 
 enum ShapeType {
