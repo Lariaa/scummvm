@@ -22,9 +22,11 @@
 #include "common/endian.h"
 
 #include "graphics/macgui/mactext.h"
+#include "graphics/managed_surface.h"
 
 #include "director/director.h"
 #include "director/cast.h"
+#include "director/castmember/castmember.h"
 #include "director/movie.h"
 #include "director/window.h"
 #include "director/lingo/lingo-ast.h"
@@ -249,6 +251,23 @@ static const MethodProto timeoutMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
+static const MethodProto imageMethods[] = {
+	// image object -- D8
+	{ "copyPixels",				LM::m_imageCopyPixels,		 3, 4,	800 },			// D8
+	{ "createMask",				LM::m_imageCreateMask,		 0, 0,	800 },			// D8
+	{ "createMatte",			LM::m_imageCreateMatte,		 0, 1,	800 },			// D8
+	{ "crop",					LM::m_imageCrop,			 1, 1,	800 },			// D8
+	{ "draw",					LM::m_imageDraw,			 2, 5,	800 },			// D8
+	{ "duplicate",				LM::m_imageDuplicate,		 0, 0,	800 },			// D8
+	{ "extractAlpha",			LM::m_imageExtractAlpha,	 0, 0,	800 },			// D8
+	{ "fill",					LM::m_imageFill,			 1, 5,	800 },			// D8
+	{ "getPixel",				LM::m_imageGetPixel,		 1, 3,	800 },			// D8
+	{ "setAlpha",				LM::m_imageSetAlpha,		 1, 1,	800 },			// D8
+	{ "setPixel",				LM::m_imageSetPixel,		 2, 3,	800 },			// D8
+	{ "trimWhiteSpace",			LM::m_imageTrimWhiteSpace,	 0, 0,	800 },			// D8
+	{ nullptr, nullptr, 0, 0, 0 }
+};
+
 static const MethodProto windowMethods[] = {
 	// window / stage
 	{ "close",					LM::m_close,				 0, 0,	400 },			// D4
@@ -275,12 +294,14 @@ void Lingo::initMethods() {
 	}
 	Window::initMethods(windowMethods);
 	TimeoutObject::initMethods(timeoutMethods);
+	ImageObject::initMethods(imageMethods);
 }
 
 void Lingo::cleanupMethods() {
 	_methods.clear();
 	Window::cleanupMethods();
 	TimeoutObject::cleanupMethods();
+	ImageObject::cleanupMethods();
 }
 
 #define XLIBDEF(class, flags, version) \
@@ -1101,6 +1122,849 @@ void LM::m_respondsTo(int nargs) {
 	}
 }
 
+/* ImageObject */
+
+// Lingo's image object, new in D8. TKKG 13 and 14 cannot get past their login
+// without it: mainScript's goToScene() grabs the stage with
+// member("stageBitmap").image = (the stage).image, and the dialogs paint
+// themselves into (the stage).image with copyPixels().
+//
+// Every image is held in the screen's pixel format. The games shuffle pixels
+// between the stage, cast members and scratch images constantly -- TKKG 14 alone
+// makes 205 copyPixels calls, 91 duplicates, 75 draws and 61 fills -- and one
+// common format keeps all of that to plain blits.
+
+ImageObject::ImageObject(Graphics::ManagedSurface *surface, bool owned) : Object<ImageObject>("image") {
+	_objType = kImageObj;
+	_surface = surface;
+	_owned = owned;
+}
+
+ImageObject::ImageObject(const ImageObject &obj) : Object<ImageObject>(obj) {
+	_surface = new Graphics::ManagedSurface();
+	if (obj._surface && obj._surface->w > 0 && obj._surface->h > 0)
+		_surface->copyFrom(*obj._surface);
+	_owned = true;
+	_alphaThreshold = obj._alphaThreshold;
+	_useAlpha = obj._useAlpha;
+}
+
+ImageObject::~ImageObject() {
+	if (_owned && _surface) {
+		_surface->free();
+		delete _surface;
+	}
+	_surface = nullptr;
+}
+
+Common::String ImageObject::asString() {
+	return Common::String::format("(image %d x %d)", _surface ? _surface->w : 0, _surface ? _surface->h : 0);
+}
+
+ImageObject *ImageObject::duplicate() const {
+	Graphics::ManagedSurface *copy = new Graphics::ManagedSurface();
+	if (_surface && _surface->w > 0 && _surface->h > 0)
+		copy->copyFrom(*_surface);
+
+	ImageObject *result = new ImageObject(copy, true);
+	result->_alphaThreshold = _alphaThreshold;
+	result->_useAlpha = _useAlpha;
+	return result;
+}
+
+AbstractObject *ImageObject::clone() {
+	return duplicate();
+}
+
+void ImageObject::flush() {
+	if (_member.isNull())
+		return;
+
+	// A member's image is handed out as a copy, so painting into it only changes
+	// the member once it is written back. Director hands out a live handle; this
+	// is the same thing, one step later.
+	Movie *movie = g_director->getCurrentMovie();
+	CastMember *member = movie ? movie->getCastMember(_member) : nullptr;
+	if (member && member->_type == kCastBitmap) {
+		Datum self(this);
+		member->setField(kTheImage, self);
+	}
+}
+
+bool ImageObject::hasProp(const Common::String &propName) {
+	return propName.equalsIgnoreCase("width")
+		|| propName.equalsIgnoreCase("height")
+		|| propName.equalsIgnoreCase("rect")
+		|| propName.equalsIgnoreCase("depth")
+		|| propName.equalsIgnoreCase("useAlpha")
+		|| propName.equalsIgnoreCase("alphaThreshold")
+		|| propName.equalsIgnoreCase("ilk");
+}
+
+Datum ImageObject::getProp(const Common::String &propName) {
+	int w = _surface ? _surface->w : 0;
+	int h = _surface ? _surface->h : 0;
+
+	if (propName.equalsIgnoreCase("width"))
+		return Datum(w);
+
+	if (propName.equalsIgnoreCase("height"))
+		return Datum(h);
+
+	if (propName.equalsIgnoreCase("rect")) {
+		Datum d;
+		d.type = RECT;
+		d.u.farr = new FArray;
+		d.u.farr->arr.push_back(Datum(0));
+		d.u.farr->arr.push_back(Datum(0));
+		d.u.farr->arr.push_back(Datum(w));
+		d.u.farr->arr.push_back(Datum(h));
+		return d;
+	}
+
+	if (propName.equalsIgnoreCase("depth"))
+		return Datum(_surface ? (int)(_surface->format.bytesPerPixel * 8) : 0);
+
+	if (propName.equalsIgnoreCase("useAlpha"))
+		return Datum(_useAlpha ? 1 : 0);
+
+	if (propName.equalsIgnoreCase("alphaThreshold"))
+		return Datum(_alphaThreshold);
+
+	if (propName.equalsIgnoreCase("ilk")) {
+		Datum d(Common::String("image"));
+		d.type = SYMBOL;
+		return d;
+	}
+
+	warning("ImageObject::getProp: unknown property '%s'", propName.c_str());
+	return Datum();
+}
+
+Common::String ImageObject::getPropAt(uint32 index) {
+	static const char *props[] = { "width", "height", "rect", "depth", "useAlpha", "alphaThreshold" };
+
+	if (index < ARRAYSIZE(props))
+		return props[index];
+
+	return Common::String();
+}
+
+uint32 ImageObject::getPropCount() {
+	return 6;
+}
+
+void ImageObject::setProp(const Common::String &propName, const Datum &value, bool force) {
+	if (propName.equalsIgnoreCase("useAlpha")) {
+		_useAlpha = value.asInt() != 0;
+		return;
+	}
+
+	if (propName.equalsIgnoreCase("alphaThreshold")) {
+		_alphaThreshold = CLIP<int>(value.asInt(), 0, 255);
+		return;
+	}
+
+	debugC(3, kDebugLingoExec, "ImageObject::setProp: ignoring '%s'", propName.c_str());
+}
+
+// The image a method was called on.
+static ImageObject *imageMe(const char *method) {
+	Datum me = g_lingo->_state->me;
+	if (me.type != OBJECT || !me.u.obj || me.u.obj->getObjType() != kImageObj) {
+		warning("%s: not called on an image", method);
+		return nullptr;
+	}
+
+	return static_cast<ImageObject *>(me.u.obj);
+}
+
+static ImageObject *imageArg(const Datum &d) {
+	if (d.type == OBJECT && d.u.obj && d.u.obj->getObjType() == kImageObj)
+		return static_cast<ImageObject *>(d.u.obj);
+
+	return nullptr;
+}
+
+// A method's arguments, in the order they were written. The image methods take
+// several argument counts each, so it is easier to read them off a list than to
+// pop against a guess.
+static void imageArgs(int nargs, Common::Array<Datum> &args) {
+	args.resize(nargs);
+	for (int i = nargs - 1; i >= 0; i--)
+		args[i] = g_lingo->pop();
+}
+
+// Lingo hands out rectangles with their corners in any order -- the Lexicon's
+// own draw() example draws an "x" with rect(140, 30, 20, 150) -- so they have to
+// be sorted before Common::Rect sees them.
+static Common::Rect imageMakeRect(int x1, int y1, int x2, int y2) {
+	return Common::Rect(MIN(x1, x2), MIN(y1, y2), MAX(x1, x2), MAX(y1, y2));
+}
+
+static uint32 imageWhite(const Graphics::PixelFormat &format) {
+	// Index 0 is white in both system palettes.
+	return format.bytesPerPixel == 1 ? 0 : format.ARGBToColor(255, 255, 255, 255);
+}
+
+static void imagePoint(const Datum &d, int &x, int &y) {
+	if ((d.type == POINT || d.type == ARRAY) && d.u.farr->arr.size() >= 2) {
+		x = d.u.farr->arr[0].asInt();
+		y = d.u.farr->arr[1].asInt();
+		return;
+	}
+
+	warning("image: expected a point, got %s", d.type2str());
+}
+
+// Lingo passes rectangles as RECT, or as a list of four numbers. copyPixels also
+// takes a quad -- a list of four points for a free transform -- and its bounding
+// box is as close as this gets.
+static Common::Rect imageRect(const Datum &d) {
+	if ((d.type == RECT || d.type == ARRAY) && d.u.farr->arr.size() >= 4) {
+		const Datum &first = d.u.farr->arr[0];
+
+		if (first.type == POINT) {
+			Common::Rect r;
+			bool started = false;
+			for (uint i = 0; i < d.u.farr->arr.size(); i++) {
+				const Datum &p = d.u.farr->arr[i];
+				if (p.type != POINT || p.u.farr->arr.size() < 2)
+					continue;
+
+				int x = p.u.farr->arr[0].asInt();
+				int y = p.u.farr->arr[1].asInt();
+				if (!started) {
+					r = Common::Rect(x, y, x, y);
+					started = true;
+				} else {
+					r.extend(Common::Rect(x, y, x, y));
+				}
+			}
+			return r;
+		}
+
+		return imageMakeRect(d.u.farr->arr[0].asInt(), d.u.farr->arr[1].asInt(),
+				d.u.farr->arr[2].asInt(), d.u.farr->arr[3].asInt());
+	}
+
+	warning("image: expected a rect, got %s", d.type2str());
+	return Common::Rect();
+}
+
+// A colour object, or a number -- which is a palette index even at higher colour
+// depths (Lingo in a Nutshell, "the backColor of sprite").
+static uint32 imageColor(const Datum &d, const Graphics::PixelFormat &format) {
+	if (d.type == OBJECT && d.u.obj && d.u.obj->getObjType() == kColorObj) {
+		ColorObject *color = static_cast<ColorObject *>(d.u.obj);
+		if (format.bytesPerPixel == 1)
+			return (uint32)color->toPaletteIndex();
+
+		uint32 rgb = color->toPackedRGB();
+		return format.ARGBToColor(255, (rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
+	}
+
+	int index = d.asInt();
+	if (format.bytesPerPixel == 1)
+		return (uint32)index;
+
+	return g_director->transformColor(index);
+}
+
+// How bright a pixel is, 0 to 255. A mask image says with it how much of the
+// source is copied -- extractAlpha() hands out exactly such a picture, and so do
+// createMask() and createMatte() here.
+static int imageLuminance(Graphics::ManagedSurface *surface, int x, int y) {
+	uint32 pixel = surface->getPixel(x, y);
+	byte r, g, b, a;
+
+	if (surface->format.bytesPerPixel == 1) {
+		const byte *palette = g_director->getPalette();
+		if (!palette || (int)pixel >= g_director->getPaletteColorCount())
+			return pixel ? 255 : 0;
+
+		r = palette[pixel * 3];
+		g = palette[pixel * 3 + 1];
+		b = palette[pixel * 3 + 2];
+	} else {
+		surface->format.colorToARGB(pixel, a, r, g, b);
+	}
+
+	return (r * 77 + g * 151 + b * 28) >> 8;
+}
+
+// What copyPixels() was asked to do beyond the plain copy.
+struct ImageBlitOptions {
+	bool useAlpha = true;
+	// 0 transparent .. 255 opaque, as #blendLevel counts.
+	int blend = 255;
+	Graphics::ManagedSurface *mask = nullptr;
+	Common::Point maskOffset;
+};
+
+// Copy src into dst, scaling into the destination rectangle and compositing the
+// source's alpha where it has one. One loop covers every combination the games
+// ask for: stage to member, member to scratch image, and scaled panels.
+static void imageBlit(Graphics::ManagedSurface *dst, const Common::Rect &destRect,
+		Graphics::ManagedSurface *src, const Common::Rect &srcRect, const ImageBlitOptions &opts) {
+	if (!dst || !src || destRect.isEmpty() || srcRect.isEmpty())
+		return;
+
+	Common::Rect clipped = destRect;
+	clipped.clip(Common::Rect(dst->w, dst->h));
+	if (clipped.isEmpty())
+		return;
+
+	const Graphics::PixelFormat &dstFormat = dst->format;
+	const Graphics::PixelFormat &srcFormat = src->format;
+	bool trueColor = dstFormat.bytesPerPixel == 4;
+	bool srcAlpha = opts.useAlpha && srcFormat.bytesPerPixel == 4 && srcFormat.aBits() > 0;
+
+	for (int y = clipped.top; y < clipped.bottom; y++) {
+		int sy = srcRect.top + (y - destRect.top) * srcRect.height() / destRect.height();
+		sy = CLIP<int>(sy, 0, src->h - 1);
+
+		for (int x = clipped.left; x < clipped.right; x++) {
+			int sx = srcRect.left + (x - destRect.left) * srcRect.width() / destRect.width();
+			sx = CLIP<int>(sx, 0, src->w - 1);
+
+			int coverage = opts.blend;
+			if (opts.mask) {
+				int mx = sx + opts.maskOffset.x;
+				int my = sy + opts.maskOffset.y;
+				// Beyond the mask nothing is copied.
+				if (mx < 0 || my < 0 || mx >= opts.mask->w || my >= opts.mask->h)
+					continue;
+
+				coverage = coverage * imageLuminance(opts.mask, mx, my) / 255;
+			}
+
+			uint32 pixel = src->getPixel(sx, sy);
+			if (srcFormat != dstFormat) {
+				byte a, r, g, b;
+				srcFormat.colorToARGB(pixel, a, r, g, b);
+				pixel = dstFormat.ARGBToColor(a, r, g, b);
+			}
+
+			byte sa = 255, sr = 0, sg = 0, sb = 0;
+			if (trueColor) {
+				dstFormat.colorToARGB(pixel, sa, sr, sg, sb);
+				if (!srcAlpha)
+					sa = 255;
+			}
+
+			int alpha = sa * coverage / 255;
+			if (alpha <= 0)
+				continue;
+
+			if (!trueColor) {
+				// Nothing to blend with on a palette surface: a pixel is copied
+				// whole or not at all.
+				if (alpha < 128)
+					continue;
+			} else if (alpha < 255) {
+				byte da, dr, dg, db;
+				dstFormat.colorToARGB(dst->getPixel(x, y), da, dr, dg, db);
+				pixel = dstFormat.ARGBToColor((byte)MAX<int>(alpha, da),
+						(sr * alpha + dr * (255 - alpha)) / 255,
+						(sg * alpha + dg * (255 - alpha)) / 255,
+						(sb * alpha + db * (255 - alpha)) / 255);
+			}
+
+			dst->setPixel(x, y, pixel);
+		}
+	}
+}
+
+void LM::m_imageDuplicate(int nargs) {
+	g_lingo->dropStack(nargs);
+
+	ImageObject *me = imageMe("image.duplicate()");
+	if (!me) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	g_lingo->push(Datum(me->duplicate()));
+}
+
+void LM::m_imageCrop(int nargs) {
+	if (nargs > 1)
+		g_lingo->dropStack(nargs - 1);
+	Datum rectD = nargs > 0 ? g_lingo->pop() : Datum();
+
+	ImageObject *me = imageMe("image.crop()");
+	if (!me || !me->_surface) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	Common::Rect rect = imageRect(rectD);
+	rect.clip(Common::Rect(me->_surface->w, me->_surface->h));
+
+	Graphics::ManagedSurface *copy = new Graphics::ManagedSurface();
+	if (!rect.isEmpty()) {
+		copy->create(rect.width(), rect.height(), me->_surface->format);
+		copy->blitFrom(*me->_surface, rect, Common::Point(0, 0));
+	}
+
+	g_lingo->push(Datum(new ImageObject(copy, true)));
+}
+
+void LM::m_imageCopyPixels(int nargs) {
+	// copyPixels(source, destRect or destQuad, sourceRect [, paramList])
+	if (nargs > 4)
+		g_lingo->dropStack(nargs - 4);
+
+	Datum params;
+	if (nargs >= 4)
+		params = g_lingo->pop();
+	Datum srcRectD = nargs >= 3 ? g_lingo->pop() : Datum();
+	Datum destD = nargs >= 2 ? g_lingo->pop() : Datum();
+	Datum srcD = nargs >= 1 ? g_lingo->pop() : Datum();
+
+	ImageObject *me = imageMe("image.copyPixels()");
+	ImageObject *src = imageArg(srcD);
+	if (!me || !me->_surface || !src || !src->_surface)
+		return;
+
+	ImageBlitOptions opts;
+	opts.useAlpha = src->_useAlpha;
+
+	// #blendLevel (0..255), #blend (0..100) and #maskImage are what the games
+	// use; #ink, #color, #dither and #useFastQuads are taken and dropped.
+	if (params.type == PARRAY) {
+		for (uint i = 0; i < params.u.parr->arr.size(); i++) {
+			const PCell &cell = params.u.parr->arr[i];
+			Common::String key = cell.p.asString();
+
+			if (key.equalsIgnoreCase("blendLevel")) {
+				opts.blend = CLIP<int>(cell.v.asInt(), 0, 255);
+			} else if (key.equalsIgnoreCase("blend")) {
+				opts.blend = CLIP<int>(cell.v.asInt(), 0, 100) * 255 / 100;
+			} else if (key.equalsIgnoreCase("maskImage")) {
+				ImageObject *mask = imageArg(cell.v);
+				if (mask)
+					opts.mask = mask->_surface;
+			} else if (key.equalsIgnoreCase("maskOffset")) {
+				int mx = 0, my = 0;
+				imagePoint(cell.v, mx, my);
+				opts.maskOffset = Common::Point(mx, my);
+			} else {
+				debugC(5, kDebugLingoExec, "LM::m_imageCopyPixels(): ignoring #%s", key.c_str());
+			}
+		}
+	}
+
+	Common::Rect srcRect = imageRect(srcRectD);
+	srcRect.clip(Common::Rect(src->_surface->w, src->_surface->h));
+
+	imageBlit(me->_surface, imageRect(destD), src->_surface, srcRect, opts);
+	me->flush();
+}
+
+// fill() and draw() take the same shape: a rectangle written as four numbers, as
+// two points or as a rect, and then either a colour object or a parameter list.
+struct ImageShapeArgs {
+	Common::Rect rect;
+	bool haveRect = false;
+	// The corners as they were written -- a line runs from one to the other, and
+	// that direction is not recoverable from the sorted rectangle.
+	int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+	Common::String shape;
+	int lineSize = 0;
+	Datum color;
+	Datum bgColor;
+};
+
+static void imageShapeArgs(int nargs, ImageShapeArgs &out) {
+	Common::Array<Datum> args;
+	imageArgs(nargs, args);
+	if (args.empty())
+		return;
+
+	Datum last = args.back();
+	args.pop_back();
+
+	if (args.size() >= 4) {
+		out.x1 = args[0].asInt();
+		out.y1 = args[1].asInt();
+		out.x2 = args[2].asInt();
+		out.y2 = args[3].asInt();
+		out.haveRect = true;
+	} else if (args.size() == 2) {
+		imagePoint(args[0], out.x1, out.y1);
+		imagePoint(args[1], out.x2, out.y2);
+		out.haveRect = true;
+	} else if (args.size() == 1) {
+		Common::Rect r = imageRect(args[0]);
+		out.x1 = r.left;
+		out.y1 = r.top;
+		out.x2 = r.right;
+		out.y2 = r.bottom;
+		out.haveRect = true;
+	}
+
+	if (out.haveRect)
+		out.rect = imageMakeRect(out.x1, out.y1, out.x2, out.y2);
+
+	if (last.type == PARRAY) {
+		for (uint i = 0; i < last.u.parr->arr.size(); i++) {
+			const PCell &cell = last.u.parr->arr[i];
+			Common::String key = cell.p.asString();
+
+			if (key.equalsIgnoreCase("shapeType"))
+				out.shape = cell.v.asString();
+			else if (key.equalsIgnoreCase("lineSize"))
+				out.lineSize = cell.v.asInt();
+			else if (key.equalsIgnoreCase("color"))
+				out.color = cell.v;
+			else if (key.equalsIgnoreCase("bgColor"))
+				out.bgColor = cell.v;
+			else
+				debugC(5, kDebugLingoExec, "image: ignoring #%s", key.c_str());
+		}
+	} else {
+		out.color = last;
+	}
+}
+
+void LM::m_imageFill(int nargs) {
+	// fill(color), fill(rect, colorOrParams), fill(point, point, colorOrParams)
+	// or fill(left, top, right, bottom, colorOrParams). Without a parameter list
+	// it is a filled rectangle with no outline.
+	ImageShapeArgs args;
+	imageShapeArgs(nargs, args);
+
+	ImageObject *me = imageMe("image.fill()");
+	if (!me || !me->_surface)
+		return;
+
+	Common::Rect rect = args.haveRect ? args.rect : Common::Rect(me->_surface->w, me->_surface->h);
+	if (rect.isEmpty())
+		return;
+
+	uint32 color = imageColor(args.color, me->_surface->format);
+
+	if (args.shape.equalsIgnoreCase("oval")) {
+		me->_surface->drawEllipse(rect.left, rect.top, rect.right - 1, rect.bottom - 1, color, true);
+	} else if (args.shape.equalsIgnoreCase("roundRect")) {
+		me->_surface->drawRoundRect(rect, MIN(rect.width(), rect.height()) / 4, color, true);
+	} else if (args.shape.equalsIgnoreCase("line")) {
+		me->_surface->drawLine(args.x1, args.y1, args.x2, args.y2, color);
+	} else {
+		me->_surface->fillRect(rect, color);
+	}
+
+	// The border is drawn in #bgColor, which defaults to white.
+	if (args.lineSize > 0) {
+		uint32 border = args.bgColor.type == VOID
+				? imageWhite(me->_surface->format)
+				: imageColor(args.bgColor, me->_surface->format);
+
+		for (int i = 0; i < args.lineSize; i++) {
+			Common::Rect r = rect;
+			r.grow(-i);
+			if (r.isEmpty())
+				break;
+
+			if (args.shape.equalsIgnoreCase("oval"))
+				me->_surface->drawEllipse(r.left, r.top, r.right - 1, r.bottom - 1, border, false);
+			else
+				me->_surface->frameRect(r, border);
+		}
+	}
+
+	me->flush();
+}
+
+void LM::m_imageDraw(int nargs) {
+	// draw(rect, colorOrParams), draw(point, point, colorOrParams) or the four
+	// edges as separate arguments. **The default shape is a line**, not a
+	// rectangle -- without a parameter list draw() connects the two corners.
+	ImageShapeArgs args;
+	imageShapeArgs(nargs, args);
+
+	ImageObject *me = imageMe("image.draw()");
+	if (!me || !me->_surface)
+		return;
+
+	uint32 color = imageColor(args.color, me->_surface->format);
+	int lineSize = MAX(1, args.lineSize);
+
+	if (args.shape.empty() || args.shape.equalsIgnoreCase("line")) {
+		me->_surface->drawLine(args.x1, args.y1, args.x2, args.y2, color);
+		me->flush();
+		return;
+	}
+
+	if (args.shape.equalsIgnoreCase("roundRect"))
+		debugC(5, kDebugLingoExec, "LM::m_imageDraw(): drawing a roundRect as a rectangle");
+
+	for (int i = 0; i < lineSize; i++) {
+		Common::Rect r = args.rect;
+		r.grow(-i);
+		if (r.isEmpty())
+			break;
+
+		if (args.shape.equalsIgnoreCase("oval"))
+			me->_surface->drawEllipse(r.left, r.top, r.right - 1, r.bottom - 1, color, false);
+		else
+			me->_surface->frameRect(r, color);
+	}
+
+	me->flush();
+}
+
+void LM::m_imageGetPixel(int nargs) {
+	// getPixel(x, y) or getPixel(point); a trailing #integer asks for the palette
+	// index instead of a colour object.
+	Common::Array<Datum> args;
+	imageArgs(nargs, args);
+
+	bool wantInteger = false;
+	if (!args.empty() && args.back().type == SYMBOL) {
+		wantInteger = args.back().asString().equalsIgnoreCase("integer");
+		args.pop_back();
+	}
+
+	int x = 0, y = 0;
+	if (args.size() >= 2) {
+		x = args[0].asInt();
+		y = args[1].asInt();
+	} else if (args.size() == 1) {
+		imagePoint(args[0], x, y);
+	}
+
+	ImageObject *me = imageMe("image.getPixel()");
+	if (!me || !me->_surface || x < 0 || y < 0 || x >= me->_surface->w || y >= me->_surface->h) {
+		// Outside the image Director answers -1.
+		g_lingo->push(Datum(-1));
+		return;
+	}
+
+	uint32 pixel = me->_surface->getPixel(x, y);
+
+	if (me->_surface->format.bytesPerPixel == 1) {
+		if (wantInteger)
+			g_lingo->push(Datum((int)pixel));
+		else
+			g_lingo->push(Datum(new ColorObject((int)pixel)));
+		return;
+	}
+
+	byte a, r, g, b;
+	me->_surface->format.colorToARGB(pixel, a, r, g, b);
+	if (wantInteger)
+		g_lingo->push(Datum((int)g_director->_wm->findBestColor(r, g, b)));
+	else
+		g_lingo->push(Datum(new ColorObject(r, g, b)));
+}
+
+void LM::m_imageSetPixel(int nargs) {
+	// setPixel(x, y, color) or setPixel(point, color)
+	Common::Array<Datum> args;
+	imageArgs(nargs, args);
+	if (args.empty())
+		return;
+
+	Datum colorD = args.back();
+	args.pop_back();
+
+	int x = 0, y = 0;
+	if (args.size() >= 2) {
+		x = args[0].asInt();
+		y = args[1].asInt();
+	} else if (args.size() == 1) {
+		imagePoint(args[0], x, y);
+	}
+
+	ImageObject *me = imageMe("image.setPixel()");
+	if (!me || !me->_surface || x < 0 || y < 0 || x >= me->_surface->w || y >= me->_surface->h)
+		return;
+
+	me->_surface->setPixel(x, y, imageColor(colorD, me->_surface->format));
+	me->flush();
+}
+
+void LM::m_imageExtractAlpha(int nargs) {
+	g_lingo->dropStack(nargs);
+
+	ImageObject *me = imageMe("image.extractAlpha()");
+	if (!me || !me->_surface) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	// The alpha channel as a grey image. An image without one is opaque
+	// throughout, so it comes back white.
+	Graphics::ManagedSurface *alpha = new Graphics::ManagedSurface();
+	alpha->create(me->_surface->w, me->_surface->h, me->_surface->format);
+
+	bool hasAlpha = me->_surface->format.bytesPerPixel == 4 && me->_surface->format.aBits() > 0;
+	for (int y = 0; y < me->_surface->h; y++) {
+		for (int x = 0; x < me->_surface->w; x++) {
+			byte a = 255, r, g, b;
+			if (hasAlpha)
+				me->_surface->format.colorToARGB(me->_surface->getPixel(x, y), a, r, g, b);
+
+			if (alpha->format.bytesPerPixel == 1)
+				alpha->setPixel(x, y, a > 127 ? 255 : 0);
+			else
+				alpha->setPixel(x, y, alpha->format.ARGBToColor(255, a, a, a));
+		}
+	}
+
+	g_lingo->push(Datum(new ImageObject(alpha, true)));
+}
+
+void LM::m_imageTrimWhiteSpace(int nargs) {
+	g_lingo->dropStack(nargs);
+
+	ImageObject *me = imageMe("image.trimWhiteSpace()");
+	if (!me || !me->_surface) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	// The picture without its white (or fully transparent) border.
+	bool truecolor = me->_surface->format.bytesPerPixel == 4;
+	uint32 white = truecolor ? me->_surface->format.ARGBToColor(255, 255, 255, 255) : 0;
+	Common::Rect content;
+	bool started = false;
+
+	for (int y = 0; y < me->_surface->h; y++) {
+		for (int x = 0; x < me->_surface->w; x++) {
+			uint32 pixel = me->_surface->getPixel(x, y);
+			bool blank = pixel == white;
+			if (truecolor && !blank) {
+				byte a, r, g, b;
+				me->_surface->format.colorToARGB(pixel, a, r, g, b);
+				blank = a == 0;
+			}
+			if (blank)
+				continue;
+
+			if (!started) {
+				content = Common::Rect(x, y, x + 1, y + 1);
+				started = true;
+			} else {
+				content.extend(Common::Rect(x, y, x + 1, y + 1));
+			}
+		}
+	}
+
+	Graphics::ManagedSurface *copy = new Graphics::ManagedSurface();
+	if (started) {
+		copy->create(content.width(), content.height(), me->_surface->format);
+		copy->blitFrom(*me->_surface, content, Common::Point(0, 0));
+	}
+
+	g_lingo->push(Datum(new ImageObject(copy, true)));
+}
+
+// Both mask makers answer the same question -- which pixels of this image count
+// -- and both hand back a picture that is white where they do. That is the
+// reading copyPixels()'s #maskImage uses, and it is what extractAlpha() produces,
+// which is how the games pass a mask in practice. Director calls these mask and
+// matte objects and keeps them apart from images; here they are images, and the
+// difference is not observable from Lingo.
+static void imageCoverage(ImageObject *me, bool fromAlpha, int threshold) {
+	Graphics::ManagedSurface *mask = new Graphics::ManagedSurface();
+	mask->create(me->_surface->w, me->_surface->h, me->_surface->format);
+
+	bool truecolor = me->_surface->format.bytesPerPixel == 4;
+	uint32 white = imageWhite(me->_surface->format);
+	uint32 black = truecolor ? me->_surface->format.ARGBToColor(255, 0, 0, 0) : 255;
+
+	for (int y = 0; y < me->_surface->h; y++) {
+		for (int x = 0; x < me->_surface->w; x++) {
+			uint32 pixel = me->_surface->getPixel(x, y);
+			bool covered;
+
+			if (fromAlpha && truecolor) {
+				byte a, r, g, b;
+				me->_surface->format.colorToARGB(pixel, a, r, g, b);
+				covered = a > threshold;
+			} else {
+				// A mask keys on white, as the mask ink does.
+				covered = pixel != white;
+			}
+
+			mask->setPixel(x, y, covered ? white : black);
+		}
+	}
+
+	g_lingo->push(Datum(new ImageObject(mask, true)));
+}
+
+void LM::m_imageCreateMatte(int nargs) {
+	// createMatte({alphaThreshold}) -- 32-bit images with an alpha channel only.
+	if (nargs > 1)
+		g_lingo->dropStack(nargs - 1);
+	int threshold = nargs >= 1 ? CLIP<int>(g_lingo->pop().asInt(), 0, 255) : 0;
+
+	ImageObject *me = imageMe("image.createMatte()");
+	if (!me || !me->_surface) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	imageCoverage(me, true, nargs >= 1 ? threshold : me->_alphaThreshold);
+}
+
+void LM::m_imageCreateMask(int nargs) {
+	g_lingo->dropStack(nargs);
+
+	ImageObject *me = imageMe("image.createMask()");
+	if (!me || !me->_surface) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	imageCoverage(me, false, 0);
+}
+
+void LM::m_imageSetAlpha(int nargs) {
+	// setAlpha(constant) or setAlpha(8bitImage): the alpha channel of a 32-bit
+	// image, set from a number or taken from another image's brightness.
+	// Answers TRUE when it could be done.
+	if (nargs > 1)
+		g_lingo->dropStack(nargs - 1);
+	Datum arg = nargs >= 1 ? g_lingo->pop() : Datum();
+
+	ImageObject *me = imageMe("image.setAlpha()");
+	if (!me || !me->_surface || me->_surface->format.bytesPerPixel != 4
+			|| me->_surface->format.aBits() == 0) {
+		g_lingo->push(Datum(0));
+		return;
+	}
+
+	ImageObject *source = imageArg(arg);
+	if (source && source->_surface
+			&& (source->_surface->w != me->_surface->w || source->_surface->h != me->_surface->h)) {
+		warning("LM::m_imageSetAlpha(): the alpha image is %dx%d, the image %dx%d",
+				source->_surface->w, source->_surface->h, me->_surface->w, me->_surface->h);
+		g_lingo->push(Datum(0));
+		return;
+	}
+
+	int constant = source ? 0 : CLIP<int>(arg.asInt(), 0, 255);
+	const Graphics::PixelFormat &format = me->_surface->format;
+
+	for (int y = 0; y < me->_surface->h; y++) {
+		for (int x = 0; x < me->_surface->w; x++) {
+			byte a, r, g, b;
+			format.colorToARGB(me->_surface->getPixel(x, y), a, r, g, b);
+			a = source ? (byte)imageLuminance(source->_surface, x, y) : (byte)constant;
+			me->_surface->setPixel(x, y, format.ARGBToColor(a, r, g, b));
+		}
+	}
+
+	me->flush();
+	g_lingo->push(Datum(1));
+}
+
 // Window
 
 Common::String Window::asString() {
@@ -1136,6 +2000,7 @@ bool Window::hasField(int field) {
 	switch (field) {
 	case kTheDrawRect:
 	case kTheFileName:
+	case kTheImage:
 	case kTheModal:
 	case kThePicture:
 	case kTheRect:
@@ -1176,8 +2041,19 @@ Datum Window::getField(int field) {
 	case kThePicture:
 		ensureMovieIsLoaded();
 		return getPicture();
+	case kTheImage: {
+			// A snapshot of the window, not a handle on it: Director's images of
+			// the stage and of a MIAW are not references either, and painting
+			// into one leaves the stage alone. TKKG 13 and 14 read it the way
+			// the documentation describes, with
+			// member("stageBitmap").image = (the stage).image.
+			ensureMovieIsLoaded();
+			Graphics::ManagedSurface *shot = new Graphics::ManagedSurface();
+			if (getSurface() && getSurface()->w > 0 && getSurface()->h > 0)
+				shot->copyFrom(*getSurface());
+			return Datum(new ImageObject(shot, true));
+		}
 	case kTheSourceRect:
-	// case kTheImage:
 		ensureMovieIsLoaded();  // Remove fallthrough once implemented
 		// fallthrough
 	default:
@@ -1211,6 +2087,18 @@ void Window::setField(int field, const Datum &value) {
 		break;
 	case kTheFileName:
 		setFileName(value.asString());
+		break;
+	case kTheImage:
+		// Painting a whole image onto the stage at once.
+		if (value.type == OBJECT && value.u.obj && value.u.obj->getObjType() == kImageObj) {
+			ImageObject *image = static_cast<ImageObject *>(value.u.obj);
+			if (image->_surface && getSurface()) {
+				getSurface()->blitFrom(*image->_surface, Common::Point(0, 0));
+				markSurfaceDirty();
+			}
+		} else {
+			warning("Window::setField: the image needs an image object, got %s", value.type2str());
+		}
 		break;
 	default:
 		warning("Window::setField: unhandled field '%s'", g_lingo->field2str(field));

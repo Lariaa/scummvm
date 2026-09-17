@@ -84,6 +84,7 @@ void b_sort(int nargs);
 void b_factory(int nargs);
 void b_floatP(int nargs);
 void b_ilk(int nargs);
+void b_image(int nargs);
 void b_integerp(int nargs);
 void b_objectp(int nargs);
 void b_pictureP(int nargs);
