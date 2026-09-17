@@ -248,6 +248,7 @@ enum TheFieldType {
 	kTheHeight,
 	kTheHilite,
 	kTheHotSpot,
+	kTheImage,
 	kTheImmediate,
 	kTheInk,
 	kTheInterface,
