@@ -77,6 +77,7 @@ enum TheEntityType {
 	kTheIdleLoadPeriod,
 	kTheIdleLoadTag,
 	kTheIdleReadChunkSize,
+	kTheImage,
 	kTheImageDirect,
 	kTheItemDelimiter,
 	kTheItems,
