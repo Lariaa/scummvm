@@ -87,6 +87,10 @@ public:
 	// does not keep the previous side's mask.
 	bool _matteFlipH = false;
 	bool _matteFlipV = false;
+	// Whether the matte came from the artist's own alpha channel rather than from
+	// the flood fill. The alpha channel can be trusted for any ink; the flood
+	// fill is a guess and must only be used where an ink asked for a matte.
+	bool _matteFromAlpha = false;
 
 	int _version;
 
