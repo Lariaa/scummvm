@@ -559,6 +559,38 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 		}
 	}
 
+	// Whether a 32-bit member's alpha channel is composited is a property of the
+	// *member*, not of the ink: "the useAlpha property specifies whether an
+	// image's alpha channel information is used when the image is drawn on the
+	// Stage" ("Director 8 Demystified", Lingo Lexicon). ScummVM asked the ink
+	// instead, so only Matte, Background Transparent and a failed Mask lookup
+	// ever looked at the alpha plane, and Copy -- the commonest ink of all --
+	// drew straight over it.
+	//
+	// That is the black in TKKG 13 and 14's start screen. resolution.cxt frames
+	// the stage with two 800x21x strips, member 5 "login0004" along the bottom
+	// and member 6 "login0005" along the top, and each fades to nothing towards
+	// the middle: 34% of their pixels are alpha 0, with ~740 partly transparent
+	// ones along a curved edge. Under that alpha the artwork stores **pure
+	// black**, all 57041 respectively 56754 pixels of it. Member 6 is placed
+	// with Mask ink and is already covered above; member 5 at the bottom is
+	// placed with Copy ink and painted a solid black band across the picture.
+	//
+	// Only where the alpha plane actually says something: createMatte() falls
+	// back to the flood fill when it is constant, and that guess belongs to the
+	// inks that asked for a matte, not here.
+	if (_sprite->_cast->_type == kCastBitmap
+			&& ((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 32) {
+		BitmapCastMember *bitmap = (BitmapCastMember *)_sprite->_cast;
+		const Graphics::Surface *matte = bitmap->getMatte(bbox, _sprite->isFlippedH(), _sprite->isFlippedV());
+
+		if (bitmap->_matteFromAlpha) {
+			debugC(4, kDebugImages, "Channel::getMask(): compositing the alpha channel of %s under ink %d",
+					_sprite->_castId.asString().c_str(), _sprite->_ink);
+			return matte;
+		}
+	}
+
 	return nullptr;
 }
 
