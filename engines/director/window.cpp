@@ -365,6 +365,13 @@ Graphics::ManagedSurface *Window::getSurface() {
 	return _window->getSurface();
 }
 
+void Window::markSurfaceDirty() {
+	// What a script paints into the window's image object is already in the
+	// surface; it only has to reach the screen. A dirty rect would send the
+	// score through renderChannel() again and paint the frame back over it.
+	_window->setContentDirty(true);
+}
+
 void Window::addDirtyRect(const Common::Rect &r) {
 	_window->addDirtyRect(r);
 }

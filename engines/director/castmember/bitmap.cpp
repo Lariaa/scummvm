@@ -42,6 +42,7 @@
 #include "director/types.h"
 #include "director/window.h"
 #include "director/castmember/bitmap.h"
+#include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-the.h"
 
 namespace Director {
@@ -1417,6 +1418,7 @@ bool BitmapCastMember::hasField(int field) {
 	switch (field) {
 	case kTheAlphaThreshold:
 	case kTheDepth:
+	case kTheImage:
 	case kTheRegPoint:
 	case kThePalette:
 	case kThePaletteRef:
@@ -1448,6 +1450,29 @@ Datum BitmapCastMember::getField(int field) {
 		d.u.farr->arr.push_back(_regX);
 		d.u.farr->arr.push_back(_regY);
 		break;
+	case kTheImage: {
+			// The member's picture as an image object, converted to the screen
+			// format once so that copying it against the stage costs nothing per
+			// pixel. Director hands out a live handle here; this is a copy, which
+			// covers what the games do with it -- reading a member as a source for
+			// copyPixels, and assigning a whole image back (see setField).
+			Graphics::ManagedSurface *surface = new Graphics::ManagedSurface();
+			if (_picture && _picture->_surface.w > 0 && _picture->_surface.h > 0) {
+				Graphics::Surface *conv = _picture->_surface.convertTo(g_director->_wm->_pixelformat,
+						_picture->_palette, _picture->getPaletteCount(),
+						g_director->_wm->getPalette(), g_director->_wm->getPaletteSize());
+				if (conv) {
+					surface->copyFrom(*conv);
+					conv->free();
+					delete conv;
+				}
+			}
+			ImageObject *image = new ImageObject(surface, true);
+			image->_member = CastMemberID(_castId, _cast ? _cast->_castLibID : DEFAULT_CAST_LIB);
+			image->_alphaThreshold = _alphaThreshold;
+			image->_useAlpha = _useAlpha;
+			return Datum(image);
+		}
 	case kThePalette:
 		// D5 and below return an integer for this field
 		if (_clut.castLib > 0) {
@@ -1551,6 +1576,55 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 			_modified = true;
 		} else {
 			warning("BitmapCastMember::setField(): Wrong Datum type %d for kTheRegPoint", d.type);
+		}
+		return;
+	case kTheImage:
+		// Replacing the member's picture with an image object. TKKG 13 and 14 grab
+		// the stage that way -- member("stageBitmap").image = (the stage).image --
+		// and then show the member. The pixels arrive in the screen's format, so
+		// the member becomes a picture of that depth.
+		if (d.type == OBJECT && d.u.obj && d.u.obj->getObjType() == kImageObj) {
+			ImageObject *image = static_cast<ImageObject *>(d.u.obj);
+			if (image->_surface && image->_surface->w > 0 && image->_surface->h > 0) {
+				Score *score = g_director->getCurrentMovie()->getScore();
+				if (score)
+					score->invalidateRectsForMember(this);
+
+				delete _picture;
+				_picture = new Picture();
+				_picture->_surface.copyFrom(image->_surface->rawSurface());
+				if (_picture->_surface.format.bytesPerPixel == 1)
+					_picture->copyPalette(g_director->getPalette(), g_director->getPaletteColorCount());
+
+				// Both caches describe the old picture
+				if (_ditheredImg) {
+					_ditheredImg->free();
+					delete _ditheredImg;
+					_ditheredImg = nullptr;
+					_ditheredTargetClut = CastMemberID(0, 0);
+				}
+				if (_matte && _matte != _matteSource) {
+					_matte->free();
+					delete _matte;
+				}
+				_matte = nullptr;
+				if (_matteSource) {
+					_matteSource->free();
+					delete _matteSource;
+					_matteSource = nullptr;
+				}
+				_noMatte = false;
+
+				_bitsPerPixel = _picture->_surface.format.bytesPerPixel * 8;
+				_pitch = _picture->_surface.pitch;
+				_initialRect = Common::Rect(_picture->_surface.w, _picture->_surface.h);
+				_boundingRect = _initialRect;
+				// An 8-bit grab holds indices into the palette that was on screen.
+				_clut = (_bitsPerPixel == 8) ? g_director->_lastPalette : CastMemberID(0, 0);
+				setModified(true);
+			}
+		} else {
+			warning("BitmapCastMember::setField(): the image needs an image object, got %s", d.type2str());
 		}
 		return;
 	case kThePalette:
