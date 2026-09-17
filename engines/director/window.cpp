@@ -815,6 +815,23 @@ bool Window::step() {
 				bool castPalette = defPal.castLib > 0 && defPal.member > 0;
 				bool builtinPalette = defPal.castLib == -1 && defPal.member < 0 &&
 						entryCast->_version >= kFileVer400 && g_director->hasPalette(defPal);
+
+				// System - Win is the value Director writes into a movie by itself,
+				// not one an author chose: 311 of 315 D8.5/D9 movies in the corpus
+				// carry it, against 14 in D6 and 10 in D7 (analysis/defpal_scan.py).
+				// Switching to it throws away the palette the movie was entered
+				// with, and in an 8-bit title that is the only real information
+				// there is -- TKKG 7's photofit program (Sz28a3, palette channel
+				// "no palette", default (-1, -101)) quantised its 32-bit artwork
+				// against the Windows system palette and came out dark red and
+				// bright green, the signature of index 221 = (0, 238, 0). A few
+				// frames later the scene sets a real palette and the same screen
+				// is right.
+				if (builtinPalette && (defPal.member == kClutSystemWin || defPal.member == kClutSystemWinD5)) {
+					debugC(2, kDebugImages, "Window::step(): the movie's default palette is System - Win, which Director writes by itself; keeping %s",
+							g_director->_lastPalette.asString().c_str());
+					builtinPalette = false;
+				}
 				if (castPalette || builtinPalette) {
 					g_director->setPalette(defPal, "movie default on entry");
 					g_director->_lastPalette = defPal;
