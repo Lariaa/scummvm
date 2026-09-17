@@ -26,6 +26,7 @@
 #include "gui/message.h"
 
 #include "graphics/macgui/macwindowmanager.h"
+#include "graphics/managed_surface.h"
 
 #include "director/director.h"
 #include "director/cast.h"
@@ -169,6 +170,7 @@ static const BuiltinProto builtins[] = {
 	{ "factory",		LB::b_factory,		1, 1, 300, FBLTIN },	//		D3
 	{ "floatP",			LB::b_floatP,		1, 1, 300, FBLTIN },	//		D3
 	{ "ilk",	 		LB::b_ilk,			1, 2, 400, FBLTIN },	//			D4 f
+	{ "image",			LB::b_image,		3, 5, 800, FBLTIN },	//							D8 f
 	{ "integerp",		LB::b_integerp,		1, 1, 200, FBLTIN },	// D2 f
 	{ "objectp",		LB::b_objectp,		1, 1, 200, FBLTIN },	// D2 f
 	{ "pictureP",		LB::b_pictureP,		1, 1, 400, FBLTIN },	//			D4 f
@@ -2912,6 +2914,41 @@ void LB::b_floatP(int nargs) {
 	g_lingo->push(res);
 }
 
+void LB::b_image(int nargs) {
+	// image(width, height, colorDepth [, alphaDepth] [, palette]) -- a new, empty
+	// image (D8). The colour depth and the palette are read and dropped: every
+	// image object is held in the screen's own format, so that copying between
+	// them stays a plain blit. The alpha depth is 0 or 8 and does matter -- it
+	// decides whether the image carries transparency at all.
+	if (nargs > 5)
+		g_lingo->dropStack(nargs - 5);
+	if (nargs == 5)
+		g_lingo->pop();
+
+	int alphaDepth = nargs >= 4 ? g_lingo->pop().asInt() : 0;
+	int depth = nargs >= 3 ? g_lingo->pop().asInt() : 0;
+	int height = nargs >= 2 ? g_lingo->pop().asInt() : 0;
+	int width = nargs >= 1 ? g_lingo->pop().asInt() : 0;
+
+	Graphics::PixelFormat format = g_director->_wm->_pixelformat;
+	Graphics::ManagedSurface *surface = new Graphics::ManagedSurface();
+	if (width > 0 && height > 0) {
+		surface->create(width, height, format);
+		// Without an alpha channel a new image is opaque black; with one it
+		// starts out transparent.
+		uint32 empty = format.bytesPerPixel == 1 ? 255 : format.ARGBToColor(alphaDepth ? 0 : 255, 0, 0, 0);
+		surface->fillRect(Common::Rect(width, height), empty);
+	} else {
+		warning("LB::b_image(): bad size %dx%d", width, height);
+	}
+
+	debugC(5, kDebugLingoExec, "LB::b_image(): %dx%d, asked for %d bits and alpha %d", width, height, depth, alphaDepth);
+
+	ImageObject *image = new ImageObject(surface, true);
+	image->_useAlpha = alphaDepth != 0;
+	g_lingo->push(Datum(image));
+}
+
 void LB::b_ilk(int nargs) {
 	Datum res(0);
 	if (nargs == 1) {
@@ -2927,6 +2964,9 @@ void LB::b_ilk(int nargs) {
 			typeStr = "list";
 		else if (item.type == PARRAY)
 			typeStr = "propList";
+		else if (item.type == OBJECT && item.u.obj->getObjType() == kImageObj)
+			// An image is its own ilk in D8, not a plain #object.
+			typeStr = "image";
 		res = Datum(typeStr);
 		res.type = SYMBOL;
 		g_lingo->push(res);
@@ -2953,6 +2993,8 @@ void LB::b_ilk(int nargs) {
 			res.u.i |= item.type == PARRAY ? 1 : 0;
 			res.u.i |= item.type == POINT ? 1 : 0;
 			res.u.i |= item.type == RECT ? 1 : 0;
+		} else if (typeCopy.equalsIgnoreCase("image")) {
+			res.u.i = (item.type == OBJECT && item.u.obj->getObjType() == kImageObj) ? 1 : 0;
 		} else {
 			res.u.i = typeCopy.equalsIgnoreCase(item.type2str(true)) ? 1 : 0;
 		}
