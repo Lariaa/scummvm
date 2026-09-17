@@ -771,6 +771,8 @@ void BitmapCastMember::createMatte() {
 	debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d: source %dx%d %s, declared %d bpp",
 			_castId, src.w, src.h, src.format.toString().c_str(), _bitsPerPixel);
 
+	_matteFromAlpha = false;
+
 	if (src.format.bytesPerPixel == 4 && src.format.aBits() == 8 && _useAlpha) {
 		Graphics::Surface *fromAlpha = new Graphics::Surface();
 		fromAlpha->create(src.w, src.h, Graphics::PixelFormat::createFormatCLUT8());
@@ -810,6 +812,7 @@ void BitmapCastMember::createMatte() {
 			}
 			_matteSource = fromAlpha;
 			_noMatte = false;
+			_matteFromAlpha = true;
 			debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s: matte taken from the alpha channel", _castId, _name.c_str());
 			return;
 		}
