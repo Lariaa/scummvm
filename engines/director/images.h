@@ -71,12 +71,18 @@ public:
 	const Graphics::Palette &getPalette() const override { return _palette; }
 	void loadPalette(Common::SeekableReadStream &stream);
 
+	// A 32-bit image whose alpha plane held nothing but zeroes, and which
+	// loadStream() has therefore made opaque. Its real alpha may live in an
+	// ALFA chunk beside it.
+	bool alphaWasEmpty() const { return _alphaWasEmpty; }
+
 private:
 	Graphics::Surface *_surface;
 	Graphics::Palette _palette;
 	uint16 _bitsPerPixel;
 	uint16 _version;
 	uint16 _pitch;
+	bool _alphaWasEmpty = false;
 };
 
 void copyStretchImg(const Graphics::Surface *srcSurface, Graphics::Surface *targetSurface, const Common::Rect &srcRect, const Common::Rect &targetRect, const byte *pal = 0);

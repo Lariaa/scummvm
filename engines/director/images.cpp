@@ -355,7 +355,8 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 	// plane holds zeroes because nothing wrote an alpha channel, not because the
 	// artist erased the picture. Hand those back as fully opaque, which is what
 	// this decoder did for every 32-bit image before.
-	if (_bitsPerPixel == 32 && !sawAlpha) {
+	_alphaWasEmpty = _bitsPerPixel == 32 && !sawAlpha;
+	if (_alphaWasEmpty) {
 		debugC(5, kDebugImages, "BITDDecoder::loadStream(): 32bpp image has an all-zero alpha plane, treating it as opaque");
 
 		for (int row = 0; row < _surface->h; row++)
