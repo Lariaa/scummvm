@@ -358,9 +358,9 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 	if (_bitsPerPixel == 32 && !sawAlpha) {
 		debugC(5, kDebugImages, "BITDDecoder::loadStream(): 32bpp image has an all-zero alpha plane, treating it as opaque");
 
-		for (int y = 0; y < _surface->h; y++)
-			for (int x = 0; x < _surface->w; x++)
-				*((uint32 *)_surface->getBasePtr(x, y)) |= 0xff;
+		for (int row = 0; row < _surface->h; row++)
+			for (int col = 0; col < _surface->w; col++)
+				*((uint32 *)_surface->getBasePtr(col, row)) |= 0xff;
 	}
 
 	return true;

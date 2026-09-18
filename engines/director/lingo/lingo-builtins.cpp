@@ -1987,9 +1987,9 @@ void LB::b_setProp(int nargs) {
 	switch (list.type) {
 	case PARRAY:
 		{
-			int index = LC::compareArrays(LC::eqData, list, prop, true).u.i;
-			if (index > 0) {
-				list.u.parr->arr[index - 1].v = value;
+			int pos = LC::compareArrays(LC::eqData, list, prop, true).u.i;
+			if (pos > 0) {
+				list.u.parr->arr[pos - 1].v = value;
 			} else {
 				warning("b_setProp: Property not found");
 			}
