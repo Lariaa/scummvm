@@ -1069,9 +1069,10 @@ Common::String BitmapCastMember::formatInfo() {
 	}
 }
 
-// From D8.5 on, a bitmap's alpha channel can live in an ALFA chunk of its own:
-// always for an image stored as JPEG in an ediM chunk, since JPEG cannot carry
-// one, and occasionally beside a BITD. It is one byte per pixel with rows padded
+// A bitmap's alpha channel can live in an ALFA chunk of its own: for an image
+// stored as JPEG in an ediM chunk, since JPEG cannot carry one -- the Loewenzahn
+// titles do this; TKKG 6's older JPEGs have no alpha and no ALFA -- and
+// occasionally beside a BITD. It is one byte per pixel with rows padded
 // to an even width, packed with the same run-length scheme as BITD. Measured on
 // Loewenzahn 8, whose 517x29 and 571x362 overlays unpack to exactly 518 and 572
 // bytes a row, and on TKKG 14, where a 13x16 image unpacks to 14.
@@ -1186,8 +1187,10 @@ void BitmapCastMember::load() {
 			}
 		}
 
-		// D8.5 can store a bitmap as embedded media instead of a BITD: the
-		// child is an ediM chunk holding a whole image file. Sounds use ediM
+		// A bitmap can be stored as embedded media instead of a BITD: the
+		// child is an ediM chunk holding a whole image file. Not only in late
+		// versions -- TKKG 6's files (version 0x4C7, D6 to ScummVM) carry 76
+		// JPEGs this way, Loewenzahn 6-8 thousands. Sounds use ediM
 		// too and name their format in the cast info, but for bitmaps that
 		// string is empty, so go by the signature.
 		if (pic == nullptr) {
