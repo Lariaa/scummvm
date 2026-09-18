@@ -1069,6 +1069,93 @@ Common::String BitmapCastMember::formatInfo() {
 	}
 }
 
+// From D8.5 on, a bitmap's alpha channel can live in an ALFA chunk of its own:
+// always for an image stored as JPEG in an ediM chunk, since JPEG cannot carry
+// one, and occasionally beside a BITD. It is one byte per pixel with rows padded
+// to an even width, packed with the same run-length scheme as BITD. Measured on
+// Loewenzahn 8, whose 517x29 and 571x362 overlays unpack to exactly 518 and 572
+// bytes a row, and on TKKG 14, where a 13x16 image unpacks to 14.
+//
+// Returns the plane at the image's own width, or nothing if this member has no
+// ALFA, or one that is empty or does not unpack to a whole picture.
+static Common::Array<byte> readAlfaChunk(Cast *cast, const Common::Array<Resource> &children, int w, int h) {
+	Common::Array<byte> plane;
+	if (w <= 0 || h <= 0)
+		return plane;
+
+	Common::SeekableReadStreamEndian *stream = nullptr;
+	for (auto &child : children) {
+		if (child.tag == MKTAG('A', 'L', 'F', 'A')) {
+			stream = cast->getResource(child.tag, child.index);
+			break;
+		}
+	}
+	if (!stream)
+		return plane;
+
+	uint32 pitch = w + (w & 1);
+	uint32 need = pitch * h;
+	Common::Array<byte> packed;
+
+	if ((uint32)stream->size() == need) {
+		packed.resize(need);
+		stream->read(packed.data(), need);
+	} else {
+		while (packed.size() < need) {
+			byte data = stream->readByte();
+			if (stream->eos())
+				break;
+
+			if (data & 0x80) {
+				int len = ((data ^ 0xff) & 0xff) + 2;
+				byte value = stream->readByte();
+				for (int i = 0; i < len; i++)
+					packed.push_back(value);
+			} else {
+				int len = data + 1;
+				for (int i = 0; i < len; i++)
+					packed.push_back(stream->readByte());
+			}
+		}
+	}
+	delete stream;
+
+	if (packed.size() < need)
+		return plane;
+
+	plane.resize(w * h);
+	for (int y = 0; y < h; y++)
+		memcpy(&plane[y * w], &packed[y * pitch], w);
+
+	return plane;
+}
+
+static void setAlphaPlane(Graphics::Surface &surface, const Common::Array<byte> &plane) {
+	const Graphics::PixelFormat &format = surface.format;
+	for (int y = 0; y < surface.h; y++) {
+		for (int x = 0; x < surface.w; x++) {
+			byte a, r, g, b;
+			format.colorToARGB(surface.getPixel(x, y), a, r, g, b);
+			surface.setPixel(x, y, format.ARGBToColor(plane[y * surface.w + x], r, g, b));
+		}
+	}
+}
+
+// How much of a plane is clear, and whether it outlines anything at all.
+static uint alphaPlaneStats(const Common::Array<byte> &plane, bool &hasClear, bool &hasSolid) {
+	uint clear = 0;
+	hasClear = hasSolid = false;
+	for (uint i = 0; i < plane.size(); i++) {
+		if (plane[i] == 0) {
+			clear++;
+			hasClear = true;
+		} else if (plane[i] == 0xff) {
+			hasSolid = true;
+		}
+	}
+	return clear;
+}
+
 void BitmapCastMember::load() {
 	if (_loaded && !_needsReload)
 		return;
@@ -1118,9 +1205,43 @@ void BitmapCastMember::load() {
 				if ((signature & 0xFFFFFF00) == 0xFFD8FF00) {
 					Image::JPEGDecoder decoder;
 					if (decoder.loadStream(*media)) {
-						// The alpha lives in a separate ALFA chunk we do not
-						// read yet, so this comes out opaque.
-						setPicture(decoder, decoder.hasPalette());
+						// JPEG cannot carry an alpha channel, so Director keeps it
+						// in an ALFA chunk beside the ediM. Loewenzahn 6, 7 and 8
+						// store a good part of their artwork this way -- 1390, 871
+						// and 879 bitmaps -- and without it every transparent area
+						// came out as a solid white, light grey or black block: the
+						// frame of Loewenzahn 8's lexicon (Lexikon/auswahl.dir,
+						// member 105) is 64% clear in its ALFA and was drawn as an
+						// opaque grey sheet over the whole screen.
+						//
+						// Hold the picture in the 32-bit layout BITDDecoder
+						// produces, so that the matte and the mask code take their
+						// alpha branches exactly as they do for a BITD that carries
+						// an alpha plane.
+						const Graphics::PixelFormat format(4, 8, 8, 8, 8, 24, 16, 8, 0);
+						Graphics::Surface *surface = decoder.getSurface()->convertTo(format);
+
+						Common::Array<byte> alpha = readAlfaChunk(_cast, _children, surface->w, surface->h);
+						if (!alpha.empty()) {
+							setAlphaPlane(*surface, alpha);
+
+							bool hasClear, hasSolid;
+							uint clear = alphaPlaneStats(alpha, hasClear, hasSolid);
+							debugC(2, kDebugImages, "BitmapCastMember::load(): cast %d '%s', %dx%d JPEG, alpha from its ALFA chunk: %d%% clear",
+									_castId, _name.c_str(), surface->w, surface->h, (int)(100ULL * clear / alpha.size()));
+						}
+
+						// Loading is not a runtime change, as in the BITD path below.
+						bool wasChanged = _isChanged;
+						delete _picture;
+						_picture = new Picture();
+						_picture->_surface.copyFrom(*surface);
+						_bitsPerPixel = 32;
+						setModified(true);
+						_isChanged = wasChanged;
+
+						surface->free();
+						delete surface;
 						delete media;
 						_loaded = true;
 						return;
@@ -1262,6 +1383,24 @@ void BitmapCastMember::load() {
 	bool wasChanged = _isChanged;
 	setPicture(*img, true);
 	_isChanged = wasChanged;
+
+	// A BITD whose alpha plane held only zeroes has just been made opaque by
+	// the decoder. Director may keep the real alpha in an ALFA chunk beside it,
+	// as Loewenzahn 8 does for three text overlays in hunde_woelfe.dir (members
+	// 182-184). Take it only when it outlines something: 421 other bitmaps in
+	// that game carry a good alpha plane next to a constant ALFA, and those
+	// must stay exactly as they are.
+	if (tag == MKTAG('B', 'I', 'T', 'D') && _bitsPerPixel == 32 &&
+			static_cast<BITDDecoder *>(img)->alphaWasEmpty()) {
+		Common::Array<byte> alpha = readAlfaChunk(_cast, _children, _picture->_surface.w, _picture->_surface.h);
+		bool hasClear = false, hasSolid = false;
+		uint clear = alpha.empty() ? 0 : alphaPlaneStats(alpha, hasClear, hasSolid);
+		if (!alpha.empty() && hasClear && hasSolid) {
+			setAlphaPlane(_picture->_surface, alpha);
+			debugC(2, kDebugImages, "BitmapCastMember::load(): cast %d '%s', %dx%d, empty alpha plane, alpha from its ALFA chunk: %d%% clear",
+					_castId, _name.c_str(), _picture->_surface.w, _picture->_surface.h, (int)(100ULL * clear / alpha.size()));
+		}
+	}
 
 	if (ConfMan.getBool("dump_scripts")) {
 
