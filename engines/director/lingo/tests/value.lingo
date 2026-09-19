@@ -58,3 +58,20 @@ scummvmNoFatalError(false)
 -- if there's no valid expression at all, return void
 set test = value("#")
 scummvmAssert(voidP(test))
+
+-- From D8 on a backslash ending a line continues the statement on the next
+-- one. TKKG 13 and 14 keep each scene's sound play list in a text member,
+-- one entry per line, and read it with value(member("playlist").text).
+-- The results are compared back at the default version, because the
+-- string-equality tables stop at D6 (see xtralist.lingo).
+set savedVer to the scummvmVersion
+set the scummvmVersion to 800
+set test = "[#a: [1, 2]," & "\" & RETURN & "#b: 3]"
+set continued = value(test)
+set the scummvmVersion to 700
+scummvmNoFatalError(true)
+set notContinued = value(test)
+scummvmNoFatalError(false)
+set the scummvmVersion to savedVer
+scummvmAssertEqual([#a: [1, 2], #b: 3], continued)
+scummvmAssert(not listP(notContinued))
