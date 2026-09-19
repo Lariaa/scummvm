@@ -119,6 +119,8 @@ void b_findEmpty(int nargs);
 void b_importFileInto(int nargs);
 void b_installMenu(int nargs);
 void b_label(int nargs);
+void b_mapMemberToStage(int nargs);
+void b_mapStageToMember(int nargs);
 void b_marker(int nargs);
 void b_move(int nargs);
 void b_moveableSprite(int nargs);
