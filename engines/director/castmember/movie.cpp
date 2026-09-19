@@ -77,9 +77,6 @@ Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint
 
 	// Composite the embedded score's live channels (frame ignored) so
 	// script-driven changes show, unlike a film loop's fixed frames.
-	Common::Rect widgetRect(bbox.width() ? bbox.width() : _initialRect.width(),
-			bbox.height() ? bbox.height() : _initialRect.height());
-
 	_subchannels.clear();
 
 	if (!_score || _score->_channels.empty())
@@ -88,6 +85,16 @@ Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint
 	bool needToScale = (bbox.width() != _initialRect.width() || bbox.height() != _initialRect.height());
 	float scaleX = needToScale ? (float)bbox.width() / _initialRect.width() : 1.0f;
 	float scaleY = needToScale ? (float)bbox.height() / _initialRect.height() : 1.0f;
+
+	// The member's rect is the linked movie's stage rect, and that carries
+	// where the stage window sat on the author's screen: Loewenzahn 8's
+	// beenden.dir has (89, 0, 889, 600), the Spielebox's and the
+	// Adventskalender's start at (89, 50). The sprites in it count from the
+	// stage's own corner, so only the size of that rect matters here, not its
+	// corner. Subtracting the corner pulled every quit dialog 89 px to the left.
+	//
+	// A film loop is different: its cells sit in the coordinates of the movie
+	// around it, and so does its rect.
 
 	// channel 0 is the score's own frame channel; sprites start at 1
 	for (uint i = 1; i < _score->_channels.size(); ++i) {
@@ -98,14 +105,17 @@ Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint
 		Sprite src = *chanSprite;
 
 		if (needToScale) {
-			src._startPoint.x = (src._startPoint.x - _initialRect.left) * scaleX + bbox.left;
-			src._startPoint.y = (src._startPoint.y - _initialRect.top) * scaleY + bbox.top;
-			src._width = widgetRect.width();
-			src._height = widgetRect.height();
+			src._startPoint.x = src._startPoint.x * scaleX + bbox.left;
+			src._startPoint.y = src._startPoint.y * scaleY + bbox.top;
+			// Each sprite keeps its own size, scaled like its position;
+			// stretching all of them to the whole placement rect piled
+			// them up on top of each other.
+			src._width = (int16)(src._width * scaleX);
+			src._height = (int16)(src._height * scaleY);
 			src._stretch = true;
 		} else {
-			src._startPoint.x = (src._startPoint.x - _initialRect.left) + bbox.left;
-			src._startPoint.y = (src._startPoint.y - _initialRect.top) + bbox.top;
+			src._startPoint.x += bbox.left;
+			src._startPoint.y += bbox.top;
 		}
 
 		Channel chan(nullptr, &src);
@@ -220,12 +230,12 @@ void MovieCastMember::routeInputEvent(LEvent event, Common::Point hostPos, const
 	if (!_linkedMovie)
 		return;
 
-	// Invert getSubChannels()'s scaling to map the click into the linked
-	// movie's coordinate space.
+	// Invert getSubChannels()'s placement to map the click into the linked
+	// movie's coordinate space, which starts at its stage's corner.
 	Common::Point p = hostPos;
 	if (bbox.width() && bbox.height()) {
-		p.x = (hostPos.x - bbox.left) * _initialRect.width() / bbox.width() + _initialRect.left;
-		p.y = (hostPos.y - bbox.top) * _initialRect.height() / bbox.height() + _initialRect.top;
+		p.x = (hostPos.x - bbox.left) * _initialRect.width() / bbox.width();
+		p.y = (hostPos.y - bbox.top) * _initialRect.height() / bbox.height();
 	}
 
 	_linkedMovie->queueInputEvent(event, 0, p);
