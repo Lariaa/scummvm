@@ -45,6 +45,7 @@ void m_baVersion(int nargs);
 void m_baSysFolder(int nargs);
 void m_baCpuInfo(int nargs);
 void m_baDiskInfo(int nargs);
+void m_baDiskList(int nargs);
 void m_baMemoryInfo(int nargs);
 void m_baFindApp(int nargs);
 void m_baReadIni(int nargs);
