@@ -206,6 +206,8 @@ static const BuiltinProto builtins[] = {
 	{ "importFileInto",	LB::b_importFileInto,2,2, 400, CBLTIN },	//			D4 c
 	{ "installMenu",	LB::b_installMenu,	1, 1, 200, CBLTIN },	// D2 c
 	{ "label",			LB::b_label,		1, 1, 200, FBLTIN },	// D2 f
+	{ "mapMemberToStage",LB::b_mapMemberToStage,2,2,700, FBLTIN },	//							D7 f
+	{ "mapStageToMember",LB::b_mapStageToMember,2,2,700, FBLTIN },	//							D7 f
 	{ "marker",			LB::b_marker,		1, 1, 200, FBLTIN },	// D2 f
 	{ "move",			LB::b_move,			1, 2, 400, CBLTIN },	//			D4 c
 	{ "moveableSprite",	LB::b_moveableSprite,0, 0, 200, CBLTIN },	// D2, FIXME: the field in D4+
@@ -3675,6 +3677,84 @@ void LB::b_label(int nargs) {
 		marker = g_lingo->func_marker(d.asInt());
 	}
 	g_lingo->push(marker);
+}
+
+// mapStageToMember() and mapMemberToStage() translate a point between the
+// stage and a sprite's cast member, taking the sprite's stretch and flips into
+// account; a point outside the sprite, or outside the member the other way
+// round, gives VOID (Director 8 Demystified; both are in the D7 keyword list).
+// Rotation and skew are not undone.
+//
+// Loewenzahn 8's Yeti game (spurBH) cuts the alpha mask of a track at the
+// position of the sprite that follows it, and the undefined handler ended the
+// scene under lingostrict.
+static Channel *mapChannel(const Datum &sprite, const char *caller) {
+	int spriteId = (sprite.type == SPRITEREF) ? sprite.u.i : sprite.asInt();
+	Score *score = g_director->getCurrentMovie()->getScore();
+	Channel *ch = score ? score->getChannelById(spriteId) : nullptr;
+	if (!ch || !ch->_sprite || !ch->_sprite->_cast) {
+		warning("%s: sprite %d has no cast member", caller, spriteId);
+		return nullptr;
+	}
+	return ch;
+}
+
+void LB::b_mapMemberToStage(int nargs) {
+	Datum point = g_lingo->pop();
+	Datum sprite = g_lingo->pop();
+
+	Channel *ch = mapChannel(sprite, "b_mapMemberToStage");
+	if (!ch || point.type != POINT) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	Common::Rect bbox = ch->getBbox();
+	Common::Rect member = ch->_sprite->_cast->_initialRect;
+	int mx = point.u.farr->arr[0].asInt();
+	int my = point.u.farr->arr[1].asInt();
+	if (bbox.isEmpty() || member.isEmpty()
+			|| mx < 0 || my < 0 || mx >= member.width() || my >= member.height()) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	if (ch->_sprite->isFlippedH())
+		mx = member.width() - 1 - mx;
+	if (ch->_sprite->isFlippedV())
+		my = member.height() - 1 - my;
+
+	g_lingo->push(Datum(Common::Point(bbox.left + mx * bbox.width() / member.width(),
+			bbox.top + my * bbox.height() / member.height())));
+}
+
+void LB::b_mapStageToMember(int nargs) {
+	Datum point = g_lingo->pop();
+	Datum sprite = g_lingo->pop();
+
+	Channel *ch = mapChannel(sprite, "b_mapStageToMember");
+	if (!ch || point.type != POINT) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	Common::Rect bbox = ch->getBbox();
+	Common::Rect member = ch->_sprite->_cast->_initialRect;
+	int x = point.u.farr->arr[0].asInt();
+	int y = point.u.farr->arr[1].asInt();
+	if (bbox.isEmpty() || member.isEmpty() || !bbox.contains(x, y)) {
+		g_lingo->pushVoid();
+		return;
+	}
+
+	int mx = (x - bbox.left) * member.width() / bbox.width();
+	int my = (y - bbox.top) * member.height() / bbox.height();
+	if (ch->_sprite->isFlippedH())
+		mx = member.width() - 1 - mx;
+	if (ch->_sprite->isFlippedV())
+		my = member.height() - 1 - my;
+
+	g_lingo->push(Datum(Common::Point(mx, my)));
 }
 
 void LB::b_marker(int nargs) {
