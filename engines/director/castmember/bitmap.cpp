@@ -1282,8 +1282,9 @@ void BitmapCastMember::load() {
 
 							bool hasClear, hasSolid;
 							uint clear = alphaPlaneStats(alpha, hasClear, hasSolid);
+							CastMemberInfo *ci = getInfo();
 							debugC(2, kDebugImages, "BitmapCastMember::load(): cast %d '%s', %dx%d JPEG, alpha from its ALFA chunk: %d%% clear",
-									_castId, _name.c_str(), surface->w, surface->h, (int)(100ULL * clear / alpha.size()));
+									_castId, ci ? ci->name.c_str() : "", surface->w, surface->h, (int)(100ULL * clear / alpha.size()));
 						}
 
 						// Loading is not a runtime change, as in the BITD path below.
@@ -1452,8 +1453,9 @@ void BitmapCastMember::load() {
 		uint clear = alpha.empty() ? 0 : alphaPlaneStats(alpha, hasClear, hasSolid);
 		if (!alpha.empty() && hasClear && hasSolid) {
 			setAlphaPlane(_picture->_surface, alpha);
+			CastMemberInfo *ci = getInfo();
 			debugC(2, kDebugImages, "BitmapCastMember::load(): cast %d '%s', %dx%d, empty alpha plane, alpha from its ALFA chunk: %d%% clear",
-					_castId, _name.c_str(), _picture->_surface.w, _picture->_surface.h, (int)(100ULL * clear / alpha.size()));
+					_castId, ci ? ci->name.c_str() : "", _picture->_surface.w, _picture->_surface.h, (int)(100ULL * clear / alpha.size()));
 		}
 	}
 
