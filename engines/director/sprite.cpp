@@ -271,8 +271,12 @@ MacShape *Sprite::getShape() {
 
 	shape->ink = _ink;
 	shape->spriteType = _spriteType;
-	shape->foreColor = _foreColor;
-	shape->backColor = _backColor;
+	// Through the accessors, which know a D7 sprite's RGB colours (see
+	// getRGBColor() below). The raw field holds only the red byte then:
+	// Loewenzahn 5's start screen fades in under a grey (170, 170, 170)
+	// rectangle, and index 170 painted it Mac palette blue.
+	shape->foreColor = getForeColor();
+	shape->backColor = getBackColor();
 	shape->lineSize = _thickness & kTThickness;
 	shape->pattern = getPattern();
 	shape->tile = nullptr;
