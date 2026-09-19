@@ -357,6 +357,18 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		// is rendered by the Score. We don't include a pointer to the current Score here,
 		// that's only for querying the constraint channel which is not used.
 		Channel chan(nullptr, &src);
+
+		// A cell can be a film loop itself (Window::inkBlitSubChannels() opens
+		// it). Its channel only lives for this frame, so it has no counter of
+		// its own; step it along with the loop around it.
+		if (src._cast && src._cast->_type == kCastFilmLoop) {
+			FilmLoopCastMember *inner = (FilmLoopCastMember *)src._cast;
+			if (inner->_score && !inner->_score->_scoreCache.empty()) {
+				uint count = inner->_score->_scoreCache.size();
+				chan._filmLoopFrame = inner->_looping ? frame % count : MIN<uint>(frame, count - 1);
+			}
+		}
+
 		_subchannels.push_back(chan);
 	}
 
