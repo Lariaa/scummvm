@@ -27,6 +27,7 @@
 
 #include "director/director.h"
 #include "director/cast.h"
+#include "director/util.h"
 #include "director/castmember/xtra.h"
 #include "director/lingo/lingo-the.h"
 #include "director/lingo/xtras-cast/textxtra.h"
@@ -91,6 +92,48 @@ bool decodeXMED(const Common::Array<byte> &data, Common::String &text) {
 	return false;
 }
 
+// The document header in front of the text: "FFFF", a 16-digit hex field, then
+// fields led by control bytes -- 0x01, 0x03, and a run of 0x02 ones. The second
+// 0x02 field holds flags, in hex like everything else. Bit 0x100 is set when
+// the text was typed on Windows: its high bytes are then Windows-1252, and
+// without it they are Mac Roman, whatever the container is. Across the TKKG
+// titles 104 Windows texts carry 101 and 792 Mac ones 1 or 10000001, with no
+// exception either way; TKKG 7 has both kinds in one movie.
+static bool readXMEDFlags(const Common::Array<byte> &data, uint32 &flags) {
+	uint32 size = data.size();
+	uint32 i = 20;
+	if (size <= i || data[i] != 0x01)
+		return false;
+
+	while (i < size && data[i] != 0x03)
+		i++;
+	while (i < size && data[i] != 0x02)
+		i++;
+	if (i >= size)
+		return false;
+
+	// Skip the first 0x02 field, read the second one.
+	i++;
+	while (i < size && data[i] != 0x02)
+		i++;
+	if (i >= size)
+		return false;
+	i++;
+
+	uint32 value = 0;
+	int digits = 0;
+	while (i < size && isHexDigit(data[i]) && digits < 8) {
+		value = value * 16 + hexValue(data[i]);
+		i++;
+		digits++;
+	}
+	if (digits == 0 || i >= size || data[i] != 0x02)
+		return false;
+
+	flags = value;
+	return true;
+}
+
 // 76-byte "text" payload observed in Physikus (D7): BE32 height at
 // offset 36, width at offset 40, mirroring the authored xtraRect.
 bool parseXtraData(const Common::Array<byte> &data, Common::Rect &rect) {
@@ -152,14 +195,20 @@ void TextXtraCastMember::load() {
 
 		Common::String text;
 		if (TextXtra::decodeXMED(data, text)) {
-			// The bytes belong to the file, not to the platform we present as.
-			// TKKG 9 is a Windows game whose movies are Mac containers, so its
-			// credits came out of getPlatformEncoding() as Windows-1252: every
-			// Mac Roman high byte turned into the wrong glyph, "Übersetzung"
-			// into "†bersetzung" and "Geräusche" into a missing character. The
-			// member's own name, which carries the same string, is decoded with
-			// the cast's encoding and has always been correct.
-			_text = Common::U32String(text, _cast->getFileEncoding());
+			// The bytes belong to the machine the text was typed on, not to the
+			// platform we present as, and not to the container either. TKKG 9
+			// is a Windows game whose movies are Mac containers; decoded with
+			// getPlatformEncoding() its credits turned "Übersetzung" into
+			// "†bersetzung". The file's encoding fixed that, but TKKG 7 is all
+			// Windows containers and still holds Mac texts: its Steckbrief read
+			// "Schlo§" and "t?tlichen". The header says which it is; without a
+			// readable header, fall back to the file.
+			Common::CodePage encoding = _cast->getFileEncoding();
+			uint32 flags;
+			if (TextXtra::readXMEDFlags(data, flags))
+				encoding = getEncoding((flags & 0x100) ? Common::kPlatformWindows : Common::kPlatformMacintosh,
+						g_director->getLanguage());
+			_text = Common::U32String(text, encoding);
 			debugC(3, kDebugText, "TextXtraCastMember::load(): XMED %d: '%s'", it.index, text.c_str());
 		} else {
 			warning("TextXtraCastMember::load(): XMED %d not decoded", it.index);
