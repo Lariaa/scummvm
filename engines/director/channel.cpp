@@ -794,7 +794,8 @@ void Channel::setCast(CastMemberID memberID) {
 	Common::Rect oldBbox = getBbox();
 	// ... but only where the outgoing member registered at its top-left corner,
 	// see the film loop block below.
-	Common::Point oldOffset = _sprite->_cast ? _sprite->_cast->getRegistrationOffset() : Common::Point(0, 0);
+	bool hadCast = _sprite->_cast != nullptr;
+	Common::Point oldOffset = hadCast ? _sprite->_cast->getRegistrationOffset() : Common::Point(0, 0);
 
 	// Replace the cast member in the sprite.
 	// Only change the dimensions if the "stretch" flag is set,
@@ -814,7 +815,14 @@ void Channel::setCast(CastMemberID memberID) {
 	// registration point the loop already lands correctly on its own, and
 	// dragging it onto the previous member's rect is what breaks it -- TKKG 2's
 	// rollover cup came out 237 px off stage, its lunch box 81 px beside itself.
-	if (hasChanged && _sprite->_cast && _sprite->_cast->_type == kCastFilmLoop
+	//
+	// And only where there was an outgoing member at all. An empty channel has
+	// no position to keep, only the loc Lingo gave it, and the loop registers
+	// on that like any member does. Loewenzahn 5 and 6 puppet an empty channel,
+	// set its loc to the stage centre and then put their quit dialog loop on
+	// it; recentring pulled the loop's top-left corner onto the centre, and the
+	// dialog hung off the bottom right of the stage.
+	if (hasChanged && hadCast && _sprite->_cast && _sprite->_cast->_type == kCastFilmLoop
 			&& oldOffset.x == 0 && oldOffset.y == 0) {
 		Common::Rect newBbox = getBbox();
 		_sprite->_startPoint.x += oldBbox.left - newBbox.left;
