@@ -178,7 +178,10 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 					//   -1: ScummVM write convention for "same cast as bitmap"
 					//    0: Mac Director 6 convention for "primary/default palette cast"
 					// Try the bitmap's own cast first, then search all movie casts
-					// for a registered palette with this member ID.
+					// for a registered palette with this member ID. This is only a
+					// first guess; clutToDrawWith() settles it when the picture is
+					// converted.
+					_clutImplicit = true;
 					clutCastLib = _cast->_castLibID;
 					Movie *paletteMovie = _cast->getMovie();
 					if (paletteMovie && !g_director->hasPalette(CastMemberID(clutId, clutCastLib))) {
@@ -266,7 +269,10 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 						//   -1: ScummVM write convention for "same cast as bitmap"
 						//    0: Mac Director 6 convention for "primary/default palette cast"
 						// Try the bitmap's own cast first, then search all movie casts
-						// for a registered palette with this member ID.
+						// for a registered palette with this member ID. This is only a
+						// first guess; clutToDrawWith() settles it when the picture is
+						// converted.
+						_clutImplicit = true;
 						clutCastLib = _cast->_castLibID;
 						Movie *paletteMovie = _cast->getMovie();
 						if (paletteMovie && !g_director->hasPalette(CastMemberID(clutId, clutCastLib))) {
@@ -373,6 +379,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, BitmapCastMember &
 	_flags2 = source._regY;
 	_bytes = source._bytes;
 	_clut = source._clut;
+	_clutImplicit = source._clutImplicit;
 	_ditheredTargetClut = source._ditheredTargetClut;
 	_editVersion = source._editVersion;
 	_updateFlags = source._updateFlags;
@@ -476,7 +483,7 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 		Score *score = movie->getScore();
 
 		if (_ditheredImg) {
-			debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Dithering cast %d from source palette %s to target palette %s", _castId, _clut.asString().c_str(), score->getCurrentPalette().asString().c_str());
+			debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Dithering cast %d from source palette %s to target palette %s", _castId, clutToDrawWith().asString().c_str(), score->getCurrentPalette().asString().c_str());
 		} else if (previouslyDithered) {
 			debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Removed dithered image for cast %d, score palette %s matches cast member", _castId, score->getCurrentPalette().asString().c_str());
 
@@ -528,6 +535,50 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 	return widget;
 }
 
+// Whether member id of cast is a palette. Cast::getCastMember() queues what it
+// finds for loading, so look into the table directly.
+static bool isPaletteMember(Cast *cast, int id) {
+	if (!cast || !cast->_loadedCast || !cast->_loadedCast->contains(id))
+		return false;
+
+	CastMember *member = cast->_loadedCast->getVal(id);
+	return member && member->_type == kCastPalette;
+}
+
+CastMemberID BitmapCastMember::clutToDrawWith() {
+	if (!_clutImplicit || !_cast)
+		return _clut;
+
+	// A clut with cast lib 0 names its palette by member number alone. In TKKG
+	// 1-9 that palette is never in the bitmap's own cast but in the shared one --
+	// the "TKKG-Palette", member 42 of global.cst (1 in TKKG 1-4) -- whereas a
+	// clut with cast lib -1 always points into the bitmap's own cast.
+	//
+	// The constructor picked a cast lib by asking g_director->hasPalette(), and
+	// that table is keyed by cast lib *number* and keeps the palettes of earlier
+	// movies, where the same number named another cast. TKKG 7's Sz09 has its own
+	// cast at castLib 5, where member 42 is a bitmap; Intro_t had GlobalF there,
+	// whose member 42 is a different palette, and in true colour the room and
+	// the TV of Sz09 were converted through it. 8-bit mode never noticed, as it
+	// draws the indices unconverted. So ask what the members of the drawing
+	// movie's casts are: the own cast if it holds a palette under that number,
+	// else the lowest cast lib that does.
+	int id = _clut.member;
+	if (isPaletteMember(_cast, id))
+		return CastMemberID(id, _cast->_castLibID);
+
+	Movie *movie = g_director->getCurrentMovie();
+	if (!movie)
+		return _clut;
+
+	int lib = 0;
+	for (auto &castPair : *movie->getCasts()) {
+		if ((!lib || castPair._key < lib) && isPaletteMember(castPair._value, id))
+			lib = castPair._key;
+	}
+	return lib ? CastMemberID(id, lib) : _clut;
+}
+
 Graphics::Surface *BitmapCastMember::getDitherImg() {
 	if (!_picture->_surface.getPixels())
         return nullptr;
@@ -551,7 +602,7 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 		currentPaletteId = CastMemberID(kClutSystemMac, -1);
 		currentPalette = g_director->getPalette(currentPaletteId);
 	}
-	CastMemberID castPaletteId = _clut;
+	CastMemberID castPaletteId = clutToDrawWith();
 	// It is possible for Director to have saved an invalid ID in _clut;
 	// if this is the case, do no dithering.
 	if (castPaletteId.isNull())
@@ -640,9 +691,10 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 			// Which palette actually got used, and is it the one the member asked
 			// for? The line above this one only says which ID was picked; two
 			// different libraries can hold a member 42 and only one of them is a
-			// palette at all. TKKG 7 renders faces red in Sz09, where the bitmaps
+			// palette at all. TKKG 7 rendered faces red in Sz09, where the bitmaps
 			// carry clut (0, 42) -- "the default palette cast" -- castLib 5 holds a
-			// bitmap at 42 and castLib 4 the real "TKKG-Palette".
+			// bitmap at 42 and castLib 4 the real "TKKG-Palette"; this line showed
+			// a stale palette under (42, 5), see clutToDrawWith().
 			//
 			// A checksum settles it in one run: same sum for wanted and used means
 			// the mix-up is harmless and the fault lies elsewhere; different sums
@@ -1766,6 +1818,7 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 				_boundingRect = _initialRect;
 				// An 8-bit grab holds indices into the palette that was on screen.
 				_clut = (_bitsPerPixel == 8) ? g_director->_lastPalette : CastMemberID(0, 0);
+				_clutImplicit = false;
 				setModified(true);
 			}
 		} else {
@@ -1793,6 +1846,7 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 			}
 			if (newClut != _clut) {
 				_clut = newClut;
+				_clutImplicit = false;
 				_modified = true;
 			}
 			return;
@@ -1826,6 +1880,7 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 			}
 			if (newClut != _clut) {
 				_clut = newClut;
+				_clutImplicit = false;
 				_modified = true;
 			}
 		}
