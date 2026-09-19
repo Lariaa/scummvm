@@ -41,6 +41,7 @@
  * Physicus / Physikus (l'Espresso, Italian; Ruske & Pühretmaier)
  * Bioscopia / Biolab
  * Der Regenbogenfisch Junior 2: Kraktors Geburtstag
+ * Haeuser bauen mit Willy Werkel
  *
  **************************************************/
 
@@ -53,6 +54,7 @@ new object me
 * baSysFolder string FolderType -- returns Windows special folders location
 * baCpuInfo string InfoType -- returns information about the processor installed
 * baDiskInfo string Disk, string InfoType -- returns information about Disk
+* baDiskList -- returns list of available drives	(Buddy API 3.0)
 * baMemoryInfo string InfoType -- returns memory information
 * baFindApp string Extension -- finds application associated with Extension
 * baReadIni string Section, string Keyname, string Default, string IniFile -- reads ini file entry
@@ -213,6 +215,7 @@ static BuiltinProto xlibBuiltins[] = {
 	{ "baSysFolder", BudAPIXtra::m_baSysFolder, 1, 1, 500, HBLTIN },
 	{ "baCpuInfo", BudAPIXtra::m_baCpuInfo, 1, 1, 500, HBLTIN },
 	{ "baDiskInfo", BudAPIXtra::m_baDiskInfo, 2, 2, 500, HBLTIN },
+	{ "baDiskList", BudAPIXtra::m_baDiskList, 0, 0, 500, HBLTIN },
 	{ "baMemoryInfo", BudAPIXtra::m_baMemoryInfo, 1, 1, 500, HBLTIN },
 	{ "baFindApp", BudAPIXtra::m_baFindApp, 1, 1, 500, HBLTIN },
 	{ "baReadIni", BudAPIXtra::m_baReadIni, 4, 4, 500, HBLTIN },
@@ -447,6 +450,22 @@ void BudAPIXtra::m_baDiskInfo(int nargs) {
 		warning("STUB: BudAPIXtra::m_baDiskInfo: unsupported InfoType '%s'", infoType.c_str());
 		g_lingo->push(Datum());
 	}
+}
+
+void BudAPIXtra::m_baDiskList(int nargs) {
+	// baDiskList() lists the available drives as roots, "C:\" and so on (Buddy
+	// API 3.0). Games look for their CD among them: Haeuser bauen mit Willy
+	// Werkel walks the list from the end, tries `drive & "Director\01m001v0.mov"`
+	// with baFileExists() and starts the game from the drive that has it. Report
+	// the hard disk and the synthetic CD drive E that baFindDrive() and
+	// baDiskInfo() answer for; the drive prefix is stripped when a path is
+	// resolved, so the game tree stands in for the CD.
+	Datum result;
+	result.type = ARRAY;
+	result.u.farr = new FArray;
+	result.u.farr->arr.push_back(Datum(Common::String("C:\\")));
+	result.u.farr->arr.push_back(Datum(Common::String("E:\\")));
+	g_lingo->push(result);
 }
 XOBJSTUB(BudAPIXtra::m_baMemoryInfo, 0)
 XOBJSTUB(BudAPIXtra::m_baFindApp, 0)
