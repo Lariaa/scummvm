@@ -2792,6 +2792,14 @@ void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
 		int index = LC::compareArrays(LC::eqData, obj, propName, true).u.i;
 		if (index > 0) {
 			d = obj.u.parr->arr[index - 1].v;
+		} else if (propName.equalsIgnoreCase("count")) {
+			// `theList.count` counts a property list as well as a linear one
+			// (Director 8 Demystified, the count entry of its Lingo lexicon). A
+			// list that holds a #count property still answers with that, as it
+			// did before. The Loewenzahn button bar builds its buttons in
+			// `repeat with a = 1 to gBWList.count`: with VOID here the loop never
+			// ran, the bar slid out empty and the games had no Exit button.
+			d = (int)obj.u.parr->arr.size();
 		}
 		g_lingo->push(d);
 		g_debugger->propReadHook(propName);
