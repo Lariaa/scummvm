@@ -362,7 +362,13 @@ void InkPrimitives<T>::drawPoint(int x, int y, uint32 src, void *data) {
 
 			*dst = tmpDst;
 		}
-	} else if (p->alpha) {
+	}
+
+	// A shape blends like any other sprite, once its pattern has picked the
+	// colour. Loewenzahn 6, 7, 8, the Spielebox and the Adventskalender lay a
+	// stage-sized rectangle at blend 20 over the scene behind their quit
+	// dialog; skipping this for shapes drew it solid and hid the whole stage.
+	if (p->alpha) {
 		// Sprite blend does not respect colourization; defaults to matte ink
 		byte rSrc, gSrc, bSrc;
 		byte rDst, gDst, bDst;
