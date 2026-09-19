@@ -49,6 +49,9 @@ public:
 	// wrong side.
 	Graphics::Surface *getMatte(const Common::Rect &bbox, bool flipH = false, bool flipV = false);
 	Graphics::Surface *getDitherImg();
+	// The palette to convert the picture through, looked up among the casts of
+	// the movie that draws it when the file gave only a member number.
+	CastMemberID clutToDrawWith();
 
 	bool hasField(int field) override;
 	Datum getField(int field) override;
@@ -97,6 +100,9 @@ public:
 	uint16 _flags2;
 	uint16 _bytes;
 	CastMemberID _clut;
+	// The file named the palette by member number alone (clut cast lib 0 or -1),
+	// so the cast lib in _clut is a guess made while the casts were loading.
+	bool _clutImplicit = false;
 	CastMemberID _ditheredTargetClut;
 
 	uint32 _tag;
