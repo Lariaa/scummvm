@@ -75,13 +75,28 @@ Common::U32String LingoCompiler::codePreprocessor(const Common::U32String &code,
 		debugC(2, kDebugPreprocess, "LingoCompiler::codePreprocessor: \"%s\", %s, %d, %d", movie.c_str(),  scriptType2str(type), id.member, id.castLib);
 	}
 
+	// From D8 on the continuation symbol is a backslash as the last character
+	// of a line, and the old one stays valid: Director 8 Demystified (p. 736)
+	// calls it "obsolete. Use the \ continuation character instead."
+	// Compiled scripts do not care, but text compiled at runtime does:
+	// TKKG 13 and 14 keep the sound play list of every scene as a multi-line
+	// list literal in a text member and read it with value().
+	const bool backslashContinues = g_director->getVersion() >= 800;
+
 	// We start from processing the continuation symbols
 	// (The continuation symbol is \xC2 in Mac Roman, \xAC in Unicode.)
 	// \xAC\n  ->  \xAC
 	// This will greatly simplify newline processing, still leaving
 	// the line number tracking intact
 	while (*s) {
-		if (*s == CONTINUATION) {
+		if (backslashContinues && *s == '\\' && (*(s + 1) == '\r' || *(s + 1) == '\n')) {
+			res += CONTINUATION;
+			s++;
+			if (*s == '\r' && *(s + 1) == '\n')
+				s++;
+			s++;
+			continue;
+		} else if (*s == CONTINUATION) {
 			res += *s++;
 			if (!*s)	// Who knows, maybe it is the last symbol in the script
 				break;
