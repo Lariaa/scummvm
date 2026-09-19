@@ -376,7 +376,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, BitmapCastMember &
 	_pitch = source._pitch;
 	_regX = source._regX;
 	_regY = source._regY;
-	_flags2 = source._regY;
+	_flags2 = source._flags2;
 	_bytes = source._bytes;
 	_clut = source._clut;
 	_clutImplicit = source._clutImplicit;
