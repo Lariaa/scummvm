@@ -227,10 +227,7 @@ void Window::renderChannel(Channel *channel, const Common::Rect &rect, Graphics:
 
 		if (ch->_visible && !ch->_hideFromStage) {
 			if (ch->hasSubChannels()) {
-				Common::Array<Channel> *list = ch->getSubChannels();
-				for (auto &k : *list) {
-					inkBlitFrom(&k, r, blitTo);
-				}
+				inkBlitSubChannels(ch, r, blitTo);
 			} else {
 				inkBlitFrom(ch, r, blitTo);
 				if ((ch == channel) && invert)
@@ -503,6 +500,38 @@ void Window::reset() {
 	resizeInner(composeSurface->w, composeSurface->h);
 	_window->setContentDirty(true);
 	_resetScreen = true;
+}
+
+// A film loop can hold another film loop among its cells: the Loewenzahn 7 and
+// 8 login screens do, and Loewenzahn 8's tamagotchi. Such a cell has no picture
+// of its own -- inkBlitFrom() found "No source surface" and left it out -- so
+// draw its cells in its place. The chain of loops being opened keeps a loop
+// that holds itself from rebuilding the list that is being walked.
+static const int kMaxNestedLoops = 4;
+
+static void inkBlitCells(Channel *channel, Common::Rect destRect, Graphics::ManagedSurface *blitTo, const CastMember **chain, int depth) {
+	Common::Array<Channel> *list = channel->getSubChannels();
+	if (!list)
+		return;
+
+	chain[depth] = channel->_sprite->_cast;
+	for (auto &k : *list) {
+		bool nested = k.hasSubChannels() && depth + 1 < kMaxNestedLoops;
+		for (int i = 0; nested && i <= depth; i++) {
+			if (chain[i] == k._sprite->_cast)
+				nested = false;
+		}
+
+		if (nested)
+			inkBlitCells(&k, destRect, blitTo, chain, depth + 1);
+		else
+			Window::inkBlitFrom(&k, destRect, blitTo);
+	}
+}
+
+void Window::inkBlitSubChannels(Channel *channel, Common::Rect destRect, Graphics::ManagedSurface *blitTo) {
+	const CastMember *chain[kMaxNestedLoops] = {};
+	inkBlitCells(channel, destRect, blitTo, chain, 0);
 }
 
 void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::ManagedSurface *blitTo) {
