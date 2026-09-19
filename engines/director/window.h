@@ -208,6 +208,8 @@ public:
 	Common::String formatWindowInfo();
 
 	static void inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::ManagedSurface *blitTo = nullptr);
+	// Draws the cells of a film loop, and of any film loop among them.
+	static void inkBlitSubChannels(Channel *channel, Common::Rect destRect, Graphics::ManagedSurface *blitTo);
 
 	// events.cpp
 	bool processSysEvent(Common::Event &event);
