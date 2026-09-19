@@ -82,6 +82,7 @@ static const BuiltinProto builtins[] = {
 	{ "value",		 	LB::b_value,		1, 1, 200, FBLTIN },	// D2 f
 	// Chunks
 	{ "delete",			LB::b_delete,		1, 1, 200, CBLTIN },	// D2 command, on a chunk reference
+	{ "handler",		LB::b_handler,		2, 2, 800, FBLTIN },	//							D8 f
 	{ "handlers",		LB::b_handlers,		1, 1, 800, FBLTIN },	//							D8 f
 	// Lists
 	{ "add",			LB::b_add,			2, 2, 400, HBLTIN_LIST },	//			D4 handler
@@ -1862,6 +1863,29 @@ void LB::b_setAt(int nargs) {
 	default:
 		break;
 	}
+}
+
+void LB::b_handler(int nargs) {
+	// handler(object, name) says whether an object answers to one handler; the
+	// name may be a symbol or a string (Director 8 Demystified, the entry for
+	// handler and handlers). Like handlers() below it looks at the object's own
+	// script only.
+	//
+	// TKKG 11, 13 and 14 ask their scene object before calling an optional
+	// handler -- `if gSceneObj.handler(#GetROMember) then` -- and the undefined
+	// handler ended TKKG 13 on its first scene under lingostrict.
+	Datum name = g_lingo->pop();
+	Datum d = g_lingo->pop();
+
+	int res = 0;
+	if (d.type == OBJECT && d.u.obj && (d.u.obj->getObjType() & kScriptObj)) {
+		ScriptContext *script = (ScriptContext *)d.u.obj;
+		res = script->_functionHandlers.contains(name.asString()) ? 1 : 0;
+	} else {
+		warning("b_handler(): expected a script object, got %s", d.type2str());
+	}
+
+	g_lingo->push(Datum(res));
 }
 
 void LB::b_handlers(int nargs) {
