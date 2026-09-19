@@ -20,13 +20,14 @@
 -- are covered below.
 -- ============================================================================
 
-global gObj, gLst
+global gObj, gLst, gCnt
 
 set save to the scummvmVersion
 set the scummvmVersion to 700
 
 set gObj to [#alpha: 42, #beta: [#gamma: 7]]
 set gLst to [10, 20, 30]
+set gCnt to [#count: 9, #a: 1]
 
 -- Read a property, and read one through a nested property list.
 scummvmAssert(value("gObj.alpha") = 42)
@@ -41,6 +42,13 @@ scummvmAssert(value("gObj.alpha") + value("gObj.beta.gamma") = 49)
 -- A linear list answers count.
 scummvmAssert(value("gLst.count") = 3)
 scummvmAssert(value("gLst.count * 2") = 6)
+
+-- So does a property list, unless it holds a #count property of its own.
+-- b_value() finds no #count key in gObj and hands the expression to the
+-- compiler, so the first two go through getObjectProp().
+scummvmAssert(value("gObj.count") = 2)
+scummvmAssert(value("gObj.count * 2") = 4)
+scummvmAssert(value("gCnt.count + 0") = 9)
 
 -- A missing key reads as VOID rather than raising.
 scummvmAssert(voidp(value("gObj.nosuchkey")))
