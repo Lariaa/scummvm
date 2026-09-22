@@ -580,12 +580,24 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 }
 
 Common::Point Window::getMousePos() {
+	Common::Point pos;
+
 	if (Director::DT::isMouseInputIgnored() && _currentMovie) {
-		return _currentMovie->_lastMousePos;
+		pos = _currentMovie->_lastMousePos;
+	} else {
+		Common::Rect innerDims = _window->getInnerDimensions();
+		pos = g_system->getEventManager()->getMousePos() - Common::Point(innerDims.left, innerDims.top);
 	}
 
-	Common::Rect innerDims = _window->getInnerDimensions();
-	return g_system->getEventManager()->getMousePos() - Common::Point(innerDims.left, innerDims.top);
+	// A linked movie plays inside a sprite of its host but reckons in its own
+	// stage's coordinates, so while it is the movie being stepped the mouse
+	// has to arrive there too. Loewenzahn 7's quit dialog lights its two
+	// answers with rollOver(the currentSpriteNum), and the Spielebox and the
+	// Adventskalender use the same dialog.
+	if (_currentMovie && _currentMovie->_isEmbedded)
+		pos -= _currentMovie->_embeddedOrigin;
+
+	return pos;
 }
 
 void Window::setVisible(bool visible, bool silent) {
