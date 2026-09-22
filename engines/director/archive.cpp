@@ -48,7 +48,27 @@ Common::String Archive::getFileName() const { return Director::getFileName(_path
 bool Archive::openFile(const Common::Path &path) {
 	Common::File *file = new Common::File();
 
-	if (path.empty() || !file->open(path)) {
+	bool opened = !path.empty() && file->open(path);
+
+	// SearchMan caches the game tree only so deep (see the addDirectory() call
+	// in the DirectorEngine constructor). A Terzio installer puts the game
+	// under Setup/WinRoot/Terzio/<game>/, which leaves its data folder one
+	// level below that: "Haeuser bauen mit Willy Werkel" could not open
+	// data/Data.cst although findPath() had just found it on disk, and the
+	// castLib("Data") that follows came back as -1. Walk down from the game
+	// directory for those, the way listFolderContents() does.
+	if (!opened && !path.empty()) {
+		Common::FSNode node(*g_director->getGameDataDir());
+		for (auto &it : path.splitComponents()) {
+			node = node.getChild(it);
+			if (!node.exists())
+				break;
+		}
+
+		opened = node.exists() && !node.isDirectory() && file->open(node);
+	}
+
+	if (!opened) {
 		warning("Archive::openFile(): Error opening file %s", path.toString(Common::Path::kNativeSeparator).c_str());
 		delete file;
 		return false;
