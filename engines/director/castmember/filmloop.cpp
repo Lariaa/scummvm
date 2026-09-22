@@ -297,6 +297,17 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			src._height = (int16)(src._height * scaleY);
 			src._stretch = true;
 
+			// A small enough placement rect scales a small cell away entirely:
+			// Loewenzahn 5 puts its quit dialog on the caravan's bar as a 50x49
+			// thumbnail, one sixteenth of its size, and the crab's 9x9 eyes come
+			// out 0x0. There is nothing to draw then, and carrying the cell on
+			// only earns a "No source surface" warning per eye and frame -- 4204
+			// of them in one run.
+			if (src._width <= 0 || src._height <= 0) {
+				debugC(5, kDebugImages, ", scaled away");
+				continue;
+			}
+
 			debugCN(5, kDebugImages, ", scaled: %d,%d %dx%d", src._startPoint.x, src._startPoint.y, src._width, src._height);
 		} else {
 			src._startPoint.x = (src._startPoint.x - _initialRect.left) + bbox.left;
