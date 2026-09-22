@@ -35,8 +35,28 @@ class XtraCastMember;
 
 namespace TextXtra {
 
+// How one stretch of the text is drawn, as the document was authored.
+struct TextStyle {
+	Common::String font;
+	uint16 size = 12;
+	byte slant = 0;
+	byte r = 0, g = 0, b = 0;
+};
+
+struct StyleRun {
+	uint32 offset = 0;	// first character the style applies to
+	TextStyle style;
+};
+
+struct StyleRuns {
+	Common::Array<StyleRun> runs;
+	byte bgR = 0xff, bgG = 0xff, bgB = 0xff;	// the member's own background
+	int align = 0;								// 0 left, 1 centre, 2 right
+};
+
 CastMember *createCastMember(Cast *cast, uint16 castId, XtraCastMember *xtra);
 bool decodeXMED(const Common::Array<byte> &data, Common::String &text);
+bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out);
 bool parseXtraData(const Common::Array<byte> &data, Common::Rect &rect);
 
 } // End of namespace TextXtra
@@ -63,6 +83,10 @@ public:
 	Common::String formatInfo() override;
 
 	Common::U32String _text;
+	// The same text with MacText's formatting codes in front of every style
+	// run, built in load() from the document's own styles.
+	Common::U32String _ftext;
+	TextXtra::StyleRuns _styles;
 };
 
 } // End of namespace Director
