@@ -382,11 +382,16 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			CastMemberID targetCast = _currentMouseDownCastID;
 			if ((event.event == kEventKeyUp) || (event.event == kEventKeyDown))
 				targetCast = _currentKeyDownCastID;
+			// The frame events are broadcast per sprite (see queueEvent()), so
+			// they name their channel as well.
 			if ((event.event == kEventMouseDown) || (event.event == kEventRightMouseDown) ||
-				(event.event == kEventMouseEnter) || (event.event == kEventMouseLeave)) {
+				(event.event == kEventMouseEnter) || (event.event == kEventMouseLeave) ||
+				(event.event == kEventEnterFrame) || (event.event == kEventExitFrame)) {
 				if (!event.channelId)
 					return;
 				Sprite *sprite = _score->getSpriteById(event.channelId);
+				if (!sprite)
+					return;
 				targetCast = sprite->_castId;
 			}
 
@@ -693,15 +698,28 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 			if ((event == kEventEnterFrame || event == kEventExitFrame) && _vm->getVersion() >= 600) {
 				for (uint ch = 1; ch < _score->_channels.size(); ch++) {
 					Channel *channel = _score->_channels[ch];
-					if (!channel || !channel->_sprite || channel->_sprite->_behaviors.empty())
+					if (!channel || !channel->_sprite)
 						continue;
 
 					// Generate an event for each behavior. Pass through by
 					// default so the message continues to the remaining
 					// behaviors and ultimately the frame and movie scripts,
 					// unless a behavior explicitly calls dontPassEvent.
-					for (uint i = 0; i < channel->_scriptInstanceList.size(); i++)
-						queue.push(LingoEvent(event, eventId, kSpriteHandler, true, pos, ch, i));
+					if (!channel->_sprite->_behaviors.empty()) {
+						for (uint i = 0; i < channel->_scriptInstanceList.size(); i++)
+							queue.push(LingoEvent(event, eventId, kSpriteHandler, true, pos, ch, i));
+					}
+
+					// After a sprite's behaviors comes the script of the member
+					// it shows: "Cast script receives events after sprite
+					// scripts", and frame events reach sprites at all from D6 on
+					// (Lingo in a Nutshell, Epstein, "Trapping Events with
+					// Scripts" and Table 2-8). The Loewenzahn quit dialog, a
+					// movie linked into a sprite, lights its two answers from
+					// `on exitFrame` handlers on the hotspot members.
+					ScriptContext *castScript = getScriptContext(kCastScript, channel->_sprite->_castId);
+					if (castScript && castScript->_eventHandlers.contains(event))
+						queue.push(LingoEvent(event, eventId, kCastHandler, true, pos, ch));
 				}
 			}
 			// fall through
