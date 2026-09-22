@@ -566,8 +566,17 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 		pd.inkBlitShape(srcRect);
 	} else if (pd.srf) {
 		pd.inkBlitSurface(srcRect, channel->getMask());
-	} else {
-		if (debugChannelSet(4, kDebugImages)) {
+	} else if (debugChannelSet(4, kDebugImages)) {
+		// A sprite parked on an empty cast slot, or one Lingo cleared, has
+		// nothing to draw and neither has Director: that is the score's own
+		// doing, not a member we failed to render. Say so quietly -- TKKG 9's
+		// Sz32 alone produced 7968 of these in one run (member 24 of castLib 3
+		// is an empty slot the score keeps a sprite on), and they buried the
+		// cases that are worth seeing, such as a film loop inside a film loop.
+		if (castType == kCastTypeNull || channel->_sprite->_castId.member == 0) {
+			debugC(4, kDebugImages, "Window::inkBlitFrom(): nothing to draw for %s (%s)",
+				channel->_sprite->_castId.asString().c_str(), castType2str(castType));
+		} else {
 			warning("Window::inkBlitFrom(): No source surface: spriteType: %d (%s), castType: %d (%s), castId: %s",
 				channel->_sprite->_spriteType, spriteType2str(channel->_sprite->_spriteType), castType, castType2str(castType),
 				channel->_sprite->_castId.asString().c_str());
