@@ -1225,9 +1225,27 @@ Common::String Datum::asString(bool printonly) const {
 		break;
 	case OBJECT:
 		if (!printonly) {
-			// Object names in Director are: "<Object:hex>"
-			// the starting '<' is important, it's used when comparing objects and integers
-			s = Common::String::format("<Object:%08x>", ((uint32)(size_t)((void *)u.obj)) & 0xffffffff);
+			// A child object carries the name of the script it was born from,
+			// its reference count and its id. Lingo in a Nutshell (Epstein),
+			// "Child Object References": an object reference takes the form
+			// <offspring "parentScriptName" referenceCount IDnumber>, e.g.
+			//   put myChild -- <offspring "parent script" 2 27c24f8>
+			//
+			// Games pick objects out of a list by that name: TKKG 11, 13 and 14
+			// find their sound player with `string(obj) contains
+			// "Soundplay_Obj"`, and until it answered to that, the player never
+			// heard the animation points it waits for, so every scene stopped
+			// on its first frame.
+			//
+			// Everything else keeps the older generic form. In both, the
+			// leading '<' is what makes an object compare greater than a number.
+			if (u.obj->getObjType() & kScriptObj) {
+				int *objRefCount = u.obj->getRefCount();
+				s = Common::String::format("<offspring \"%s\" %d %x>", u.obj->getName().c_str(),
+						objRefCount ? *objRefCount : 0, ((uint32)(size_t)((void *)u.obj)) & 0xffffff);
+			} else {
+				s = Common::String::format("<Object:%08x>", ((uint32)(size_t)((void *)u.obj)) & 0xffffffff);
+			}
 		} else {
 			s = u.obj->asString();
 		}
