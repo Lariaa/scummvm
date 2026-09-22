@@ -239,6 +239,11 @@ public:
 	// host's handler scope, so getHandler() falls back to the parent.
 	Movie *_parentMovie = nullptr;
 
+	// For an embedded movie, where its stage's corner sits in the host's
+	// coordinates. Its own Lingo reckons from that corner, so the mouse has
+	// to be shifted by it (Window::getMousePos()).
+	Common::Point _embeddedOrigin;
+
 private:
 	Window *_window;
 	DirectorEngine *_vm;
