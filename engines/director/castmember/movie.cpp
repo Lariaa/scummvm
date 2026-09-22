@@ -82,6 +82,11 @@ Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint
 	if (!_score || _score->_channels.empty())
 		return &_subchannels;
 
+	// Where the linked movie's stage corner sits on the host's stage, for the
+	// Lingo running inside it (Window::getMousePos()).
+	if (_linkedMovie)
+		_linkedMovie->_embeddedOrigin = Common::Point(bbox.left, bbox.top);
+
 	bool needToScale = (bbox.width() != _initialRect.width() || bbox.height() != _initialRect.height());
 	float scaleX = needToScale ? (float)bbox.width() / _initialRect.width() : 1.0f;
 	float scaleY = needToScale ? (float)bbox.height() / _initialRect.height() : 1.0f;
@@ -237,6 +242,7 @@ void MovieCastMember::routeInputEvent(LEvent event, Common::Point hostPos, const
 		p.x = (hostPos.x - bbox.left) * _initialRect.width() / bbox.width();
 		p.y = (hostPos.y - bbox.top) * _initialRect.height() / bbox.height();
 	}
+	_linkedMovie->_embeddedOrigin = Common::Point(bbox.left, bbox.top);
 
 	_linkedMovie->queueInputEvent(event, 0, p);
 }
