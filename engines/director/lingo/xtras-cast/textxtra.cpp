@@ -49,13 +49,77 @@ static uint hexValue(byte c) {
 	return c - 'a' + 10;
 }
 
+static bool isHexRun(const Common::Array<byte> &data, uint32 pos, uint32 digits) {
+	if (pos + digits > data.size())
+		return false;
+	for (uint32 i = 0; i < digits; i++) {
+		if (!isHexDigit(data[pos + i]))
+			return false;
+	}
+	return true;
+}
+
+static uint32 hexField(const Common::Array<byte> &data, uint32 pos, uint32 digits) {
+	uint32 value = 0;
+	for (uint32 i = 0; i < digits; i++)
+		value = value * 16 + hexValue(data[pos + i]);
+	return value;
+}
+
 // XMED payload is an ASCII-hex serialized Hermes-Paige document:
-// "FFFF" header, then 0x00 <hex length> ',' <text>, then style runs.
+// "FFFF" header, then sections, each 0x03, a 4-digit hex id, an 8-digit hex
+// length and an 8-digit hex count, then a body; the next section starts
+// 20 + length bytes after the 0x03. Section 0002 holds the text, as
+// 0x00 <hex length> ',' <text>.
+//
+// A long text is split over several 0002 sections, and the count field then
+// gives the character offset the piece starts at. TKKG 14's sound play lists
+// need them: sc01 holds 4410 characters in two pieces, sc31 17819 in six.
+// Reading only the first piece cut the list off mid-entry, so it no longer
+// parsed and the scene held on its first frame waiting for a sequence that
+// never started.
 bool decodeXMED(const Common::Array<byte> &data, Common::String &text) {
 	uint32 size = data.size();
 	if (size < 4 || memcmp(data.data(), "FFFF", 4) != 0)
 		return false;
 
+	text.clear();
+
+	// The header fields in front of the first section vary in length, so look
+	// for the first thing that is shaped like a section header.
+	uint32 pos = 20;
+	while (pos + 21 <= size && !(data[pos] == 0x03 && isHexRun(data, pos + 1, 20)))
+		pos++;
+
+	while (pos + 21 <= size && data[pos] == 0x03 && isHexRun(data, pos + 1, 20)) {
+		uint32 id = hexField(data, pos + 1, 4);
+		uint32 sectionLen = hexField(data, pos + 5, 8);
+		if (sectionLen < 1 || pos + 20 + sectionLen > size)
+			break;
+
+		if (id == 0x0002) {
+			uint32 j = pos + 21;
+			if (j < size && data[j] == 0x00) {
+				j++;
+				uint32 len = 0;
+				int digits = 0;
+				while (j < size && isHexDigit(data[j]) && digits < 6) {
+					len = len * 16 + hexValue(data[j]);
+					j++;
+					digits++;
+				}
+				if (digits > 0 && j < size && data[j] == ',' && j + 1 + len <= size)
+					text += Common::String((const char *)&data[j + 1], len);
+			}
+		}
+
+		pos += 20 + sectionLen;
+	}
+
+	if (!text.empty())
+		return true;
+
+	// No usable section chain: fall back to the first blob that reads as text.
 	for (uint32 i = 0; i + 2 < size; i++) {
 		if (data[i] != 0x00)
 			continue;
