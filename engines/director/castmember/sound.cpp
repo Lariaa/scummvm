@@ -230,6 +230,7 @@ bool SoundCastMember::hasField(int field) {
 	case kTheCuePointNames:		// D6
 	case kTheCuePointTimes:		// D6
 	case kTheCurrentTime:		// D6
+	case kTheDuration:
 	case kTheLoop:
 	case kTheSampleRate:
 	case kTheSampleSize:
@@ -271,6 +272,14 @@ Datum SoundCastMember::getField(int field) {
 			d.type = ARRAY;
 			d.u.farr = arr;
 		}
+		break;
+	case kTheDuration:
+		// Director limits duration to transitions, digital video and streaming
+		// sound (Director 8 Demystified, Lingo Lexicon), and gives it in the unit
+		// the currentTime of a sound uses, milliseconds. TKKG 13 and 14 hand a
+		// linked member its file and then read its duration to pace the scene
+		// against the sound; without an answer they stopped on their first frame.
+		d = (int)_audio->getDuration();
 		break;
 	case kTheLoop:
 		d = _looping ? 1 : 0;
