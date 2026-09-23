@@ -91,6 +91,16 @@ Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint
 	float scaleX = needToScale ? (float)bbox.width() / _initialRect.width() : 1.0f;
 	float scaleY = needToScale ? (float)bbox.height() / _initialRect.height() : 1.0f;
 
+	// Placement diagnostics, the counterpart of the film loop's. A sprite that
+	// lands somewhere unexpected inside an embedded movie shows up here as a
+	// stage rect whose corner is not the one the sprites count from, or as a
+	// scale factor that does not match the placement.
+	debugC(3, kDebugImages, "MovieCastMember::getSubChannels(): cast %d, %d channels: stage rect %dx%d@%d,%d, placement bbox %dx%d@%d,%d, needToScale %d (scaleX %.3f scaleY %.3f)",
+			_castId, (int)_score->_channels.size() - 1,
+			_initialRect.width(), _initialRect.height(), _initialRect.left, _initialRect.top,
+			bbox.width(), bbox.height(), bbox.left, bbox.top,
+			needToScale, scaleX, scaleY);
+
 	// The member's rect is the linked movie's stage rect, and that carries
 	// where the stage window sat on the author's screen: Loewenzahn 8's
 	// beenden.dir has (89, 0, 889, 600), the Spielebox's and the
@@ -122,6 +132,10 @@ Common::Array<Channel> *MovieCastMember::getSubChannels(Common::Rect &bbox, uint
 			src._startPoint.x += bbox.left;
 			src._startPoint.y += bbox.top;
 		}
+
+		debugC(5, kDebugImages, "  embedded sub-sprite %d: cast member %s, ink %d, %dx%d at %d,%d",
+				i, src._castId.asString().c_str(), src._ink,
+				src._width, src._height, src._startPoint.x, src._startPoint.y);
 
 		Channel chan(nullptr, &src);
 		_subchannels.push_back(chan);
