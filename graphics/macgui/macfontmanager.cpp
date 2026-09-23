@@ -713,7 +713,15 @@ int MacFontManager::registerFontName(Common::String name, int preferredId) {
 
 	FontInfo *info = new FontInfo;
 	info->name = name;
-	if (preferredId >= 0x4000) {
+	// A font id at or above 0x4000 belongs to a Japanese font -- but only in a
+	// Japanese product. Director's font maps hand out ids from the same range
+	// whatever the language: "Bygg hus med Mulle Meck" (German) maps 0x8001 to
+	// Courier and 0x8002 to Arial, both flagged as Windows fonts. Taking those
+	// for Japanese made every text member drawn in them decode as Shift JIS,
+	// which turned the name "Stella, Trabyra" (with umlauts) into one CJK
+	// character plus a replacement character, and the list it belongs to no
+	// longer parsed.
+	if (preferredId >= 0x4000 && _language == Common::JA_JPN) {
 		info->lang = Common::JA_JPN;
 		info->encoding = Common::kWindows932; // default to Shift JIS
 	} else {
