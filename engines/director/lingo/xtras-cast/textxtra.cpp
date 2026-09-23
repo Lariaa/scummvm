@@ -455,6 +455,20 @@ CastMember *createCastMember(Cast *cast, uint16 castId, XtraCastMember *xtra) {
 
 } // End of namespace TextXtra
 
+// The document names its fonts ("Arial", "AvantGarde", "Cooper Black"), so look
+// them up the way a text member's Lingo font assignment does. registerFontName()
+// would coin a fresh id instead, one the font manager has no _fontInfo for: it
+// warned about every lookup and fell back to Geneva, whose glyph table has no
+// umlauts, which turned TKKG 7's Steckbrief into "Schlo? Hohenblaubl?then".
+// A name the manager does not know resolves to the system font, which draws
+// them.
+static int fontIdFor(const Common::String &name) {
+	if (name.empty())
+		return Graphics::kMacFontSystem;
+
+	return g_director->_wm->_fontMan->getFontIdByName(name);
+}
+
 TextXtraCastMember::TextXtraCastMember(Cast *cast, uint16 castId, XtraCastMember &source)
 		: CastMember(cast, castId) {
 	// Not kCastText: the engine casts kCastText members to TextCastMember
@@ -531,8 +545,7 @@ void TextXtraCastMember::load() {
 						continue;
 
 					const TextXtra::TextStyle &s = styles.runs[i].style;
-					int fontId = s.font.empty() ? Graphics::kMacFontSystem
-							: g_director->_wm->_fontMan->registerFontName(s.font);
+					int fontId = fontIdFor(s.font);
 
 					// The colour components travel as 16-bit fields whose low
 					// byte MacText keeps (mactext-canvas.cpp: findBestColor(
@@ -575,9 +588,7 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 	Graphics::MacFont macFont(1, 12);
 	if (!_styles.runs.empty()) {
 		const TextXtra::TextStyle &first = _styles.runs[0].style;
-		int fontId = first.font.empty() ? Graphics::kMacFontSystem
-				: g_director->_wm->_fontMan->registerFontName(first.font);
-		macFont = Graphics::MacFont(fontId, first.size, first.slant);
+		macFont = Graphics::MacFont(fontIdFor(first.font), first.size, first.slant);
 	}
 
 	Graphics::TextAlign align = Graphics::kTextAlignLeft;
