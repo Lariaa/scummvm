@@ -37,6 +37,8 @@
 #include "director/castmember/bitmap.h"
 #include "director/castmember/filmloop.h"
 #include "director/picture.h"
+#include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-the.h"
 
 
 namespace Director {
@@ -480,6 +482,40 @@ void FilmLoopCastMember::load() {
 
 void FilmLoopCastMember::unload() {
 	// No unload necessary.
+}
+
+bool FilmLoopCastMember::hasField(int field) {
+	switch (field) {
+	case kTheRegPoint:
+		return true;
+	default:
+		break;
+	}
+	return CastMember::hasField(field);
+}
+
+Datum FilmLoopCastMember::getField(int field) {
+	Datum d;
+
+	switch (field) {
+	case kTheRegPoint: {
+			// A film loop registers on the centre of its rect, which is what the
+			// drawing path places it by, so the property has to say the same.
+			// TKKG 13 and 14 animate a speaking head by swapping the sprite's film
+			// loop and moving the sprite by the difference of the two members'
+			// rects and registration points, so that the picture stays put.
+			Common::Point reg = getRegistrationOffset();
+			d.type = POINT;
+			d.u.farr = new FArray;
+			d.u.farr->arr.push_back(reg.x);
+			d.u.farr->arr.push_back(reg.y);
+		}
+		break;
+	default:
+		d = CastMember::getField(field);
+	}
+
+	return d;
 }
 
 Common::Point FilmLoopCastMember::getRegistrationOffset() {
