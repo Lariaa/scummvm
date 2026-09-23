@@ -561,8 +561,14 @@ void TextXtraCastMember::load() {
 						_ftext += _text[c];
 					}
 
-					debugC(4, kDebugText, "TextXtraCastMember::load(): run at %d: font '%s' %d pt, slant %d, RGB(%d, %d, %d)",
-							from, s.font.c_str(), s.size, s.slant, s.r, s.g, s.b);
+					// The resolved id and the language it is registered under
+					// decide which glyph table MacText draws the run from: a
+					// font registered as Japanese has no umlauts, which is how
+					// TKKG 7's Steckbrief lost them.
+					debugC(4, kDebugText, "TextXtraCastMember::load(): run at %d: font '%s' -> id %d (language %d), %d pt, slant %d, RGB(%d, %d, %d)",
+							from, s.font.c_str(), fontId,
+							(int)g_director->_wm->_fontMan->getFontLanguage(fontId),
+							s.size, s.slant, s.r, s.g, s.b);
 				}
 
 				debugC(3, kDebugText, "TextXtraCastMember::load(): %d style runs, background RGB(%d, %d, %d), align %d",
