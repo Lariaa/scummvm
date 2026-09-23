@@ -22,6 +22,8 @@
 #include "common/macresman.h"
 #include "common/stream.h"
 
+#include "graphics/macgui/macfontmanager.h"
+
 #include "director/director.h"
 #include "director/cast.h"
 #include "director/stxt.h"
@@ -109,6 +111,14 @@ Stxt::Stxt(Cast *cast, Common::SeekableReadStreamEndian &textStream) : _cast(cas
 	_ptext += u32Text;
 	_ftext += u32Text;
 	logText += Common::toPrintable(u32Text);
+
+	// Which code page the bytes were read as, and what decided it: the cast's
+	// platform and the language the font id is registered under. A text that
+	// comes out as one CJK character where two accented letters belong was read
+	// as Shift JIS, and this line says why.
+	debugC(4, kDebugText, "Stxt::load(): cast platform %d, font %d registered as language %d -> code page %d",
+			(int)cast->_platform, _style.fontId,
+			(int)g_director->_wm->_fontMan->getFontLanguage(_style.fontId), (int)encoding);
 
 	debugC(4, kDebugText, "#### text:\n%s\n####", logText.encode(Common::kUtf8).c_str());
 }
