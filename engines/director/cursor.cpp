@@ -155,11 +155,17 @@ void Cursor::readFromCast(Datum cursorCasts) {
 
 			if (!cursor) {
 				*dst = 3;
-			} else {
-				*dst = (!mask || *mask) ? (*cursor ? 0 : 1) : 3;
+			} else if (!mask) {
+				// No mask member: the Custom Cursor Xtra's autoMask, whose
+				// documented default is on. "When autoMask is set to TRUE, the
+				// white pixels are transparent" -- so a cursor without a mask
+				// is its own mask, rather than a solid 16x16 block.
+				*dst = *cursor ? 0 : 3;
 				cursor++;
-				if (mask)
-					mask++;
+			} else {
+				*dst = *mask ? (*cursor ? 0 : 1) : 3;
+				cursor++;
+				mask++;
 			}
 			dst++;
 		}
