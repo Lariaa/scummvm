@@ -141,8 +141,15 @@ void Cursor::readFromCast(Datum cursorCasts) {
 		}
 
 		for (int x = 0; x < 16; x++) {
+			// Stop at the edge of the picture, and at the edge of the mask if
+			// there is one. Asking for !maskSurface here instead made every
+			// column of a cursor that has no mask fall through to the
+			// transparent branch below, so the whole cursor disappeared --
+			// Loewenzahn 8's cursors come from a Cursor Xtra member that names
+			// no mask at all. The row loop above has the test the right way
+			// round.
 			if (x >= cursorSurface->w ||
-					(!maskSurface || x >= maskSurface->w)) {
+					(maskSurface && x >= maskSurface->w)) {
 				cursor = mask = nullptr;
 			}
 
