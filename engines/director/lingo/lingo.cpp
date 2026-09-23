@@ -1240,9 +1240,9 @@ Common::String Datum::asString(bool printonly) const {
 			// Everything else keeps the older generic form. In both, the
 			// leading '<' is what makes an object compare greater than a number.
 			if (u.obj->getObjType() & kScriptObj) {
-				int *refCount = u.obj->getRefCount();
+				int *objRefCount = u.obj->getRefCount();
 				s = Common::String::format("<offspring \"%s\" %d %x>", u.obj->getName().c_str(),
-						refCount ? *refCount : 0, ((uint32)(size_t)((void *)u.obj)) & 0xffffff);
+						objRefCount ? *objRefCount : 0, ((uint32)(size_t)((void *)u.obj)) & 0xffffff);
 			} else {
 				s = Common::String::format("<Object:%08x>", ((uint32)(size_t)((void *)u.obj)) & 0xffffffff);
 			}
