@@ -66,6 +66,9 @@ public:
 
 	Common::String formatInfo() override;
 
+	bool hasField(int field) override;
+	Datum getField(int field) override;
+
 	void load() override;
 	void unload() override;
 
