@@ -1215,6 +1215,17 @@ Audio::AudioStream *SNDDecoder::getAudioStream(bool looping, bool forPuppet, Dis
 	return stream;
 }
 
+uint32 SNDDecoder::getDuration() {
+	if (!_data || !_rate || !_channels || !_bits)
+		return 0;
+
+	uint32 frameSize = _channels * (_bits / 8);
+	if (!frameSize)
+		return 0;
+
+	return (uint32)((uint64)(_size / frameSize) * 1000 / _rate);
+}
+
 bool SNDDecoder::hasLoopBounds() {
 	return _loopStart != 0 || _loopEnd != 0;
 }
@@ -1330,6 +1341,23 @@ Audio::AudioStream *AudioFileDecoder::getAudioStream(bool looping, bool forPuppe
 	}
 
 	return nullptr;
+}
+
+uint32 AudioFileDecoder::getDuration() {
+	// A linked sound only knows how long it is once its file has been read, so
+	// decode it, ask, and throw the stream away again. Scripts read this once
+	// per sound to pace themselves against it, not per frame.
+	Audio::AudioStream *stream = getAudioStream(false, false, DisposeAfterUse::YES);
+	if (!stream)
+		return 0;
+
+	uint32 duration = 0;
+	Audio::SeekableAudioStream *seekable = dynamic_cast<Audio::SeekableAudioStream *>(stream);
+	if (seekable)
+		duration = seekable->getLength().msecs();
+
+	delete stream;
+	return duration;
 }
 
 MoaStreamDecoder::MoaStreamDecoder(Common::String &format, Common::SeekableReadStreamEndian *stream)
