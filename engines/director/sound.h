@@ -296,6 +296,12 @@ public:
 	virtual int getChannelCount() { return 0; }
 	virtual int getSampleRate() { return 0; }
 	virtual int getSampleSize() { return 0; }
+
+	// Playing time in milliseconds, the unit the currentTime of a sound is
+	// given in (Director 8 Demystified, Lingo Lexicon "currentTime (sound)").
+	// 0 means "not known", which is what Director answers for a member whose
+	// sound has not been streamed yet.
+	virtual uint32 getDuration() { return 0; }
 };
 
 class SNDDecoder : public AudioDecoder {
@@ -314,6 +320,7 @@ public:
 	int getChannelCount() override { return _channels; }
 	int getSampleRate() override { return _rate; }
 	int getSampleSize() override { return _bits; }
+	uint32 getDuration() override;
 
 private:
 	byte *_data;
@@ -334,6 +341,7 @@ public:
 	void setPath(Common::String &path);
 
 	Audio::AudioStream *getAudioStream(bool looping = false, bool forPuppet = false, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES) override;
+	uint32 getDuration() override;
 
 private:
 	Common::String _path;
