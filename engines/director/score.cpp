@@ -1041,6 +1041,40 @@ void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 			currentSprite->_autoPuppet = 0;
 		}
 
+		// A channel the score never places a sprite in is not a channel Lingo can
+		// draw into. Director 8 Demystified, under puppetSprite: "Puppeting is
+		// still required when you want Lingo to control a sprite after the sprite
+		// is no longer in the Score. Without puppeting, Lingo changes to a sprite
+		// last only so long as the sprite is in the Score." A channel with no span
+		// at all never has one, so an auto-puppeted member there shows nothing in
+		// Director.
+		//
+		// TKKG 8's bar is written that way. One scene object serves all eight
+		// variants of scene 80 and does
+		//     sprite(53).member = member(91, "Sz80")
+		// but only Sz80K1, T1, W1 and g1 carry a sprite in channel 53; G2, K2, T2
+		// and W2 -- the one the player reaches -- do not. The line is dead code
+		// there, and ScummVM painted the knot board (154x131) at the stage's top
+		// left corner, clipped to 63x131 at 0,27: the white rectangle over the bar.
+		//
+		// The score's own span data is D6+, and below that startFrame is -1 for
+		// every channel, so the test would throw out every Lingo-set sprite.
+		// Explicit puppeting always wins, and a channel that is mid-span keeps
+		// what it has -- that is the case the auto-puppet reclaim above covers.
+		if (g_director->getVersion() >= 600 && currentSprite && nextSprite &&
+				!currentSprite->_puppet && currentSprite->_autoPuppet &&
+				!currentSprite->_castId.isNull() &&
+				channel->_startFrame == -1 && nextSprite->_spriteInfo.startFrame == -1) {
+			debugC(4, kDebugImages, "Score::updateSprites(): channel %d has no score sprite, dropping the Lingo member %s",
+					i, currentSprite->_castId.asString().c_str());
+			currentSprite->_autoPuppet = 0;
+			currentSprite->setCast(CastMemberID(0, 0));
+			// setCast() leaves the type alone for an empty member, and an empty
+			// score channel reports kInactiveSprite.
+			currentSprite->_spriteType = kInactiveSprite;
+			channel->setDirty();
+		}
+
 		// widget content has changed and needs a redraw.
 		// this doesn't include changes in dimension or position!
 		bool widgetRedrawn = channel->updateWidget();
