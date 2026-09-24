@@ -249,6 +249,30 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 		if (stream.pos() < stream.size()) {
 			_updateFlags = stream.readByte();
 
+			// The member says whether its alpha channel counts. Director 8
+			// Demystified, under useAlpha: "alpha channel information is used
+			// when the useAlpha property is TRUE, and it is ignored when the
+			// value is FALSE (the default). The useAlpha property only works on
+			// 32-bit images." kFlagFollowAlpha is where that switch is stored;
+			// the flag was read here all along and never asked.
+			//
+			// Plenty of 32-bit artwork carries an alpha plane that is not a
+			// silhouette. Loewenzahn 5's login screen has three such members --
+			// "schneckenmaske", "zugmaske" and "augenmaske" -- whose alpha is a
+			// halftone of alternating rows crossed by a diagonal. Used as a
+			// matte it painted exactly that pattern into the open doors of the
+			// first three wagons; the other three wagons use members whose alpha
+			// is constant, fall back to the flood fill, and look right.
+			//
+			// Counted over whole titles, the flag and a usable alpha go
+			// together: Loewenzahn 5 937 members with both against 34 with an
+			// alpha but no flag, Loewenzahn 8 3572 against 33, TKKG 14 13786
+			// against 54. The exceptions are named "...maske" or "..._print", or
+			// hold no fully opaque pixel at all. The confirmed cases keep their
+			// flag: Loewenzahn 8's "Rahmen" (the frame with the see-through
+			// middle) and its treasure chest both carry it.
+			_useAlpha = (_updateFlags & kFlagFollowAlpha) != 0;
+
 			// This is color image flag
 			if (_pitch & 0x8000) {
 				_pitch &= 0x3fff;
