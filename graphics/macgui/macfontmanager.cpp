@@ -419,7 +419,12 @@ void MacFontManager::loadMacFont(Common::MacResManager *fontFile, const Common::
 
 			FontInfo *info = new FontInfo;
 			info->name = fontFamily->getName();
-			if (id >= 0x4000) {
+			// Same as in registerFontName(): a family id at or above 0x4000
+			// means a Japanese font only in a Japanese product. "Bygg hus med
+			// Mulle Meck" (German) ships a font family with id 0x8001, and
+			// reading every text drawn in it as Shift JIS broke the property
+			// lists the game builds its objects from.
+			if (id >= 0x4000 && _language == Common::JA_JPN) {
 				info->lang = Common::JA_JPN;
 				info->encoding = Common::kWindows932;
 			} else {
