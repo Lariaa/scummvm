@@ -1847,7 +1847,14 @@ public:
 		// version, not the main movie's. Löwenzahn 4 loads the D7 cast TS/MPEG_W.DIR
 		// into a D9 movie at runtime; reading its handler records as D8.5+ ate four
 		// bytes of stackHeight per handler and walked the offsets off the end.
-		_scripts[id] = new LingoDec::Script(_cast->_version);
+		// LingoDec compares against human version numbers (500 for the literal
+		// and property forms, 850 for the stackHeight field in a handler
+		// record). _version is the number the file itself carries -- 1115 for
+		// D4, 1410 for D8 -- and every one of those is already above 850, so
+		// each cast from D4 to D8 was read as D8.5 or newer. That ate four
+		// bytes per handler record, and from the second handler on every
+		// offset pointed somewhere else.
+		_scripts[id] = new LingoDec::Script(humanVersion(_cast->_version));
 		_scripts[id]->read(*r);
 		delete r;
 
@@ -1861,7 +1868,7 @@ public:
 		Common::SeekableReadStreamEndian *r;
 
 		r = _cast->_castArchive->getResource(MKTAG('L', 'n', 'a', 'm'), id);
-		_scriptnames[id] = new LingoDec::ScriptNames(_cast->_version);
+		_scriptnames[id] = new LingoDec::ScriptNames(humanVersion(_cast->_version));
 		_scriptnames[id]->read(*r);
 		delete r;
 
@@ -1971,7 +1978,7 @@ void Cast::loadLingoContext(Common::SeekableReadStreamEndian &stream) {
 		// Rewind stream
 		stream.seek(0);
 		_chunkResolver = new ChunkResolver(this);
-		_lingodec = new LingoDec::ScriptContext(_version, _chunkResolver);
+		_lingodec = new LingoDec::ScriptContext(humanVersion(_version), _chunkResolver);
 		_lingodec->read(stream);
 
 		_lingodec->parseScripts();
