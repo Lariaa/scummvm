@@ -333,6 +333,15 @@ Common::SharedPtr<Node> Handler::readChunkRef(uint32 offset, Common::SharedPtr<N
 	return string;
 }
 
+bool Handler::bytecodeIndexAt(uint32 pos, uint32 &index) const {
+	auto it = bytecodePosMap.find(pos);
+	if (it == bytecodePosMap.end() || it->second >= bytecodeArray.size())
+		return false;
+
+	index = it->second;
+	return true;
+}
+
 void Handler::tagLoops() {
 	// Tag any jmpifz which is a loop with the loop type
 	// (kTagRepeatWhile, kTagRepeatWithIn, kTagRepeatWithTo, kTagRepeatWithDownTo).
@@ -348,7 +357,10 @@ void Handler::tagLoops() {
 
 		// ...and end with endrepeat.
 		uint32 jmpPos = jmpifz.pos + jmpifz.obj;
-		uint32 endIndex = bytecodePosMap[jmpPos];
+		uint32 endIndex;
+		if (!bytecodeIndexAt(jmpPos, endIndex) || endIndex < 1)
+			continue;
+
 		auto &endRepeat = bytecodeArray[endIndex - 1];
 		if (endRepeat.opcode != kOpEndRepeat || (endRepeat.pos - endRepeat.obj) > jmpifz.pos)
 			continue;
@@ -357,6 +369,13 @@ void Handler::tagLoops() {
 		bytecodeArray[startIndex].tag = loopType;
 
 		if (loopType == kTagRepeatWithIn) {
+			// The tags below reach from startIndex - 7 to endIndex, which
+			// isRepeatWithIn() has already read; keep the writes inside the
+			// array even if that ever changes.
+			if (startIndex < 7 || startIndex + 5 >= bytecodeArray.size()
+					|| endIndex < 3 || endIndex >= bytecodeArray.size())
+				continue;
+
 			for (uint32 i = startIndex - 7, end = startIndex - 1; i <= end; i++)
 				bytecodeArray[i].tag = kTagSkip;
 			for (uint32 i = startIndex + 1, end = startIndex + 5; i <= end; i++)
@@ -368,7 +387,11 @@ void Handler::tagLoops() {
 			bytecodeArray[endIndex - 1].ownerLoop = startIndex;
 			bytecodeArray[endIndex].tag = kTagSkip; // pop 3
 		} else if (loopType == kTagRepeatWithTo || loopType == kTagRepeatWithDownTo) {
-			uint32 conditionStartIndex = bytecodePosMap[endRepeat.pos - endRepeat.obj];
+			uint32 conditionStartIndex;
+			if (!bytecodeIndexAt(endRepeat.pos - endRepeat.obj, conditionStartIndex)
+					|| conditionStartIndex < 1 || startIndex < 1 || endIndex < 5)
+				continue;
+
 			bytecodeArray[conditionStartIndex - 1].tag = kTagSkip; // set
 			bytecodeArray[conditionStartIndex].tag = kTagSkip; // get
 			bytecodeArray[startIndex - 1].tag = kTagSkip; // lteq / gteq
@@ -387,7 +410,13 @@ void Handler::tagLoops() {
 }
 
 bool Handler::isRepeatWithIn(uint32 startIndex, uint32 endIndex) {
-	if (startIndex < 7 || startIndex > bytecodeArray.size() - 6)
+	// startIndex - 7 up to startIndex + 5 and endIndex - 3 up to endIndex are
+	// read below. Writing the upper bound as size() - 6 underflowed for a
+	// handler with fewer than six instructions, which let every one of those
+	// reads run off the array.
+	if (startIndex < 7 || startIndex + 5 >= bytecodeArray.size())
+		return false;
+	if (endIndex < 3 || endIndex >= bytecodeArray.size())
 		return false;
 	if (!(bytecodeArray[startIndex - 7].opcode == kOpPeek && bytecodeArray[startIndex - 7].obj == 0))
 		return false;
@@ -417,8 +446,6 @@ bool Handler::isRepeatWithIn(uint32 startIndex, uint32 endIndex) {
 			|| bytecodeArray[startIndex + 5].opcode == kOpSetParam || bytecodeArray[startIndex + 5].opcode == kOpSetLocal))
 		return false;
 
-	if (endIndex < 3)
-		return false;
 	if (!(bytecodeArray[endIndex - 3].opcode == kOpPushInt8 && bytecodeArray[endIndex - 3].obj == 1))
 		return false;
 	if (!(bytecodeArray[endIndex - 2].opcode == kOpAdd))
@@ -450,10 +477,13 @@ BytecodeTag Handler::identifyLoop(uint32 startIndex, uint32 endIndex) {
 		return kTagRepeatWhile;
 	}
 
-	auto &endRepeat = bytecodeArray[endIndex - 1];
-	uint32 conditionStartIndex = bytecodePosMap[endRepeat.pos - endRepeat.obj];
+	if (endIndex < 1 || endIndex > bytecodeArray.size())
+		return kTagRepeatWhile;
 
-	if (conditionStartIndex < 1)
+	auto &endRepeat = bytecodeArray[endIndex - 1];
+	uint32 conditionStartIndex;
+	if (!bytecodeIndexAt(endRepeat.pos - endRepeat.obj, conditionStartIndex)
+			|| conditionStartIndex < 1)
 		return kTagRepeatWhile;
 
 	OpCode getOp;
@@ -526,8 +556,9 @@ void Handler::parse() {
 						if (caseLabel->expect == kCaseExpectOtherwise) {
 							ast.currentBlock->currentCaseLabel = nullptr;
 							caseStmt->addOtherwise(i);
-							size_t otherwiseIndex = bytecodePosMap[caseStmt->potentialOtherwisePos];
-							bytecodeArray[otherwiseIndex].translation = Common::SharedPtr<Node>(caseStmt->otherwise);
+							uint32 otherwiseIndex;
+							if (bytecodeIndexAt(caseStmt->potentialOtherwisePos, otherwiseIndex))
+								bytecodeArray[otherwiseIndex].translation = Common::SharedPtr<Node>(caseStmt->otherwise);
 							ast.enterBlock(caseStmt->otherwise->block.get());
 						} else if (caseLabel->expect == kCaseExpectEnd) {
 							ast.currentBlock->currentCaseLabel = nullptr;
@@ -789,7 +820,14 @@ uint32 Handler::translateBytecode(Bytecode &bytecode, uint32 index) {
 	case kOpJmp:
 		{
 			uint32 targetPos = bytecode.pos + bytecode.obj;
-			size_t targetIndex = bytecodePosMap[targetPos];
+			uint32 targetIndex;
+			// A jump whose target carries no bytecode: operator[] would insert a
+			// fresh 0 here and targetIndex - 1 just below would wrap.
+			if (!bytecodeIndexAt(targetPos, targetIndex) || targetIndex < 1) {
+				translation = Common::SharedPtr<Node>(new CommentNode(bytecode.pos, "ERROR: Jmp has no target!"));
+				break;
+			}
+
 			auto &targetBytecode = bytecodeArray[targetIndex];
 			auto ancestorLoop = ast.currentBlock->ancestorLoop();
 			if (ancestorLoop) {
@@ -801,9 +839,13 @@ uint32 Handler::translateBytecode(Bytecode &bytecode, uint32 index) {
 					break;
 				}
 			}
-			auto &nextBytecode = bytecodeArray[index + 1];
+			// A jmp as the last instruction of a handler -- which is what a
+			// handler whose bytecode broke off mid-stream ends on -- has no
+			// next bytecode to look at. Common::Array::operator[] asserts on
+			// the way past the end, and without asserts it reads out of bounds.
 			auto ancestorStatement = ast.currentBlock->ancestorStatement();
-			if (ancestorStatement && nextBytecode.pos == ast.currentBlock->endPos) {
+			if (ancestorStatement && index + 1 < bytecodeArray.size()
+					&& bytecodeArray[index + 1].pos == ast.currentBlock->endPos) {
 				if (ancestorStatement->type == kIfStmtNode) {
 					auto ifStmt = static_cast<IfStmtNode *>(ancestorStatement);
 					if (ast.currentBlock == ifStmt->block1.get()) {
@@ -845,7 +887,6 @@ uint32 Handler::translateBytecode(Bytecode &bytecode, uint32 index) {
 	case kOpJmpIfZ:
 		{
 			uint32 endPos = bytecode.pos + bytecode.obj;
-			uint32 endIndex = bytecodePosMap[endPos];
 			switch (bytecode.tag) {
 			case kTagRepeatWhile:
 				{
@@ -861,7 +902,11 @@ uint32 Handler::translateBytecode(Bytecode &bytecode, uint32 index) {
 			case kTagRepeatWithIn:
 				{
 					auto list = pop();
-					Common::String varName = getVarNameFromSet(bytecodeArray[index + 5]);
+					// The loop variable is set five instructions on. A tag that
+					// does not have one -- a handler whose bytecode broke off --
+					// leaves the name out rather than reading past the array.
+					Common::String varName = (index + 5 < bytecodeArray.size())
+							? getVarNameFromSet(bytecodeArray[index + 5]) : Common::String();
 					auto loop = Common::SharedPtr<RepeatWithInStmtNode>(new RepeatWithInStmtNode(bytecode.pos, varName, Common::move(list), bytecode.pos));
 					loop->block->endPos = endPos;
 					loop->block->_endOffset = endPos;
@@ -876,9 +921,17 @@ uint32 Handler::translateBytecode(Bytecode &bytecode, uint32 index) {
 					bool up = (bytecode.tag == kTagRepeatWithTo);
 					auto end = pop();
 					auto start = pop();
-					auto endRepeat = bytecodeArray[endIndex - 1];
-					uint32 conditionStartIndex = bytecodePosMap[endRepeat.pos - endRepeat.obj];
-					Common::String varName = getVarNameFromSet(bytecodeArray[conditionStartIndex - 1]);
+					// Same here: the counter's name comes from the instruction
+					// before the condition, two jump targets away. Either may be
+					// missing in a handler that did not read cleanly.
+					Common::String varName;
+					uint32 endIndex, conditionStartIndex;
+					if (bytecodeIndexAt(endPos, endIndex) && endIndex >= 1) {
+						auto endRepeat = bytecodeArray[endIndex - 1];
+						if (bytecodeIndexAt(endRepeat.pos - endRepeat.obj, conditionStartIndex)
+								&& conditionStartIndex >= 1)
+							varName = getVarNameFromSet(bytecodeArray[conditionStartIndex - 1]);
+					}
 					auto loop = Common::SharedPtr<RepeatWithToStmtNode>(new RepeatWithToStmtNode(bytecode.pos, varName, Common::move(start), up, Common::move(end), bytecode.pos));
 					loop->block->endPos = endPos;
 					loop->block->_endOffset = endPos;
