@@ -81,6 +81,10 @@ struct Handler {
 	Common::SharedPtr<Node> readV4Property(uint32 offset, int propertyType, int propertyID);
 	Common::SharedPtr<Node> readChunkRef(uint32 offset, Common::SharedPtr<Node> string);
 	void tagLoops();
+	// The index of the bytecode at a jump target, if there is one. Reading
+	// bytecodePosMap with operator[] instead inserts a fresh 0 for a target
+	// that carries no bytecode, and every "index - 1" below then wraps.
+	bool bytecodeIndexAt(uint32 pos, uint32 &index) const;
 	bool isRepeatWithIn(uint32 startIndex, uint32 endIndex);
 	BytecodeTag identifyLoop(uint32 startIndex, uint32 endIndex);
 	void parse();
