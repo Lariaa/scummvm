@@ -1459,12 +1459,17 @@ void LB::b_getPropRef(int nargs) {
 	Datum obj = g_lingo->pop();
 	Datum value;
 
-	if (obj.type == OBJECT && prop.type == SYMBOL && obj.u.obj->hasProp(*prop.u.s)) {
-		value = obj.u.obj->getProp(*prop.u.s);
-	} else if (obj.type == PARRAY) {
-		int found = LC::compareArrays(LC::eqData, obj, prop, true).u.i;
+	// The reference has to survive as far as the chunk form below, so LC::call()
+	// leaves this argument alone where it evaluates every other builtin's first
+	// one. The object and list forms want the value, so take it here.
+	Datum objValue = obj.isVarRef() ? obj.eval() : obj;
+
+	if (objValue.type == OBJECT && prop.type == SYMBOL && objValue.u.obj->hasProp(*prop.u.s)) {
+		value = objValue.u.obj->getProp(*prop.u.s);
+	} else if (objValue.type == PARRAY) {
+		int found = LC::compareArrays(LC::eqData, objValue, prop, true).u.i;
 		if (found > 0)
-			value = obj.u.parr->arr[found - 1].v;
+			value = objValue.u.parr->arr[found - 1].v;
 	} else if (nargs == 3 && prop.type == SYMBOL) {
 		// The chunk form on something writable: `getPropRef(var, #char, n)` is a
 		// reference to the nth chunk, which the caller then assigns through --
