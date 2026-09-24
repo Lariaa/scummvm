@@ -1692,7 +1692,22 @@ void LC::call(const Common::String &name, int nargs, bool allowRetVal) {
 				}
 				return;
 			}
-			firstArg = g_lingo->_state->stack[g_lingo->_state->stack.size() - nargs] = firstArg.eval();
+			// getPropRef() exists to hand back a reference into its first
+			// argument, so that one has to stay a reference. Everything else
+			// wants the value, and the eval here is what lets a builtin take a
+			// bare variable.
+			//
+			// Loewenzahn 5, 7 and 8 build their cursor mask names with
+			//   put "M" into char <n> of msk
+			// which compiles to getPropRef(msk, #char, n) followed by
+			// setContents(). With the local evaluated away, the chunk
+			// reference pointed at a copy of the string, the write went
+			// nowhere and "linksC" never became "linksM" -- so the cursor was
+			// set to [member("linksC"), member("linksC")] and came out as a
+			// hollow outline with nothing filled in. Fourteen such writes in
+			// one Loewenzahn 8 run, and fourteen hollow cursors.
+			if (!name.equalsIgnoreCase("getPropRef"))
+				firstArg = g_lingo->_state->stack[g_lingo->_state->stack.size() - nargs] = firstArg.eval();
 		}
 
 		// Script/Xtra method call
