@@ -171,6 +171,26 @@ void Cursor::readFromCast(Datum cursorCasts) {
 		}
 	}
 
+	// What the two members actually produced. A cursor whose mask is the same
+	// member as its picture keeps only the outline and turns the inside
+	// transparent, where a proper mask -- the filled silhouette that sits next
+	// to the outline in the cast -- makes it white. Counting the three kinds of
+	// pixel says which of the two happened without having to look at the screen.
+	if (debugChannelSet(3, kDebugImages)) {
+		int black = 0, white = 0, clear = 0;
+		for (int i = 0; i < getWidth() * getHeight(); i++) {
+			if (_surface[i] == 0)
+				black++;
+			else if (_surface[i] == 1)
+				white++;
+			else
+				clear++;
+		}
+		debugC(3, kDebugImages, "Cursor::readFromCast(): %s drew %d black, %d white and %d transparent pixels%s",
+				cursorId.asString().c_str(), black, white, clear,
+				maskCast ? (maskId == cursorId ? " (mask is the picture itself)" : "") : " (no mask)");
+	}
+
 	BitmapCastMember *bc = (BitmapCastMember *)(cursorCast);
 	int offX = bc->_regX - bc->_initialRect.left;
 	int offY = bc->_regY - bc->_initialRect.top;
