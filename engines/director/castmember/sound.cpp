@@ -64,8 +64,46 @@ Common::String SoundCastMember::formatInfo() {
 }
 
 void SoundCastMember::load() {
-	if (_loaded)
+	if (_loaded && !_needsReload)
 		return;
+
+	// Setting "the fileName of member" points the member at a file on disk, and
+	// from then on that file is what it plays. The linked path below is only
+	// consulted when a member arrives with no sound data of its own, so a member
+	// that does carry some kept playing it for good.
+	//
+	// TKKG 13 and 14 speak through two placeholder members in global.cxt named
+	// "sound_member" and "sound_member2". Each holds 4418 bytes of sndS in which
+	// not one sample is anything but silence; before every line the game writes
+	// the path of the take into the member's fileName and queues it on a sound
+	// channel. Keeping the embedded silence made the whole game mute except for
+	// the ambiences, which take the "sound playFile" route and never touch a
+	// cast member.
+	if (_needsReload) {
+		_needsReload = false;
+
+		Common::String linked = _cast->getLinkedPath(_castId);
+		if (!linked.empty()) {
+			delete _audio;
+			_audio = new AudioFileDecoder(linked);
+			_size = 0;
+			// Linked sound files always have the loop flag disabled, the same as
+			// on the first-load path below.
+			_looping = false;
+			// The cue points belonged to whatever the member held before.
+			_cuePoints.clear();
+			_cuePointNames.clear();
+			_loaded = true;
+
+			debugC(2, kDebugLoading, "SoundCastMember::load(): cast %d now plays the linked file '%s'", _castId, linked.c_str());
+			return;
+		}
+
+		// Nothing to point at. Keep what the member already had rather than
+		// reloading it from the archive.
+		if (_loaded)
+			return;
+	}
 
 	uint32 tag = 0;
 	uint16 sndId = 0;
