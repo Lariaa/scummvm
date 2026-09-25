@@ -433,6 +433,9 @@ void MacFontManager::loadMacFont(Common::MacResManager *fontFile, const Common::
 
 			_fontIds[name] = id;
 			_fontInfo[id] = info;
+
+			debugC(1, kDebugLevelMacGUI, "MacFontManager::loadMacFont(): registered family '%s' as id %d, language %d (product language %d)",
+					name.c_str(), id, (int)info->lang, (int)_language);
 		}
 
 		Common::String fontName = Common::String::format("%s-%d-%d", familyName.c_str(), (*assoc)[i]._fontStyle | familySlant, (*assoc)[i]._fontSize);
@@ -740,6 +743,10 @@ int MacFontManager::registerFontName(Common::String name, int preferredId) {
 	}
 	_fontInfo[id] = info;
 	_fontIds[name] = id;
+
+	debugC(1, kDebugLevelMacGUI, "MacFontManager::registerFontName(): registered '%s' as id %d (asked for %d), language %d (product language %d)",
+			name.c_str(), id, preferredId, (int)info->lang, (int)_language);
+
 	return id;
 }
 
