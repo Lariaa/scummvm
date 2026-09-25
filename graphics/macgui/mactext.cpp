@@ -74,6 +74,21 @@ Common::CodePage MacFontRun::getEncoding() {
 }
 
 bool MacFontRun::plainByteMode() {
+	// A font that was substituted by a TTF addresses its glyphs by Unicode code
+	// point, so squeezing the text back down to a code page first hands it the
+	// wrong characters. The font id still says which code page the run was
+	// typed in, and nothing notices while the text is ASCII, since every code
+	// page agrees with Unicode there.
+	//
+	// TKKG 7's Steckbrief is Mac Roman drawn in Arial, which ScummVM serves as
+	// Liberation Sans. "Schloss" came out as "Schlo" plus a section sign: the
+	// sharp s decoded to U+00DF, converted back to the Mac Roman byte 0xa7, and
+	// the TTF read that as U+00A7. The o and u umlauts became the Mac Roman
+	// bytes 0x8a and 0x9f, which are control characters as code points, and
+	// vanished.
+	if (wm->_fontMan->isUnicodeFont(getFont()))
+		return false;
+
 	Common::CodePage encoding = getEncoding();
 	// This return statement accounts for utf8, invalid.
 	// For future Unicode font compatibility, it should account for all codepages instead.
