@@ -20,7 +20,6 @@
  */
 
 #include "common/config-manager.h"
-#include "common/hashmap.h"
 #include "common/stream.h"
 #include "common/macresman.h"
 #include "graphics/surface.h"
@@ -985,80 +984,17 @@ void BitmapCastMember::createMatte() {
 			_matteSource = nullptr;
 		}
 
-		// Scanned artwork often dithers its paper instead of laying it down
-		// flat. Janosch Panama's title sign alternates 0xffffff and 0xeeeeee
-		// across the sheet -- 13707 pixels against 12421 in cast 68 alone -- and
-		// an exact-match fill takes whichever of the two sits in the corner and
-		// is stopped by the other immediately: it cleared 649 pixels out of
-		// 32000 and left the paper opaque. Snap the near misses onto the
-		// background colour first. tmp is a scratch copy, so only the mask is
-		// affected.
+		// Only exact matches. Measured in Director MX 8.5.1 with a 32-bit probe
+		// (matte_probe.ls): a block of rgb(247, 255, 255) laid on white paper and
+		// touching the member's edge stays opaque, and so does one of
+		// rgb(238, 238, 238), so the ink has no tolerance at 8 or at 17. A sheet
+		// dithered between white and rgb(238, 238, 238) stays opaque too -- in a
+		// checkerboard no white pixel touches another white pixel edgewise, and the
+		// fill cannot advance past the border.
 		//
-		// Deliberately narrow. 20 per channel spans that pair, which lie 17
-		// apart, and stops well short of the next entry down in the game's
-		// palette at 0xdddddd. Every game drawing with matte ink comes through
-		// here, so this errs towards changing nothing. The paletted branch is
-		// left alone: comparing indices says nothing about colour distance.
-		//
-		// And only for a colour that is really dithered against the background,
-		// which means most of its pixels sit next to one. Distance alone cannot
-		// tell the two apart: TKKG 8's barman wears a uniform in the game's
-		// palette entry 11, RGB(247, 255, 255), which is 8 from white, nearer
-		// than Janosch's pair is to each other. Snapping it joined the sleeves
-		// to the paper -- they are cut off at the shoulder, so the fill walked
-		// straight in and left the arms as bare outlines over the bar, while
-		// the torso, whose white is enclosed by the figure's own outline, came
-		// out solid.
-		//
-		// Measured, the two cases are an order of magnitude apart: of the
-		// uniform's pixels 8 to 9 percent touch white in the arms and 1 percent
-		// in the torso, against the whole of a dithered sheet.
-		if (!tmp.format.isCLUT8()) {
-			byte wr, wg, wb;
-			tmp.format.colorToRGB(whiteColor, wr, wg, wb);
-
-			Common::HashMap<uint32, uint32> nearTotal, nearTouching;
-
-			for (int y = 0; y < tmp.h; y++) {
-				for (int x = 0; x < tmp.w; x++) {
-					uint32 c = tmp.getPixel(x, y);
-					if (c == whiteColor)
-						continue;
-
-					byte r, g, b;
-					tmp.format.colorToRGB(c, r, g, b);
-					if (ABS(r - wr) > 20 || ABS(g - wg) > 20 || ABS(b - wb) > 20)
-						continue;
-
-					nearTotal[c]++;
-
-					if ((x > 0 && tmp.getPixel(x - 1, y) == whiteColor)
-							|| (x < tmp.w - 1 && tmp.getPixel(x + 1, y) == whiteColor)
-							|| (y > 0 && tmp.getPixel(x, y - 1) == whiteColor)
-							|| (y < tmp.h - 1 && tmp.getPixel(x, y + 1) == whiteColor))
-						nearTouching[c]++;
-				}
-			}
-
-			Common::HashMap<uint32, bool> snap;
-			for (auto &it : nearTotal) {
-				bool dithered = nearTouching.getValOrDefault(it._key, 0) * 2 >= it._value;
-				snap[it._key] = dithered;
-
-				debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s: near-white 0x%08x, %d pixels, %d of them next to the background -> %s",
-						_castId, _name.c_str(), it._key, it._value,
-						nearTouching.getValOrDefault(it._key, 0), dithered ? "dithered paper" : "kept");
-			}
-
-			if (!snap.empty()) {
-				for (int y = 0; y < tmp.h; y++) {
-					for (int x = 0; x < tmp.w; x++) {
-						if (snap.getValOrDefault(tmp.getPixel(x, y), false))
-							tmp.setPixel(x, y, whiteColor);
-					}
-				}
-			}
-		}
+		// That last one is Janosch Panama's title sign, which an earlier rule here
+		// snapped onto the background to clear. Leaving it opaque is what Director
+		// does, so the rule went.
 
 		Graphics::FloodFill matteFill(&tmp, whiteColor, 0, true);
 
