@@ -22,6 +22,7 @@
 #ifndef GRAPHICS_MACGUI_MACFONTMANAGER_H
 #define GRAPHICS_MACGUI_MACFONTMANAGER_H
 
+#include "common/hash-ptr.h"
 #include "common/language.h"
 #include "graphics/fonts/bdf.h"
 #include "graphics/fontman.h"
@@ -210,6 +211,13 @@ public:
 
 	int getFamilyId(int newId, int newSlant);
 
+	/**
+	 * Whether this font addresses its glyphs by Unicode code point rather than
+	 * by a byte in some code page. A TTF substitute does; a Mac bitmap font
+	 * does not.
+	 */
+	bool isUnicodeFont(const Graphics::Font *font) const { return font && _unicodeFonts.contains(font); }
+
 #ifdef USE_FREETYPE2
 	/**
 	 * Set the TTF rendering mode used when loading TTF fonts.
@@ -249,6 +257,10 @@ private:
 
 	/* Unicode font */
 	Common::HashMap<Common::String, const Graphics::Font *> _uniFontRegistry;
+
+	// The fonts in _uniFontRegistry again, by pointer, so that a caller holding
+	// only the resolved font can ask whether it takes code points.
+	Common::HashMap<const Graphics::Font *, bool> _unicodeFonts;
 
 	Common::HashMap<Common::String, Common::SeekableReadStream *> _ttfData;
 };
