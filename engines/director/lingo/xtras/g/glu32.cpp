@@ -199,7 +199,7 @@ void GLU32Xtra::m_GLUCall(int nargs) {
 			g_lingo->push(Datum((int)43289555)); //tested
 			return;
 		}
-		if (gameId == "garygadget4" {
+		if (gameId == "garygadget4") {
 			g_lingo->push(Datum((int)27879921)); // TODO: Check with the game
 			return;
 		}
