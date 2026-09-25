@@ -594,20 +594,29 @@ const Font *MacFontManager::getFont(MacFont *macFont) {
 			}
 			font = Graphics::loadTTFFontFromArchive("LiberationSans-Regular.ttf", macFont->getSize(), Graphics::kTTFSizeModeCharacter, 0, 0, _ttfRenderMode);
 			_uniFontRegistry.setVal(macFont->getName(), font);
-			if (font)
+			if (font) {
 				_unicodeFonts[font] = true;
+				debugC(1, kDebugLevelMacGUI, "MacFontManager::getFont(): '%s' (id %d) substituted by a Unicode font; its text is drawn by code point",
+						macFont->getName().c_str(), macFont->getId());
+			}
 		} else if (_fontInfo.contains(familyId)) {
 			font = Graphics::loadTTFFontFromArchive(_fontInfo[familyId]->name, macFont->getSize(), Graphics::kTTFSizeModeCharacter, 0, 0, _ttfRenderMode);
 
 			// We may get nullptr from here, so storing it to avoid multiple tries
 			_uniFontRegistry.setVal(macFont->getName(), font);
-			if (font)
+			if (font) {
 				_unicodeFonts[font] = true;
+				debugC(1, kDebugLevelMacGUI, "MacFontManager::getFont(): '%s' (id %d) substituted by a Unicode font; its text is drawn by code point",
+						macFont->getName().c_str(), macFont->getId());
+			}
 		} else {
 			font = Graphics::loadTTFFontFromArchive("LiberationSans-Regular.ttf", macFont->getSize(), Graphics::kTTFSizeModeCharacter, 0, 0, _ttfRenderMode);
 			_uniFontRegistry.setVal(macFont->getName(), font);
-			if (font)
+			if (font) {
 				_unicodeFonts[font] = true;
+				debugC(1, kDebugLevelMacGUI, "MacFontManager::getFont(): '%s' (id %d) substituted by a Unicode font; its text is drawn by code point",
+						macFont->getName().c_str(), macFont->getId());
+			}
 		}
 	}
 #endif
