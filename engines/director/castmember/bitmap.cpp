@@ -20,6 +20,7 @@
  */
 
 #include "common/config-manager.h"
+#include "common/hashmap.h"
 #include "common/stream.h"
 #include "common/macresman.h"
 #include "graphics/surface.h"
@@ -998,17 +999,63 @@ void BitmapCastMember::createMatte() {
 		// palette at 0xdddddd. Every game drawing with matte ink comes through
 		// here, so this errs towards changing nothing. The paletted branch is
 		// left alone: comparing indices says nothing about colour distance.
+		//
+		// And only for a colour that is really dithered against the background,
+		// which means most of its pixels sit next to one. Distance alone cannot
+		// tell the two apart: TKKG 8's barman wears a uniform in the game's
+		// palette entry 11, RGB(247, 255, 255), which is 8 from white, nearer
+		// than Janosch's pair is to each other. Snapping it joined the sleeves
+		// to the paper -- they are cut off at the shoulder, so the fill walked
+		// straight in and left the arms as bare outlines over the bar, while
+		// the torso, whose white is enclosed by the figure's own outline, came
+		// out solid.
+		//
+		// Measured, the two cases are an order of magnitude apart: of the
+		// uniform's pixels 8 to 9 percent touch white in the arms and 1 percent
+		// in the torso, against the whole of a dithered sheet.
 		if (!tmp.format.isCLUT8()) {
 			byte wr, wg, wb;
 			tmp.format.colorToRGB(whiteColor, wr, wg, wb);
 
+			Common::HashMap<uint32, uint32> nearTotal, nearTouching;
+
 			for (int y = 0; y < tmp.h; y++) {
 				for (int x = 0; x < tmp.w; x++) {
-					byte r, g, b;
-					tmp.format.colorToRGB(tmp.getPixel(x, y), r, g, b);
+					uint32 c = tmp.getPixel(x, y);
+					if (c == whiteColor)
+						continue;
 
-					if (ABS(r - wr) <= 20 && ABS(g - wg) <= 20 && ABS(b - wb) <= 20)
-						tmp.setPixel(x, y, whiteColor);
+					byte r, g, b;
+					tmp.format.colorToRGB(c, r, g, b);
+					if (ABS(r - wr) > 20 || ABS(g - wg) > 20 || ABS(b - wb) > 20)
+						continue;
+
+					nearTotal[c]++;
+
+					if ((x > 0 && tmp.getPixel(x - 1, y) == whiteColor)
+							|| (x < tmp.w - 1 && tmp.getPixel(x + 1, y) == whiteColor)
+							|| (y > 0 && tmp.getPixel(x, y - 1) == whiteColor)
+							|| (y < tmp.h - 1 && tmp.getPixel(x, y + 1) == whiteColor))
+						nearTouching[c]++;
+				}
+			}
+
+			Common::HashMap<uint32, bool> snap;
+			for (auto &it : nearTotal) {
+				bool dithered = nearTouching.getValOrDefault(it._key, 0) * 2 >= it._value;
+				snap[it._key] = dithered;
+
+				debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s: near-white 0x%08x, %d pixels, %d of them next to the background -> %s",
+						_castId, _name.c_str(), it._key, it._value,
+						nearTouching.getValOrDefault(it._key, 0), dithered ? "dithered paper" : "kept");
+			}
+
+			if (!snap.empty()) {
+				for (int y = 0; y < tmp.h; y++) {
+					for (int x = 0; x < tmp.w; x++) {
+						if (snap.getValOrDefault(tmp.getPixel(x, y), false))
+							tmp.setPixel(x, y, whiteColor);
+					}
 				}
 			}
 		}
