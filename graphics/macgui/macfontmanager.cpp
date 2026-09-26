@@ -625,6 +625,19 @@ const Font *MacFontManager::getFont(MacFont *macFont) {
 	if (!font) {
 		font = macFont->getFallback();
 
+		// ScummVM's own GUI font, and it addresses its glyphs by code point like
+		// a TTF does, not by a Mac Roman byte. Squeezing the text back down to a
+		// code page before handing it over picks the wrong glyphs: TKKG 7's
+		// Steckbrief asks for Arial at 12 pt, which is neither a Mac family nor
+		// in the TTF archive, and its sharp s -- U+00DF, Mac Roman 0xa7 -- came
+		// out as a section sign, while the two umlauts landed on 0x8a and 0x9f
+		// and drew nothing. Loewenzahn 8 asks for Comic Sans MS the same way.
+		if (font) {
+			_unicodeFonts[font] = true;
+			debugC(1, kDebugLevelMacGUI, "MacFontManager::getFont(): '%s' (id %d) fell back on the built-in font '%s'; its text is drawn by code point",
+					macFont->getName().c_str(), macFont->getId(), macFont->getFallbackName().c_str());
+		}
+
 		for (auto &it : _fontInfo) {
 			if (it._value->name == macFont->getFallbackName()) {
 				macFont->setId(it._key);
