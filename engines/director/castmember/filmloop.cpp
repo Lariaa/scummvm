@@ -182,6 +182,12 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			src._startPoint.x = widgetDelta.x + bbox.left;
 			src._startPoint.y = widgetDelta.y + bbox.top;
 
+			// Cells are stored at the loop's canvas size: draw each bitmap at its own size
+			if (src._cast && src._cast->_type == kCastBitmap) {
+				src._width = src._cast->_initialRect.width();
+				src._height = src._cast->_initialRect.height();
+			}
+
 			debugC(5, kDebugImages, ", no scaling");
 		}
 
