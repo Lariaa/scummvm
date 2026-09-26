@@ -1038,6 +1038,12 @@ void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 			channel->_startFrame == nextSprite->_spriteInfo.startFrame;
 
 		if (autoPuppetContested && !ownsLiveSpan && (nextSprite->_copyBackMask & kSCBCastId)) {
+			// The other half of the puppet story: the score taking a channel back at a
+			// frame boundary. Paired with the b_puppetSprite() lines, a run shows
+			// whether a sprite that Lingo released is ever reclaimed, and when.
+			debugC(3, kDebugEvents, "Score::updateSprites(): reclaiming auto-puppet on channel %d, cast %s -> %s, autoPuppet 0x%08x",
+					i, currentSprite->_castId.asString().c_str(), nextSprite->_castId.asString().c_str(),
+					currentSprite->_autoPuppet);
 			currentSprite->_autoPuppet = 0;
 		}
 
