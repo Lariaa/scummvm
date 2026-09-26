@@ -4083,6 +4083,8 @@ void LB::b_puppetSprite(int nargs) {
 			int spriteId = sprite.asInt();
 			Sprite *target = sc->getSpriteById(spriteId);
 			bool val = (bool)state.asInt();
+			bool wasPuppet = target->_puppet;
+			uint32 wasAutoPuppet = target->_autoPuppet;
 			target->_puppet = val;
 			if (!val) {
 				// Explicitly un-puppeting a sprite returns full control to the
@@ -4097,6 +4099,17 @@ void LB::b_puppetSprite(int nargs) {
 				// channel at the next sprite-span boundary instead.
 				target->_autoPuppet = kAPNone;
 			}
+
+			// Who owned the channel before the call, and who owns it after. The
+			// transition is the whole story: a sprite that keeps drawing after
+			// `puppetSprite n, FALSE` is one the score never reclaimed.
+			//
+			// The companion line that reported the copy-back from the frame cache is
+			// gone with the block it sat in -- upstream removed the restore here, so
+			// Score::updateSprites() is now the only place that hands a channel back,
+			// and its own line is what to look for.
+			debugC(3, kDebugEvents, "b_puppetSprite(): channel %d: puppet %d -> %d, autoPuppet 0x%08x -> 0x%08x",
+					spriteId, wasPuppet, val, wasAutoPuppet, target->_autoPuppet);
 		} else {
 			warning("b_puppetSprite: sprite index out of bounds");
 		}
