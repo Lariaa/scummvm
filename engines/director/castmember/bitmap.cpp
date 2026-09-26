@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/algorithm.h"
+#include "common/array.h"
 #include "common/config-manager.h"
 #include "common/stream.h"
 #include "common/macresman.h"
@@ -44,6 +46,28 @@
 #include "director/lingo/lingo-the.h"
 
 namespace Director {
+
+// A bitmap stores the cast of its palette as -1 for its own cast, otherwise as
+// the position among the movie's other casts, ordered by castLib number.
+static int resolveClutCastLib(Cast *cast, int clutCastLib) {
+	if (clutCastLib == -1)
+		return cast->_castLibID;
+
+	Movie *movie = cast->getMovie();
+	if (!movie)
+		return clutCastLib;
+
+	Common::Array<int> others;
+	for (auto &it : *movie->getCasts()) {
+		if (it._key != cast->_castLibID)
+			others.push_back(it._key);
+	}
+	Common::sort(others.begin(), others.end());
+
+	if (clutCastLib >= 0 && (uint)clutCastLib < others.size())
+		return others[clutCastLib];
+	return clutCastLib;
+}
 
 BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableReadStreamEndian &stream, uint32 castTag, uint16 version, uint8 flags1)
 		: CastMember(cast, castId, stream) {
@@ -143,10 +167,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 			if (clutId <= 0) // builtin palette
 				_clut = CastMemberID(clutId - 1, -1);
 			else if (clutId > 0) {
-				if (clutCastLib == -1) {
-					clutCastLib = _cast->_castLibID;
-				}
-				_clut = CastMemberID(clutId, clutCastLib);
+				_clut = CastMemberID(clutId, resolveClutCastLib(_cast, clutCastLib));
 			}
 			if (stream.pos() < stream.size()) {
 				// castSize > 26 bytes on D4, > 28 bytes on D5
@@ -215,10 +236,7 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 				if (clutId <= 0) // builtin palette
 					_clut = CastMemberID(clutId - 1, -1);
 				else if (clutId > 0) {
-					if (clutCastLib == -1) {
-						clutCastLib = _cast->_castLibID;
-					}
-					_clut = CastMemberID(clutId, clutCastLib);
+					_clut = CastMemberID(clutId, resolveClutCastLib(_cast, clutCastLib));
 				}
 			} else {
 				_bitsPerPixel = 1;
