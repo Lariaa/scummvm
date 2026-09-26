@@ -4081,6 +4081,8 @@ void LB::b_puppetSprite(int nargs) {
 			Sprite *target = sc->getSpriteById(spriteId);
 			bool val = (bool)state.asInt();
 			bool refresh = (!val) && (target->_puppet || target->_autoPuppet);
+			bool wasPuppet = target->_puppet;
+			uint32 wasAutoPuppet = target->_autoPuppet;
 			target->_puppet = val;
 			if (!val) {
 				// Explicitly un-puppeting a sprite returns full control to the
@@ -4091,11 +4093,24 @@ void LB::b_puppetSprite(int nargs) {
 				// are shown by puppeting and hidden with `puppetSprite n, FALSE`).
 				target->_autoPuppet = kAPNone;
 			}
+			// Who owned the channel before the call, and who owns it after. The
+			// transition is the whole story: a sprite that keeps drawing after
+			// `puppetSprite n, FALSE` is one the score never reclaimed.
+			debugC(3, kDebugEvents, "b_puppetSprite(): channel %d: puppet %d -> %d, autoPuppet 0x%08x -> 0x%08x",
+					spriteId, wasPuppet, val, wasAutoPuppet, target->_autoPuppet);
+
 			if (refresh) {
 				// puppetSprite set to FALSE, copy back sprite data from frame cache
 				Channel *chan = sc->getChannelById(spriteId);
 				chan->setClean(sc->_currentFrame->_sprites[spriteId]);
 				chan->setDirty();
+
+				// Deliberately inside the block: the line reports that the copy-back
+				// ran at all. Where a Director version or a later change moves the
+				// restore to frame exit instead, the absence of this line is the
+				// observation, and the transition line above still fires.
+				debugC(3, kDebugEvents, "b_puppetSprite(): channel %d: copied sprite data back from the frame cache",
+						spriteId);
 			}
 		} else {
 			warning("b_puppetSprite: sprite index out of bounds");
