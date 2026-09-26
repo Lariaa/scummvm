@@ -380,7 +380,17 @@ Datum Lingo::findVarV4(int varType, const Datum &id) {
 				stride = 8;
 			}
 			if (id.asInt() % stride != 0) {
-				warning("BUILDBOT: findVarV4: invalid var ID %d for var type %d (not divisible by %d)", id.asInt(), varType, stride);
+				// Say which handler and where. TKKG 13 and 14 hit this over a
+				// million times in one session with id 1 and var type 5, the
+				// assignment then fails, and the scene name it was building
+				// stays empty -- the games ask for member "_Obj" and go to a
+				// movie with no name. Without the site there is no way to tell
+				// which opcode pushed the id, and whether it is an offset at
+				// all: ProjectorRays reads the same operands as plain indices.
+				warning("BUILDBOT: findVarV4: invalid var ID %d for var type %d (not divisible by %d) in %s at pc %d",
+						id.asInt(), varType, stride,
+						callstack.back()->sp.name ? callstack.back()->sp.name->c_str() : "<unnamed>",
+						_state->pc);
 				return res;
 			}
 			int varIndex = id.asInt() / stride;
