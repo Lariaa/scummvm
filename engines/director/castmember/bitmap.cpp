@@ -143,8 +143,11 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 			if (clutId <= 0) // builtin palette
 				_clut = CastMemberID(clutId - 1, -1);
 			else if (clutId > 0) {
+				// -1: the bitmap's own cast, 0: the default cast
 				if (clutCastLib == -1) {
 					clutCastLib = _cast->_castLibID;
+				} else if (clutCastLib == 0) {
+					clutCastLib = DEFAULT_CAST_LIB;
 				}
 				_clut = CastMemberID(clutId, clutCastLib);
 			}
@@ -215,8 +218,11 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, Common::SeekableRe
 				if (clutId <= 0) // builtin palette
 					_clut = CastMemberID(clutId - 1, -1);
 				else if (clutId > 0) {
+					// -1: the bitmap's own cast, 0: the default cast
 					if (clutCastLib == -1) {
 						clutCastLib = _cast->_castLibID;
+					} else if (clutCastLib == 0) {
+						clutCastLib = DEFAULT_CAST_LIB;
 					}
 					_clut = CastMemberID(clutId, clutCastLib);
 				}
