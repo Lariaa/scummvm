@@ -1013,6 +1013,13 @@ void MacFontManager::generateTTFFont(MacFont &toFont, Common::SeekableReadStream
 	toFont.setGenerated(true);
 	toFont.setFont(font, true);
 
+	// A real TrueType, so it addresses its glyphs by code point. A Mac family
+	// that ships only an sfnt and no bitmap strike arrives here, and classic
+	// Chicago is one of them: TKKG 7's Steckbrief asks for Chicago at 14 pt and
+	// got its text squeezed into Mac Roman first, which turned the sharp s into
+	// a section sign and dropped both umlauts.
+	_unicodeFonts[font] = true;
+
 	FontMan.assignFontToName(getFontName(toFont), font);
 	_fontRegistry.setVal(getFontName(toFont), new MacFont(toFont));
 
