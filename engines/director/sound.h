@@ -62,6 +62,13 @@ struct FadeParams {
 struct SoundQueueEntry {
 	CastMemberID member;
 	int loopCount; // how often the sound plays; 0 repeats it until breakLoop()
+	// Where the member pointed when it was queued. A linked sound member is a
+	// handle that Lingo re-aims between queue() and play(), and TKKG 13 and 14
+	// speak entirely through two such placeholders: they set "the fileName of
+	// member", queue it, and do the same again for the next clip. Reading the
+	// member back at playback made both entries the second file, so one take was
+	// heard twice and the other not at all.
+	Common::String linkedPath;
 
 	SoundQueueEntry() : loopCount(1) {}
 	SoundQueueEntry(CastMemberID m, int loops) : member(m), loopCount(loops) {}

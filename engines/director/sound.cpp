@@ -700,7 +700,17 @@ void DirectorSound::startQueueEntry(int soundChannel, const SoundQueueEntry &ent
 	// Lingo owns the channel while its list plays, so the score's sound channels
 	// leave it alone, as they do for puppetSound.
 	setPuppetSound(SoundID(entry.member), soundChannel);
-	playPuppetSound(soundChannel);
+
+	if (!entry.linkedPath.empty()) {
+		// The entry knows which file the member pointed at when it was queued.
+		// Reading the member again here would give whatever Lingo has aimed it at
+		// since, and TKKG 13 and 14 re-aim the same two placeholders for every
+		// line they speak: one take was heard twice and the next not at all.
+		_channels[soundChannel]->newPuppet = false;
+		playFile(entry.linkedPath, soundChannel);
+	} else {
+		playPuppetSound(soundChannel);
+	}
 
 	if (fade) {
 		channel->fade = fade;
