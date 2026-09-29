@@ -22,6 +22,8 @@
 #include "common/system.h"
 
 #include "director/director.h"
+#include "director/cast.h"
+#include "director/castmember/castmember.h"
 #include "director/movie.h"
 #include "director/score.h"
 #include "director/sound.h"
@@ -300,6 +302,19 @@ static bool readQueueEntry(const Datum &d, SoundQueueEntry &entry) {
 		warning("SoundChannelXtra: no sound member in %s", d.asString(true).c_str());
 		return false;
 	}
+
+	// Take down where the member points now. Lingo re-aims a linked sound member
+	// between one queue() and the next, and reading it back at playback would
+	// give every entry the file the last one set.
+	CastMember *cast = g_director->getCurrentMovie()->getCastMember(entry.member);
+	if (cast && cast->_type == kCastSound && cast->getCast()) {
+		entry.linkedPath = cast->getCast()->getLinkedPath(entry.member.member);
+
+		if (!entry.linkedPath.empty())
+			debugC(5, kDebugSound, "SoundChannelXtra: queued %s as '%s'",
+					entry.member.asString().c_str(), entry.linkedPath.c_str());
+	}
+
 	return true;
 }
 
