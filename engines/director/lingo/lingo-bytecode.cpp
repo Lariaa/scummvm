@@ -474,7 +474,16 @@ void LC::cb_unk2() {
 void LC::cb_delete() {
 	int varType = g_lingo->readInt();
 	Datum varID = g_lingo->pop();
-	Datum var = g_lingo->findVarV4(varType, varID);
+	// Numbers the variable directly, the same way opcode 0x6d does. TKKG 14's
+	// FillNotes trims its notebook with
+	//
+	//   [2442] pushint8 1        <1>
+	//   [2444] deletechunk 5     delete char -30000 of Notebook
+	//   [2448] getlocal 1        <Notebook>
+	//
+	// so the 1 is local 1, which that getlocal names as Notebook. Divided by the
+	// stride it was rejected outright, 567874 times in one session.
+	Datum var = g_lingo->findVarV4(varType, varID, true);
 	Datum chunkRef = readChunkRef(var);
 	g_lingo->push(chunkRef);
 	LC::c_delete();
