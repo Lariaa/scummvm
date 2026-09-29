@@ -90,6 +90,15 @@ void MacTextCanvas::chopChunk(const Common::U32String &str, int *curLinePtr, int
 		D(9, "Line Continuations [%d] : %d", i, lineContinuations[i]);
 	}
 
+	// What the wrap decided. Loewenzahn 8's "Wo ist was?" shows only the first
+	// word of its longer entries -- "Der" for "Der elektronische Hund" -- while
+	// short ones fit and "Das interaktive Lexikon" breaks cleanly over two
+	// lines, so the question is how wide the text measures against the room it
+	// is given, not which glyphs come out.
+	debugC(1, kDebugLevelMacGUI, "MacTextCanvas::chopChunk(): \"%s\" font id %d at %d pt: maxWidth %d, already used %d, measures %d -> %d line(s)",
+			Common::toPrintable(str.encode()).c_str(), chunk->fontId, chunk->fontSize,
+			maxWidth, w, chunk->getFont()->getStringWidth(str), (int)text.size());
+
 	if (text.empty()) {
 		D(5, "chopChunk: too narrow width, >%d", maxWidth);
 
