@@ -437,7 +437,9 @@ public:
 	void varAssign(const Datum &var, const Datum &value);
 	Datum varFetch(const Datum &var, bool silent = false);
 	Common::U32String evalChunkRef(const Datum &var);
-	Datum findVarV4(int varType, const Datum &id);
+	// idIsIndex: the id numbers the argument or local directly instead of
+	// giving its byte offset in the name table. Opcode 0x6d pushes it that way.
+	Datum findVarV4(int varType, const Datum &id, bool idIsIndex = false);
 	CastMemberID resolveCastMember(const Datum &memberID, const Datum &castLib, CastType type);
 	CastMemberID toCastMemberID(const Datum &member, const Datum &castLib);
 	void exposeXObject(const char *name, Datum obj);

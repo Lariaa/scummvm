@@ -354,7 +354,7 @@ void Lingo::initBytecode() {
 	}
 }
 
-Datum Lingo::findVarV4(int varType, const Datum &id) {
+Datum Lingo::findVarV4(int varType, const Datum &id, bool idIsIndex) {
 	Datum res;
 	switch (varType) {
 	case 1: // global
@@ -378,6 +378,10 @@ Datum Lingo::findVarV4(int varType, const Datum &id) {
 			int stride = 6;
 			if (g_director->getVersion() >= 500) {
 				stride = 8;
+			}
+			if (idIsIndex) {
+				// Already the number we want, so do not divide it.
+				stride = 1;
 			}
 			if (id.asInt() % stride != 0) {
 				// Say which handler and where. TKKG 13 and 14 hit this over a
@@ -437,7 +441,16 @@ void LC::cb_varrefpushv4() {
 	int varType = g_lingo->readInt();
 	Datum varId = g_lingo->pop();
 
-	g_lingo->push(g_lingo->findVarV4(varType, varId));
+	// The id this one pushes numbers the variable directly; it is not the byte
+	// offset the other stack-id opcodes carry. TKKG 13's GameSave builds
+	// strInfo.line[nLine] and assigns into it, and the reference has to come out
+	// as strInfo, which the same handler reaches as local 1 two instructions
+	// earlier -- read as an offset it would resolve to local 0 instead. Dividing
+	// by the stride rejected every odd id outright: one TKKG 14 session logged
+	// 1233364 of those, the assignment failed each time, and the scene name the
+	// handler was building stayed empty until the game hung on a movie with no
+	// name.
+	g_lingo->push(g_lingo->findVarV4(varType, varId, true));
 }
 
 void LC::cb_unk() {
