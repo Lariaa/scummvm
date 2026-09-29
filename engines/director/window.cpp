@@ -544,6 +544,17 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 
 	CastType castType = channel->_sprite->_cast ? channel->_sprite->_cast->_type : kCastTypeNull;
 
+	// One line per blit, so an area of the stage can be traced back to whoever
+	// owns it. TKKG 13 and 14 leave the middle of their login screen black and
+	// nothing said whose pixels those are: getPlotData() reports only
+	// background-transparent sprites, and the line below sits at level 8, which
+	// buries a single screen under a hundred thousand lines.
+	debugC(3, kDebugImages, "Window::inkBlitFrom(): channel %d, %s, type %s, ink %d, into %d,%d %dx%d",
+			channel->_sprite->_spriteInfo.channelNum,
+			channel->_sprite->_castId.asString().c_str(), castType2str(castType),
+			channel->_sprite->_ink,
+			destRect.left, destRect.top, destRect.width(), destRect.height());
+
 	uint32 renderStartTime = 0;
 	if (debugChannelSet(8, kDebugImages)) {
 		debugC(8, kDebugImages, "Window::inkBlitFrom(): updating %dx%d @ %d,%d -> %dx%d @ %d,%d, type: %s, cast: %s, ink: %d",
@@ -560,8 +571,11 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 	// applied ahead of the ink, so both put a white rectangle on the stage.
 	// TKKG 8's golf holes park the shared "dummy" member in a channel to blank it
 	// and hit both cases.
-	if (castType == kCastBitmap && channel->_sprite->_cast->_initialRect.isEmpty())
+	if (castType == kCastBitmap && channel->_sprite->_cast->_initialRect.isEmpty()) {
+		debugC(3, kDebugImages, "Window::inkBlitFrom(): channel %d draws nothing, %s has an empty rect",
+				channel->_sprite->_spriteInfo.channelNum, channel->_sprite->_castId.asString().c_str());
 		return;
+	}
 
 	if (pd.ms) {
 		pd.inkBlitShape(srcRect);
