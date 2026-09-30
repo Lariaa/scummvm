@@ -507,8 +507,13 @@ void MacText::getChunkPosFromIndex(int index, uint &lineNum, uint &chunkNum, uin
 	}
 	for (uint i = 0; i < _canvas._text.size(); i++) {
 		if (_canvas.getLineCharWidth(i) <= index) {
-			// include carriage return
-			index -= _canvas.getLineCharWidth(i) + 1;
+			index -= _canvas.getLineCharWidth(i);
+			// A hard line break is one character of the text, a soft wrap is
+			// none: a wrapped paragraph is spread over several rows here, and
+			// only its last row ends with a return. getLineCharacter() counts
+			// character space the same way.
+			if (_canvas._text[i].paragraphEnd)
+				index--;
 		} else {
 			lineNum = i;
 			chunkNum = _canvas._text[i].getChunkNum(&index);
