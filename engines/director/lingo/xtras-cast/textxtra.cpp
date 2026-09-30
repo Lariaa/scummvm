@@ -502,6 +502,49 @@ TextXtraCastMember::TextXtraCastMember(Cast *cast, uint16 castId, TextXtraCastMe
 		_children = source._children;
 }
 
+// _text carries the characters, _ftext the same characters with one of MacText's
+// formatting codes in front of every style run. Whoever changes _text has to
+// come through here, or the member keeps drawing the text it was authored with.
+void TextXtraCastMember::buildFormattedText() {
+	_ftext.clear();
+
+	for (uint i = 0; i < _styles.runs.size(); i++) {
+		uint32 from = _styles.runs[i].offset;
+		if (from >= _text.size())
+			break;
+
+		uint32 to = (i + 1 < _styles.runs.size()) ? _styles.runs[i + 1].offset : _text.size();
+		to = MIN<uint32>(to, _text.size());
+		if (to <= from)
+			continue;
+
+		const TextXtra::TextStyle &s = _styles.runs[i].style;
+		int fontId = fontIdFor(s.font);
+
+		// The colour components travel as 16-bit fields whose low byte MacText
+		// keeps (mactext-canvas.cpp: findBestColor(palinfo1 & 0xff, ...)), so
+		// pass the 8-bit value itself.
+		_ftext += Common::String::format("\001\016%04x%02x%04x%04x%04x%04x",
+				fontId, s.slant, s.size, s.r, s.g, s.b);
+
+		for (uint32 c = from; c < to; c++) {
+			// A \001 in the text has to be doubled, or MacText reads it as the
+			// start of a code of our own.
+			if (_text[c] == '\001')
+				_ftext += '\001';
+			_ftext += _text[c];
+		}
+
+		// The resolved id and the language it is registered under decide which
+		// glyph table MacText draws the run from: a font registered as Japanese
+		// has no umlauts, which is how TKKG 7's Steckbrief lost them.
+		debugC(4, kDebugText, "TextXtraCastMember::buildFormattedText(): run at %d: font '%s' -> id %d (language %d), %d pt, slant %d, RGB(%d, %d, %d)",
+				from, s.font.c_str(), fontId,
+				(int)g_director->_wm->_fontMan->getFontLanguage(fontId),
+				s.size, s.slant, s.r, s.g, s.b);
+	}
+}
+
 void TextXtraCastMember::load() {
 	if (_loaded)
 		return;
@@ -542,44 +585,7 @@ void TextXtraCastMember::load() {
 			TextXtra::StyleRuns styles;
 			if (TextXtra::readXMEDStyles(data, styles)) {
 				_styles = styles;
-				_ftext.clear();
-
-				for (uint i = 0; i < styles.runs.size(); i++) {
-					uint32 from = styles.runs[i].offset;
-					if (from >= _text.size())
-						break;
-
-					uint32 to = (i + 1 < styles.runs.size()) ? styles.runs[i + 1].offset : _text.size();
-					to = MIN<uint32>(to, _text.size());
-					if (to <= from)
-						continue;
-
-					const TextXtra::TextStyle &s = styles.runs[i].style;
-					int fontId = fontIdFor(s.font);
-
-					// The colour components travel as 16-bit fields whose low
-					// byte MacText keeps (mactext-canvas.cpp: findBestColor(
-					// palinfo1 & 0xff, ...)), so pass the 8-bit value itself.
-					_ftext += Common::String::format("\001\016%04x%02x%04x%04x%04x%04x",
-							fontId, s.slant, s.size, s.r, s.g, s.b);
-
-					for (uint32 c = from; c < to; c++) {
-						// A \001 in the text has to be doubled, or MacText
-						// reads it as the start of a code of our own.
-						if (_text[c] == '\001')
-							_ftext += '\001';
-						_ftext += _text[c];
-					}
-
-					// The resolved id and the language it is registered under
-					// decide which glyph table MacText draws the run from: a
-					// font registered as Japanese has no umlauts, which is how
-					// TKKG 7's Steckbrief lost them.
-					debugC(4, kDebugText, "TextXtraCastMember::load(): run at %d: font '%s' -> id %d (language %d), %d pt, slant %d, RGB(%d, %d, %d)",
-							from, s.font.c_str(), fontId,
-							(int)g_director->_wm->_fontMan->getFontLanguage(fontId),
-							s.size, s.slant, s.r, s.g, s.b);
-				}
+				buildFormattedText();
 
 				debugC(3, kDebugText, "TextXtraCastMember::load(): %d style runs, background RGB(%d, %d, %d), align %d",
 						(int)styles.runs.size(), styles.bgR, styles.bgG, styles.bgB, styles.align);
@@ -666,8 +672,18 @@ Datum TextXtraCastMember::getField(int field) {
 void TextXtraCastMember::setField(int field, const Datum &d) {
 	switch (field) {
 	case kTheText:
+		// Make sure the authored document has been read, or the styles this
+		// rebuilds against are still empty.
+		load();
 		_text = Common::U32String(d.asString(), Common::kUtf8);
-		_loaded = true;
+		// The authored runs are offsets into the text that just went away, so
+		// only the first of them can still mean anything: a member written to
+		// from Lingo draws in one format, the way a field does.
+		if (_styles.runs.size() > 1)
+			_styles.runs.resize(1);
+		if (!_styles.runs.empty())
+			_styles.runs[0].offset = 0;
+		buildFormattedText();
 		setModified(true);
 		return;
 	default:
