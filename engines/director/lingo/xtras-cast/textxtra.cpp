@@ -497,6 +497,7 @@ TextXtraCastMember::TextXtraCastMember(Cast *cast, uint16 castId, TextXtraCastMe
 	_text = source._text;
 	_ftext = source._ftext;
 	_styles = source._styles;
+	_scroll = source._scroll;
 	_loaded = source._loaded;
 	if (cast == source._cast)
 		_children = source._children;
@@ -639,8 +640,9 @@ bool TextXtraCastMember::hasField(int field) {
 	switch (field) {
 	case kTheText:
 	// A Text Xtra member scrolls like a field, so the scrollbar behaviours ask
-	// it for its visible height. CastMember answers both.
+	// it for its visible height and for where it is scrolled to.
 	case kThePageHeight:
+	case kTheScrollTop:
 		return true;
 	default:
 		break;
@@ -660,6 +662,9 @@ Datum TextXtraCastMember::getField(int field) {
 	case kTheText:
 		load();
 		d = _text.encode(Common::kUtf8);
+		break;
+	case kTheScrollTop:
+		d = _scroll;
 		break;
 	default:
 		d = CastMember::getField(field);
@@ -684,6 +689,14 @@ void TextXtraCastMember::setField(int field, const Datum &d) {
 		if (!_styles.runs.empty())
 			_styles.runs[0].offset = 0;
 		buildFormattedText();
+		setModified(true);
+		return;
+	case kTheScrollTop:
+		// Only remembered and reported, as TextCastMember does it: nothing in
+		// either of them moves the widget yet, that runs through scrollByLine().
+		// Before this the whole property was missing, which under lingostrict
+		// stopped the movie where TKKG 11, 13 and 14 reset their notebook.
+		_scroll = d.asInt();
 		setModified(true);
 		return;
 	default:
