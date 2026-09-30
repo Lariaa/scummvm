@@ -1070,8 +1070,14 @@ void LB::b_count(int nargs) {
 		// The chunk form on a string: `count(str, #char|#word|#item|#line)` is
 		// how many of those the string holds, the same spelling b_getProp()
 		// already accepts. Janosch Panama measures `the labelList` this way.
+		//
+		// A member reference is text as well, and the chunk machinery already
+		// reads one: LC::chunkRef() resolves the source through evalChunkRef().
+		// TKKG 11, 13 and 14 measure their notebook that way before paging it
+		// (`member("notebook").char.count` in sc10's FillPage), and a builtin
+		// that returns nothing takes the movie down with it.
 		ChunkType chunkType = kChunkChar;
-		if (obj.type == STRING && prop.type == SYMBOL && chunkTypeFromSymbol(*prop.u.s, chunkType)) {
+		if ((obj.type == STRING || obj.isCastRef()) && prop.type == SYMBOL && chunkTypeFromSymbol(*prop.u.s, chunkType)) {
 			g_lingo->push(LC::lastChunk(chunkType, obj).u.cref->startChunk);
 			return;
 		}
