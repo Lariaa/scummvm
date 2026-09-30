@@ -572,6 +572,28 @@ void TextCastMember::setTextStyle(const Common::String &textStyle) {
 	_modified = true;
 }
 
+Common::Point TextCastMember::charPosToLoc(int charPos) {
+	// "The point is given in pixels and specifies the distance from the
+	// upper-left corner of the field Cast member ... all characters have a
+	// location, even if they are not visible in the Cast member's
+	// representation as a sprite on the Stage, and moving the sprite on the
+	// Stage does not affect the charPosToLoc return value" (Director 8
+	// Demystified, Lingo Lexicon, p. 769). So this is the laid-out text's own
+	// coordinate system, not the screen's, and scrolling does not enter into it.
+	Graphics::MacText *target = getWidget();
+	if (!target) {
+		warning("TextCastMember::charPosToLoc(): no widget available, returning 0,0");
+		return Common::Point(0, 0);
+	}
+
+	// Lingo counts characters from one, so anything below that is not a
+	// character at all and has no location.
+	if (charPos < 1)
+		return Common::Point(0, 0);
+
+	return target->getCharPosition(charPos - 1);
+}
+
 void TextCastMember::scrollByLine(int count) {
 	Graphics::MacText *target = getWidget();
 	target->scroll(count);
