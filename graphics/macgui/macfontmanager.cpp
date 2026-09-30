@@ -602,6 +602,18 @@ const Font *MacFontManager::getFont(MacFont *macFont) {
 		} else if (_fontInfo.contains(familyId)) {
 			font = Graphics::loadTTFFontFromArchive(_fontInfo[familyId]->name, macFont->getSize(), Graphics::kTTFSizeModeCharacter, 0, 0, _ttfRenderMode);
 
+			if (!font) {
+				// The name came off the machine the title was authored on, and
+				// we ship hardly any of those, so this asks the archive for a
+				// file that is not there and used to give up on the spot -- the
+				// text then fell all the way through to the built-in font, whose
+				// widths have nothing to do with the authored ones. Do what the
+				// branch below already does for an unregistered name.
+				debugC(1, kDebugLevelMacGUI, "MacFontManager::getFont(): no TTF named '%s' in the archive, trying Liberation Sans",
+						_fontInfo[familyId]->name.c_str());
+				font = Graphics::loadTTFFontFromArchive("LiberationSans-Regular.ttf", macFont->getSize(), Graphics::kTTFSizeModeCharacter, 0, 0, _ttfRenderMode);
+			}
+
 			// We may get nullptr from here, so storing it to avoid multiple tries
 			_uniFontRegistry.setVal(macFont->getName(), font);
 			if (font) {
