@@ -24,7 +24,10 @@
 
 #include "director/director.h"
 #include "director/cast.h"
+#include "director/channel.h"
 #include "director/movie.h"
+#include "director/score.h"
+#include "director/sprite.h"
 #include "director/castmember/castmember.h"
 #include "director/castmember/script.h"
 #include "director/lingo/lingo-the.h"
@@ -115,6 +118,24 @@ Common::Rect CastMember::getBbox(int16 currentWidth, int16 currentHeight) {
 	Common::Point offset = getRegistrationOffset(currentWidth, currentHeight);
 	result.moveTo(-offset.x, -offset.y);
 	return result;
+}
+
+int CastMember::getPageHeight() {
+	// The manual is explicit that this is a screen measurement, not a member
+	// one: "a field Cast member could actually be 224 pixels high, but if
+	// resized on the Stage to 140 pixels, the pageHeight of member would return
+	// 140" (D8 Demystified, Lingo Lexicon). So find the sprite showing it.
+	Movie *movie = g_director->getCurrentMovie();
+	if (movie) {
+		Common::Array<Channel *> &channels = movie->getScore()->_channels;
+		for (uint i = 0; i < channels.size(); i++) {
+			if (channels[i]->_sprite && channels[i]->_sprite->_cast == this)
+				return channels[i]->getBbox().height();
+		}
+	}
+
+	// Nothing shows it, so all we know is how tall it was authored.
+	return _cast->getCastMemberInitialRect(_castId).height();
 }
 
 bool CastMember::hasProp(const Common::String &propName) {
@@ -233,6 +254,9 @@ Datum CastMember::getField(int field) {
 	case kTheRect:
 		// not sure get the initial rect would be fine to castmember
 		d = Datum(_cast->getCastMember(_castId)->_initialRect);
+		break;
+	case kThePageHeight:
+		d = getPageHeight();
 		break;
 	/*
 	ScummVM does not do preloading so we will always return false here.

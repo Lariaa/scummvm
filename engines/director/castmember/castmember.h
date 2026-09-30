@@ -88,6 +88,12 @@ public:
 	// release the control to widget, this happens when we are changing sprites. Because we are having the new cast member and the old one shall leave
 	void releaseWidget() { _widget = nullptr; }
 
+	// "the height of the text shown on the Stage, not the height if the entire
+	// Cast member were visible" -- so this answers with the sprite's height, and
+	// the member's own rect only stands in when nothing shows it. Every member
+	// that scrolls is asked for it: fields, rich text and the Text Xtra.
+	int getPageHeight();
+
 	virtual Common::String formatInfo() { return Common::String(); };
 
 	// Return the default bounding box of the cast member. The origin is at the registration offset.
