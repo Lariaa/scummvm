@@ -526,6 +526,29 @@ void MacText::getChunkPosFromIndex(int index, uint &lineNum, uint &chunkNum, uin
 	offset = 0;
 }
 
+Common::Point MacText::getCharPosition(int index) {
+	if (_canvas._text.empty())
+		return Common::Point(0, 0);
+
+	if (index < 0)
+		return Common::Point(0, 0);
+
+	uint lineNum = 0, chunkNum = 0, offset = 0;
+	getChunkPosFromIndex(index, lineNum, chunkNum, offset);
+
+	// The row is measured in columns, so add up the chunks in front of the one
+	// the index landed in.
+	int col = (int)offset;
+	for (uint i = 0; i < chunkNum && i < _canvas._text[lineNum].chunks.size(); i++)
+		col += _canvas._text[lineNum].chunks[i].text.size();
+
+	// Take the height first: getLineWidth() returns as soon as it reaches the
+	// column it was given, and leaves the row's height uncomputed.
+	int bottom = _canvas._text[lineNum].y + _canvas.getLineHeight(lineNum);
+
+	return Common::Point(_canvas.getAlignOffset(lineNum) + _canvas.getLineWidth(lineNum, false, col), bottom);
+}
+
 void setTextColorCallback(MacFontRun &macFontRun, int color) {
 	macFontRun.fgcolor = color;
 }

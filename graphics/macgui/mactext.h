@@ -165,6 +165,13 @@ public:
 	void insertChar(byte c, int *row, int *col);
 
 	void getChunkPosFromIndex(int index, uint &lineNum, uint &chunkNum, uint &offset);
+	/**
+	 * Where a character sits in the laid-out text, in the text's own
+	 * coordinates: x is its left edge, y the bottom of the line holding it.
+	 *
+	 * @param index 0-based character offset into the text
+	 */
+	Common::Point getCharPosition(int index);
 	void getRowCol(int x, int y, int *sx, int *sy, int *row, int *col, int *chunk_ = nullptr);
 	void getLineCharacter(int x, int y, int *sx, int *sy, int *line, int *character, int *chunk_ = nullptr);
 	Common::U32String getTextChunk(int startRow, int startCol, int endRow, int endCol, bool formatted = false, bool newlines = true);

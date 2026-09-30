@@ -70,6 +70,9 @@ public:
 
 	int getTextHeight();
 
+	// Where the given character sits inside the member, counting from one.
+	Common::Point charPosToLoc(int charPos);
+
 	Common::String getTextFont();
 	Common::String getTextFont(int start, int end);
 	void setTextFont(const Common::String &fontName);
