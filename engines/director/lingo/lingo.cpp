@@ -2006,6 +2006,14 @@ Common::U32String Lingo::evalChunkRef(const Datum &var) {
 				result = ((TextCastMember *)member)->getText();
 				break;
 			default:
+				// A Text Xtra member keeps its text the same way, it just is not
+				// a field. Ask for the property instead of the class, so every
+				// member that carries text can be chunked -- TKKG 11, 13 and 14
+				// hold their notebook in such a member.
+				if (member->hasField(kTheText)) {
+					result = member->getField(kTheText).asString().decode(Common::kUtf8);
+					break;
+				}
 				warning("evalChunkRef: Unhandled cast type %d", member->_type);
 				break;
 			}
