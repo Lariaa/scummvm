@@ -74,6 +74,9 @@ public:
 
 	void load() override;
 
+	// Rebuild _ftext from _text and _styles. Every change to _text needs it.
+	void buildFormattedText();
+
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
 
 	bool hasField(int field) override;
