@@ -1856,6 +1856,15 @@ void Lingo::varAssign(const Datum &var, const Datum &value) {
 				((TextCastMember *)member)->setRawText(value.asString());
 				break;
 			default:
+				// The write side of what evalChunkRef() reads: a Text Xtra
+				// member takes text like a field, it just is not one, so ask for
+				// the property rather than test for the class. TKKG 11, 13 and
+				// 14 fill their notebook this way, and because the CHUNKREF case
+				// below assigns through here, so do their chunk writes.
+				if (member->hasField(kTheText)) {
+					member->setField(kTheText, value);
+					break;
+				}
 				warning("varAssign: Unhandled cast type %d", member->_type);
 				break;
 			}
