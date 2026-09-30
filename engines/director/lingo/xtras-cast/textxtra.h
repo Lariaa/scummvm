@@ -90,6 +90,8 @@ public:
 	// run, built in load() from the document's own styles.
 	Common::U32String _ftext;
 	TextXtra::StyleRuns _styles;
+	// Where the text is scrolled to, kept the way a field keeps it
+	uint16 _scroll = 0;
 };
 
 } // End of namespace Director
