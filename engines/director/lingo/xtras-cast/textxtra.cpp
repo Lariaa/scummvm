@@ -456,27 +456,27 @@ CastMember *createCastMember(Cast *cast, uint16 castId, XtraCastMember *xtra) {
 
 } // End of namespace TextXtra
 
-// The document names its fonts ("Arial", "AvantGarde", "Cooper Black"), but a
-// name is only worth taking when the font manager has glyphs behind it. A movie's
-// font map registers every name it mentions, so getFontIdByName() answers for
-// "Arial" as well -- with an id that nothing was ever loaded for, and the text
-// is then drawn through a substitute whose glyph table has no umlauts. That is
-// what turned TKKG 7's Steckbrief into "Schlo? Hohenblaubl?then" while the
-// bytes behind it were decoded correctly.
+// Take the document at its word. It names its fonts ("Arial", "AvantGarde",
+// "Cooper Black"); a name the manager holds a family for resolves to that
+// family, and every other one is registered so that getFont() can substitute
+// for it.
 //
-// The titles carry their fonts in the projector (TKKG 8 brings Geneva, Courier,
-// Times and Helvetica), so ask the families the manager really holds, and leave
-// everything else to the system font, which draws the accented characters.
+// This used to accept only names with a family and send the rest to the system
+// font, because a Windows name resolved to an id with no glyphs behind it and
+// TKKG 7's Steckbrief came out as "Schlo? Hohenblaubl?then". That is no longer
+// where it ends: a substitute is drawn by code point now, so the accented
+// characters survive. What the detour cost instead was the metrics. The system
+// font is Chicago, a display face, and Loewenzahn 8's "Wo ist was?" sizes every
+// title box to its own string in Arial: measured in Chicago, eight of its
+// fourteen titles came out 5 to 16 per cent too wide and wrapped out of a box
+// one line high. Liberation Sans, which getFont() substitutes, is metrically
+// compatible with Arial, so the author's line breaks come back.
 static int fontIdFor(const Common::String &name) {
 	if (name.empty())
 		return Graphics::kMacFontSystem;
 
-	for (auto *family : g_director->_wm->_fontMan->getFontFamilies()) {
-		if (family && family->getName().equalsIgnoreCase(name))
-			return g_director->_wm->_fontMan->getFontIdByName(name);
-	}
-
-	return Graphics::kMacFontSystem;
+	// A name the manager already knows keeps its id; an unknown one gets one.
+	return g_director->_wm->_fontMan->registerFontName(name);
 }
 
 TextXtraCastMember::TextXtraCastMember(Cast *cast, uint16 castId, XtraCastMember &source)
