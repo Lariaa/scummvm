@@ -5273,10 +5273,28 @@ void LB::b_windowPresent(int nargs) {
 }
 
 void LB::b_charPosToLoc(int nargs) {
-	g_lingo->printSTUBWithArglist("b_charPosToLoc", nargs);
-	g_lingo->dropStack(nargs);
-	Datum res(Common::Point(0, 0));
-	g_lingo->push(res);
+	ARGNUMCHECK(2);
+	Datum charPos = g_lingo->pop();
+	Datum member = g_lingo->pop();
+	CastMemberID id = member.asMemberID();
+	Movie *movie = g_director->getCurrentMovie();
+	CastMember *cast = movie->getCastMember(id);
+
+	Common::Point loc;
+	if (!cast) {
+		g_lingo->lingoError("b_charPosToLoc: Could not resolve cast member %s", id.asString().c_str());
+	} else if (cast->_type != kCastText) {
+		// "In field Cast members, this function determines the coordinates
+		// occupied by a given character ... It cannot be applied to text Cast
+		// members" (D8 Demystified, Lingo Lexicon). Macromedia's own scrolling
+		// behaviour asks a text member all the same, so answer the empty point
+		// rather than stop the movie.
+		debugC(1, kDebugLingoExec, "b_charPosToLoc: %s is a %s and not a field, no location", id.asString().c_str(), castType2str(cast->_type));
+	} else {
+		loc = ((TextCastMember *)cast)->charPosToLoc(charPos.asInt());
+	}
+
+	g_lingo->push(Datum(loc));
 }
 
 void LB::b_linePosToLocV(int nargs) {
