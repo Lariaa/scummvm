@@ -632,6 +632,9 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 bool TextXtraCastMember::hasField(int field) {
 	switch (field) {
 	case kTheText:
+	// A Text Xtra member scrolls like a field, so the scrollbar behaviours ask
+	// it for its visible height. CastMember answers both.
+	case kThePageHeight:
 		return true;
 	default:
 		break;

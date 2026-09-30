@@ -743,10 +743,6 @@ Datum TextCastMember::getField(int field) {
 		warning("STUB: TextCastMember::getField(): margin not implemented");
 		d = 0;
 		break;
-	case kThePageHeight:
-		warning("STUB: TextCastMember::getField(): pageHeight not implemented");
-		d = 0;
-		break;
 	case kTheScrollTop:
 		d = _scroll;
 		break;
