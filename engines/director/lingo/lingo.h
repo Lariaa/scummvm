@@ -595,6 +595,15 @@ public:
 	Datum _windowList;
 	Symbol _currentInputEvent;
 
+	// What `on cuePassed me, whichChannel, cuePointNumber, cuePointName` is
+	// handed: "the channel identifier, sprite channel member, or sound channel
+	// symbol; the cue point number; and the cue point name" (Director 8
+	// Demystified, "The on cuePassed handler"). Filled in where the cue point is
+	// raised and read back where the handler is called.
+	Datum _cuePointChannel;
+	int _cuePointNumber = 0;
+	Common::String _cuePointName;
+
 	struct {
 		LingoExecState _state = kRunning;
 		bool (*_shouldPause)() = nullptr;
