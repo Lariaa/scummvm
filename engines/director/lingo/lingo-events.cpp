@@ -726,6 +726,10 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 
 		case kEventIdle:
 		case kEventTimeout:
+		// A cue point belongs to a sound, not to a sprite, so there is no sprite
+		// to start at: the manual's own example puts `on cuePassed` in a frame
+		// behaviour, and it reaches the movie script after that.
+		case kEventCuePassed:			// D6
 			queue.push(LingoEvent(event, eventId, kFrameHandler, false, pos, channelId));
 			// fall through
 
@@ -967,6 +971,18 @@ bool Lingo::processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int
 			(event == kEventMouseLeave && script->_eventHandlers[event].name->equalsIgnoreCase("endRollover"))) {
 			push(Datum(channelId));
 			nargs = 1;
+		}
+
+		// "Director automatically passes the four parameters to the handler: the
+		// self-referencing me; the channel identifier, sprite channel member, or
+		// sound channel symbol; the cue point number; and the cue point name"
+		// (Director 8 Demystified, "The on cuePassed handler"). TKKG 11, 13 and
+		// 14 drive their talking heads from it.
+		if (event == kEventCuePassed) {
+			push(_cuePointChannel);
+			push(Datum(_cuePointNumber));
+			push(Datum(_cuePointName));
+			nargs = 3;
 		}
 
 		Symbol sym = script->_eventHandlers[event];
