@@ -449,6 +449,24 @@ BitmapCastMember::~BitmapCastMember() {
 	}
 }
 
+// The palette a bitmap is drawn against right now: what the score says, the
+// movie's default when the score says nothing, and the Mac system palette when
+// neither resolves. createWidget() and isModified() must agree on this, or a
+// cached conversion is compared against an id that was never used to make it.
+CastMemberID BitmapCastMember::currentStagePalette() {
+	Movie *movie = g_director->getCurrentMovie();
+	if (!movie)
+		return CastMemberID(kClutSystemMac, -1);
+
+	CastMemberID paletteId = movie->getScore()->getCurrentPalette();
+	if (paletteId.isNull())
+		paletteId = movie->_defaultPalette;
+	if (!g_director->getPalette(paletteId))
+		paletteId = CastMemberID(kClutSystemMac, -1);
+
+	return paletteId;
+}
+
 Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
 	if (!_picture) {
 		warning("BitmapCastMember::createWidget: No picture");
@@ -508,6 +526,14 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 
 		if (_ditheredImg) {
 			if (srcBpp > 1) {
+				// Record which palette this quantisation was made for, exactly
+				// as getDitherImg() does for an indexed source. Without it the
+				// result is cached forever: isModified() has nothing to compare
+				// against, the widget is never rebuilt, and the member keeps the
+				// colours of whatever palette happened to be up the first time
+				// it was drawn.
+				_ditheredTargetClut = currentStagePalette();
+
 				// A 16- or 32-bit source carries no palette, and the conversion
 				// above passed none: every pixel is matched against the window
 				// manager's palette by nearest colour. Naming clutToDrawWith()
@@ -632,17 +658,22 @@ Graphics::Surface *BitmapCastMember::getDitherImg() {
 	int targetBpp = g_director->_wm->_pixelformat.bytesPerPixel;
 
 	// Get the current score palette. Note that this is the ID of the palette in the list, not the cast member!
-	CastMemberID currentPaletteId = score->getCurrentPalette();
-	if (currentPaletteId.isNull())
-		currentPaletteId = movie->_defaultPalette;
-	PaletteV4 *currentPalette = g_director->getPalette(currentPaletteId);
-	if (!currentPalette) {
+	// Resolved in one place so that the id a conversion is tagged with is the
+	// same one isModified() later compares against.
+	CastMemberID wantedPaletteId = score->getCurrentPalette();
+	if (wantedPaletteId.isNull())
+		wantedPaletteId = movie->_defaultPalette;
+	CastMemberID currentPaletteId = currentStagePalette();
+	if (currentPaletteId != wantedPaletteId) {
 		// Last resort. Whatever gets converted here may come out recoloured, so say
 		// when it happens instead of doing it silently.
 		warning("BitmapCastMember::getDitherImg(): cast %d has no usable target palette (%s), falling back to the Mac system palette",
-				_castId, currentPaletteId.asString().c_str());
-		currentPaletteId = CastMemberID(kClutSystemMac, -1);
-		currentPalette = g_director->getPalette(currentPaletteId);
+				_castId, wantedPaletteId.asString().c_str());
+	}
+	PaletteV4 *currentPalette = g_director->getPalette(currentPaletteId);
+	if (!currentPalette) {
+		warning("BitmapCastMember::getDitherImg(): cast %d has no palette to convert into at all, leaving it alone", _castId);
+		return nullptr;
 	}
 	CastMemberID castPaletteId = clutToDrawWith();
 	// It is possible for Director to have saved an invalid ID in _clut;
@@ -806,23 +837,14 @@ bool BitmapCastMember::isModified() {
 	// will dither the image so that it fits within the current palette.
 	// When the score palette changes, we need to flag that the widget needs
 	// to be recreated.
-	if (!_clut.isNull()) {
-		Movie *movie = g_director->getCurrentMovie();
-		Score *score = movie->getScore();
-		CastMemberID currentPaletteId = score->getCurrentPalette();
-		if (currentPaletteId.isNull())
-			currentPaletteId = movie->_defaultPalette;
-		PaletteV4 *currentPalette = g_director->getPalette(currentPaletteId);
-		if (!currentPalette) {
-			currentPaletteId = CastMemberID(kClutSystemMac, -1);
-			currentPalette = g_director->getPalette(currentPaletteId);
-		}
-		CastMemberID castPaletteId = _clut;
-		if (castPaletteId.isNull())
-			castPaletteId = movie->_defaultPalette;
+	// A 16- or 32-bit bitmap has no palette of its own, so _clut says nothing
+	// about it -- but on an 8-bit stage it is still quantised onto the stage
+	// palette, and that result goes just as stale when the palette changes.
+	// _ditheredTargetClut is set whenever a conversion was made, by either
+	// path, so it is the thing to ask.
+	if (!_clut.isNull() || !_ditheredTargetClut.isNull())
+		return !_ditheredTargetClut.isNull() && _ditheredTargetClut != currentStagePalette();
 
-		return !_ditheredTargetClut.isNull() && _ditheredTargetClut != currentPaletteId;
-	}
 	return false;
 }
 
