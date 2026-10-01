@@ -692,9 +692,22 @@ CollisionTest Channel::isMouseIn(const Common::Point &pos) {
 
 	if (_sprite->_cast) {
 		return _sprite->_cast->isWithin(bbox, pos, _sprite->_ink, _sprite->isFlippedH(), _sprite->isFlippedV());
-	} else if (!bbox.contains(pos)) {
-		return kCollisionNo;
 	}
+
+	// Nothing to show, nothing to hit. A sprite whose member is 0 draws nothing
+	// in Director and takes no click either; here its rectangle went on
+	// swallowing them. TKKG 10 parks a warning overlay over its login screen and
+	// blanks it with `sprite(...).member = 0` once the name is free again -- the
+	// sprite stays, and 24 of the 30 guard checks in one session were that
+	// invisible overlay refusing the click meant for the OK button beneath it.
+	//
+	// Shapes are drawn from the score and never have a member, so they keep
+	// their rectangle: Loewenzahn's quit bar is clicked through one.
+	if (!_sprite->isQDShape())
+		return kCollisionNo;
+
+	if (!bbox.contains(pos))
+		return kCollisionNo;
 
 	return kCollisionYes;
 }
