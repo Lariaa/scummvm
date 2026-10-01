@@ -255,18 +255,32 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			// castLib -1 means "the enclosing movie's cast", i.e. the film loop's
 			// own cast -- resolve the cell there (this is what makes e.g. the
 			// Mission to Planet X walk cycle work).
-			if (src._castId.castLib == -1 && _cast != nullptr) {
+			//
+			// From D8 on, a cell in the loop's own cast carries castLib 0 instead,
+			// and it has to be resolved the same way. A census of the film loop
+			// scores says the spelling simply changed: the D8.5 Adventskalender
+			// writes -1 throughout (BW_VORN 368, BW_HINTEN 367, BW_KUECHE 363),
+			// TKKG 14 writes 0 throughout (sc01 305 of 305, sc02 218 of 218), and
+			// TKKG 11, whose scenes are partly reused, holds both side by side
+			// (sc02: 39 on -1, 183 on 0). Skipping them cost TKKG 14 its talking
+			// heads -- every cell of those loops was dropped.
+			bool ownCast = src._castId.castLib == -1
+					|| (src._castId.castLib == 0 && g_director->getVersion() >= 800);
+
+			if (ownCast && _cast != nullptr) {
 				src._cast = _cast->getCastMember(src._castId.member, true);
 				// Matches the bookkeeping Sprite::setCast() does; the old pointer
 				// is null here, so there is nothing to release first
 				if (src._cast)
 					src._cast->incRefCount();
 			} else {
-				// castLib 0 = "no cast": an empty/disabled film-loop channel that
-				// Director leaves blank. Forcing it onto the loop's own cast draws a
-				// spurious bitmap -- e.g. the TKKG5 Sz40 "FB blinzelt" loop carries a
-				// stale man's-arm/cane cell (HB_ar06, castLib 0) that must not render
-				// while the man himself is absent. Skip it.
+				// Below D8, castLib 0 is not that: it is the odd cell left over from
+				// another cut of a scene, and Director leaves it blank. TKKG 5's
+				// Sz40 has exactly one, member 73 "040_1b/2_HB_ar06" -- Mr
+				// Bleibtreu's arm from scene variant 1b/2 -- inside loop 25
+				// "GS FB stizt +blinzelt", which plays variant 1a, where he is not
+				// in the room. 70 of the 303 castLib warnings in one run were that
+				// single cell; every other one named castLib -1.
 				continue;
 			}
 		}
