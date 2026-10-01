@@ -2794,6 +2794,19 @@ void Lingo::setTheChunk(Datum &chunk, int field, Datum &d) {
 
 void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
 	Datum d;
+
+	// `x.ilk` is the no-argument form of ilk(x) -- the manual spells both
+	// "elementName.ilk(typeSymbol)" and "elementName.ilk" (Director 8
+	// Demystified, Lingo Lexicon). Answer with the builtin rather than keep a
+	// second copy of its type table, and leave an object that carries a
+	// property of that name to the branch below.
+	if (propName.equalsIgnoreCase("ilk") && !(obj.type == OBJECT && obj.u.obj->hasProp(propName))) {
+		g_lingo->push(obj);
+		LB::b_ilk(1);
+		g_debugger->propReadHook(propName);
+		return;
+	}
+
 	if (obj.type == OBJECT) {
 		if (obj.u.obj->hasProp(propName)) {
 			d = obj.u.obj->getProp(propName);
