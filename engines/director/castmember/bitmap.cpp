@@ -507,7 +507,25 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 		Score *score = movie->getScore();
 
 		if (_ditheredImg) {
-			debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Dithering cast %d from source palette %s to target palette %s", _castId, clutToDrawWith().asString().c_str(), score->getCurrentPalette().asString().c_str());
+			if (srcBpp > 1) {
+				// A 16- or 32-bit source carries no palette, and the conversion
+				// above passed none: every pixel is matched against the window
+				// manager's palette by nearest colour. Naming clutToDrawWith()
+				// here would print a palette that was never consulted, which
+				// reads like a wrong-palette bug -- say what was really used.
+				// The score's idea of the current palette is printed next to it
+				// because the two can drift apart, and only then is the colour
+				// shift the palette's fault rather than the quantisation's.
+				const byte *wmPal = g_director->_wm->getPalette();
+				uint wmColors = g_director->_wm->getPaletteSize();
+				uint32 sum = 0;
+				for (uint i = 0; i < wmColors * 3; i++)
+					sum = sum * 31 + wmPal[i];
+				debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Quantising cast %d (%d bpp, no source palette) onto the window manager's %d colours, checksum 0x%08x; the score's current palette is %s",
+						_castId, srcBpp * 8, wmColors, sum, score->getCurrentPalette().asString().c_str());
+			} else {
+				debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Dithering cast %d from source palette %s to target palette %s", _castId, clutToDrawWith().asString().c_str(), score->getCurrentPalette().asString().c_str());
+			}
 		} else if (previouslyDithered) {
 			debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Removed dithered image for cast %d, score palette %s matches cast member", _castId, score->getCurrentPalette().asString().c_str());
 
