@@ -348,6 +348,24 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 	if (!_sprite->isQDShape() && _sprite->_ink == kInkTypeCopy && _sprite->_thickness & kTHasBlend)
 		needsMatte = true;
 
+	// A member that asks for its alpha gets it, whatever the ink says. The
+	// property is about the member, not about how it is composed: it "specifies
+	// whether an image's alpha channel information is used when the image is
+	// drawn on the Stage ... used when the useAlpha property is TRUE, and it is
+	// ignored when the value is FALSE (the default)" (Director 8 Demystified,
+	// Lingo Lexicon). Copy ink is not in the list above, so the alpha plane was
+	// never looked at: TKKG 14's login screen draws member 21 "login0003" that
+	// way, updateFlags 0x98, and its whole 480x200 rectangle went down opaque.
+	//
+	// 32 bit only. Below that there is no alpha plane and createMatte() would
+	// fall through to a flood fill, which under copy ink is a guess, not a
+	// mechanism.
+	if (!_sprite->isQDShape() && _sprite->_cast->_type == kCastBitmap) {
+		BitmapCastMember *bitmap = (BitmapCastMember *)_sprite->_cast;
+		if (bitmap->_bitsPerPixel == 32 && bitmap->_useAlpha)
+			needsMatte = true;
+	}
+
 	// Mask ink names its own mask -- the member right after this one -- so it must
 	// not be diverted into the matte path. The blend clause above did exactly
 	// that: TKKG 8's harbour fog (member 213 "Magla7", ink 9) carries blend 102
