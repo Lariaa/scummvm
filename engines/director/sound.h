@@ -23,6 +23,8 @@
 #define DIRECTOR_SOUND_H
 
 #include "audio/mixer.h"
+#include "common/array.h"
+#include "common/str-array.h"
 
 namespace Audio {
 	class AudioStream;
@@ -168,6 +170,10 @@ struct SoundChannel {
 	int originalRate;
 	FadeParams *fade;
 	int lastCuePointIndex;
+	// Which cast member's cue points apply to what is playing. Normally that is
+	// lastPlayedSound, but a linked file is played by name and deliberately
+	// leaves that empty, so the member is remembered here instead.
+	CastMemberID cuePointSource;
 
 	// a non-zero sound ID if the channel is a puppet. i.e. it's controlled by lingo
 	SoundID puppet;
@@ -217,7 +223,7 @@ public:
 	~DirectorSound();
 
 	SoundChannel *getChannel(int soundChannel);
-	void playFile(Common::String filename, int soundChannel);
+	void playFile(Common::String filename, int soundChannel, CastMemberID cuePointSource = CastMemberID());
 	void playMCI(Audio::AudioStream &stream, uint32 from, uint32 to);
 	void playStream(Audio::AudioStream &stream, int soundChannel);
 	void playSound(SoundID soundId, int soundChannel, bool forPuppet = false);
@@ -349,6 +355,11 @@ public:
 
 	Audio::AudioStream *getAudioStream(bool looping = false, bool forPuppet = false, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES) override;
 	uint32 getDuration() override;
+
+	// Read the cue points the file carries, in milliseconds. Both spellings are
+	// understood: an AIFF 'MARK' chunk and the table a Shockwave Audio header
+	// keeps after its fixed part.
+	bool getCuePoints(Common::Array<int32> &times, Common::StringArray &names);
 
 private:
 	Common::String _path;
