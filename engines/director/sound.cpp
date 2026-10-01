@@ -403,6 +403,13 @@ uint32 DirectorSound::getChannelElapsedTime(int soundChannel) {
 	return _mixer->getSoundElapsedTime(_channels[soundChannel]->handle);
 }
 
+int DirectorSound::getChannelLastCuePoint(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return -1;
+
+	return _channels[soundChannel]->lastCuePointIndex;
+}
+
 SoundID DirectorSound::getChannelLastPlayed(int soundChannel) {
 	if (!assertChannel(soundChannel))
 		return SoundID();
