@@ -1614,6 +1614,19 @@ void LC::c_tell() {
 	Window *currentWindow = g_director->getCurrentWindow();
 	g_lingo->push(currentWindow);
 	if (window.type != OBJECT || window.u.obj->getObjType() != kWindowObj) {
+		// `tell` takes a window: "this command is used to pass Lingo statements
+		// from one window object to another" (Director 8 Demystified, Lingo
+		// Lexicon), and the Director MX manual says the same. A sprite is not
+		// one, so the body simply runs where it stands -- which is what Director
+		// does with it too, and there is nothing to report. TKKG 14 writes
+		// `tell sprite(pSp) / _frame = the frame / end tell` in the endSprite of
+		// four film loop behaviors and produced 1087 of these in one session,
+		// burying the lines worth reading.
+		if (window.type == SPRITEREF) {
+			debugC(5, kDebugLingoExec, "LC::c_tell(): a sprite is not a window, running the body where it stands");
+			return;
+		}
+
 		warning("LC::c_tell(): wrong argument type: %s", window.type2str());
 		return;
 	}
