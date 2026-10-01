@@ -27,6 +27,7 @@
 #include "common/file.h"
 #include "common/macresman.h"
 #include "common/substream.h"
+#include "common/xpfloat.h"
 
 #include "audio/decoders/wave.h"
 #include "audio/decoders/raw.h"
@@ -74,7 +75,7 @@ SoundChannel *DirectorSound::getChannel(int soundChannel) {
 	return _channels[soundChannel];
 }
 
-void DirectorSound::playFile(Common::String filename, int soundChannel) {
+void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemberID cuePointSource) {
 	if (!assertChannel(soundChannel))
 		return;
 
@@ -103,6 +104,11 @@ void DirectorSound::playFile(Common::String filename, int soundChannel) {
 
 	// Set the last played sound so that cast member 0 in the sound channel doesn't stop this file.
 	setLastPlayedSound(soundChannel, SoundID(), false);
+	// A file is played by name, so the empty id above leaves nothing to look the
+	// cue points up on. Remember the member that asked for it. The index starts
+	// over too: the elapsed time this is measured against restarts here.
+	_channels[soundChannel]->cuePointSource = cuePointSource;
+	_channels[soundChannel]->lastCuePointIndex = -1;
 	_channels[soundChannel]->fromLastMovie = false;
 }
 
@@ -143,6 +149,16 @@ void DirectorSound::playStream(Audio::AudioStream &stream, int soundChannel) {
 	cancelFade(soundChannel);
 
 	_mixer->stopHandle(_channels[soundChannel]->handle);
+
+	// Whatever played before has had its cue points, and the elapsed time the
+	// next sound is measured against starts at zero again. Without this, a
+	// channel kept every cue it had already passed and the second sound on it
+	// skipped all of its own -- which is how TKKG 13 and 14 speak, line after
+	// line through the same channel.
+	_channels[soundChannel]->lastCuePointIndex = -1;
+	// An embedded sound is looked up through lastPlayedSound, so drop whatever a
+	// linked file left behind.
+	_channels[soundChannel]->cuePointSource = CastMemberID();
 
 	setChannelDefaultVolume(soundChannel);
 
@@ -707,7 +723,7 @@ void DirectorSound::startQueueEntry(int soundChannel, const SoundQueueEntry &ent
 		// since, and TKKG 13 and 14 re-aim the same two placeholders for every
 		// line they speak: one take was heard twice and the next not at all.
 		_channels[soundChannel]->newPuppet = false;
-		playFile(entry.linkedPath, soundChannel);
+		playFile(entry.linkedPath, soundChannel, entry.member);
 	} else {
 		playPuppetSound(soundChannel);
 	}
@@ -1014,40 +1030,47 @@ void DirectorSound::processCuePoints() {
 	for (auto &it : _channels) {
 		SoundChannel *channel = it._value;
 
-		const SoundID &lastPlayedSound = channel->lastPlayedSound;
-		if (lastPlayedSound.type == kSoundCast) {
-			CastMemberID memberID(lastPlayedSound.u.cast.member, lastPlayedSound.u.cast.castLib);
-			CastMember *member = _window->getCurrentMovie()->getCastMember(memberID);
-
-			// The sound channel can reference a cast member that is not (or no
-			// longer) a sound -- e.g. when the member ID resolves to a bitmap.
-			// Guard the downcast; otherwise we read _cuePoints off an unrelated
-			// object (here a BitmapCastMember) and crash in a release build.
-			if (!member || member->_type != kCastSound)
+		// A linked file names the member it was played for; everything else is
+		// found through the sound that last started on the channel.
+		CastMemberID memberID = channel->cuePointSource;
+		if (memberID.member == 0) {
+			const SoundID &lastPlayedSound = channel->lastPlayedSound;
+			if (lastPlayedSound.type != kSoundCast)
 				continue;
+			memberID = CastMemberID(lastPlayedSound.u.cast.member, lastPlayedSound.u.cast.castLib);
+		}
 
-			SoundCastMember *soundCast = (SoundCastMember *)member;
+		CastMember *member = _window->getCurrentMovie()->getCastMember(memberID);
 
-			if (soundCast->_cuePoints.empty())
-				continue;
+		// The sound channel can reference a cast member that is not (or no
+		// longer) a sound -- e.g. when the member ID resolves to a bitmap.
+		// Guard the downcast; otherwise we read _cuePoints off an unrelated
+		// object (here a BitmapCastMember) and crash in a release build.
+		if (!member || member->_type != kCastSound)
+			continue;
 
-			uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
+		SoundCastMember *soundCast = (SoundCastMember *)member;
 
-			if (!elapsedTime)
-				continue;
+		if (soundCast->_cuePoints.empty())
+			continue;
 
-			for (uint i = channel->lastCuePointIndex + 1; i < soundCast->_cuePoints.size(); i++) {
-				int32 cuePoint = soundCast->_cuePoints[i];
+		uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
 
-				if (cuePoint > (int32)elapsedTime)
-					break;
+		if (!elapsedTime)
+			continue;
 
-				debugC(5, kDebugSound, "DirectorSound::processCuePoints(): cue point %d reached on channel %d", cuePoint, it._key);
+		for (uint i = channel->lastCuePointIndex + 1; i < soundCast->_cuePoints.size(); i++) {
+			int32 cuePoint = soundCast->_cuePoints[i];
 
-				_window->getCurrentMovie()->processEvent(kEventCuePassed, i);
+			if (cuePoint > (int32)elapsedTime)
+				break;
 
-				channel->lastCuePointIndex = i;
-			}
+			debugC(5, kDebugSound, "DirectorSound::processCuePoints(): cue point %d ('%s') reached on channel %d",
+					cuePoint, i < soundCast->_cuePointNames.size() ? soundCast->_cuePointNames[i].c_str() : "", it._key);
+
+			_window->getCurrentMovie()->processEvent(kEventCuePassed, i);
+
+			channel->lastCuePointIndex = i;
 		}
 	}
 }
@@ -1351,6 +1374,141 @@ Audio::AudioStream *AudioFileDecoder::getAudioStream(bool looping, bool forPuppe
 	}
 
 	return nullptr;
+}
+
+// A Shockwave Audio header is 320 bytes of fixed fields, and whatever follows
+// is a cue point table: a count, then one 36-byte record per cue point holding
+// its time in milliseconds and a 32-byte name. Measured over TKKG 14's 2249
+// speech files, where `324 + count * 36` lands exactly on the end of the header
+// every single time, and over Loewenzahn's .swa, where the files that say
+// nothing simply stop at 320.
+static const uint32 kSWACuePointCount = 320;
+static const uint32 kSWACuePointTable = 324;
+static const uint32 kSWACuePointSize = 36;
+
+static bool readSWACuePoints(Common::SeekableReadStream *stream, Common::Array<int32> &times, Common::StringArray &names) {
+	stream->seek(0);
+	uint32 headerEnd = 4 + stream->readUint32BE();
+	if (headerEnd <= kSWACuePointTable || headerEnd > (uint32)stream->size())
+		return false;
+
+	stream->seek(kSWACuePointCount);
+	uint32 count = stream->readUint32BE();
+	if (count > 0xffff || kSWACuePointTable + count * kSWACuePointSize != headerEnd)
+		return false;
+
+	for (uint32 i = 0; i < count; i++) {
+		stream->seek(kSWACuePointTable + i * kSWACuePointSize);
+		uint32 time = stream->readUint32BE();
+
+		byte raw[kSWACuePointSize - 4];
+		if (stream->read(raw, sizeof(raw)) != sizeof(raw))
+			break;
+
+		Common::String name;
+		for (uint j = 0; j < sizeof(raw) && raw[j]; j++)
+			name += (char)raw[j];
+
+		// A few records carry neither a readable name nor a sane time -- 594 of
+		// 19950 in TKKG 14. Director skips what it cannot use, and so do we,
+		// rather than hand the game a cue it would act on.
+		if (name.empty() || time > 0x7fffffff)
+			continue;
+		bool printable = true;
+		for (uint j = 0; j < name.size(); j++)
+			if (name[j] < 32 || (byte)name[j] > 126)
+				printable = false;
+		if (!printable)
+			continue;
+
+		times.push_back((int32)time);
+		names.push_back(name);
+	}
+
+	return !times.empty();
+}
+
+// AIFF keeps its markers in a 'MARK' chunk, positioned in sample frames, so the
+// rate from 'COMM' turns them into milliseconds. TKKG 13 speaks this way where
+// TKKG 14 speaks Shockwave Audio -- same names, different container.
+static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<int32> &times, Common::StringArray &names) {
+	double rate = 0.0;
+	Common::Array<uint32> positions;
+	Common::StringArray markNames;
+
+	int64 pos = 12;
+	while (pos + 8 <= stream->size()) {
+		stream->seek(pos);
+		uint32 tag = stream->readUint32BE();
+		uint32 size = stream->readUint32BE();
+		int64 body = pos + 8;
+
+		if (tag == MKTAG('C', 'O', 'M', 'M') && size >= 18) {
+			stream->seek(body + 8);
+			Common::XPFloat extended(stream->readUint16BE(), stream->readUint64BE());
+			rate = extended.toDouble();
+		} else if (tag == MKTAG('M', 'A', 'R', 'K') && size >= 2) {
+			stream->seek(body);
+			uint16 count = stream->readUint16BE();
+			for (uint16 i = 0; i < count && stream->pos() + 7 <= body + (int64)size; i++) {
+				stream->readUint16BE();	// marker id, unused
+				positions.push_back(stream->readUint32BE());
+				byte len = stream->readByte();
+				Common::String name;
+				for (byte j = 0; j < len; j++)
+					name += (char)stream->readByte();
+				markNames.push_back(name);
+				if (!(len & 1))
+					stream->readByte();	// pad to an even length
+			}
+		}
+
+		pos = body + size + (size & 1);
+	}
+
+	if (rate <= 0.0 || positions.empty() || positions.size() != markNames.size())
+		return false;
+
+	for (uint i = 0; i < positions.size(); i++) {
+		times.push_back((int32)(positions[i] / rate * 1000.0 + 0.5));
+		names.push_back(markNames[i]);
+	}
+
+	return true;
+}
+
+bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringArray &names) {
+	if (_path.empty())
+		return false;
+
+	Common::Path newPath = findAudioPath(_path);
+	Common::SeekableReadStream *stream = Common::MacResManager::openFileOrDataFork(newPath);
+	if (!stream)
+		return false;
+
+	bool found = false;
+	if (stream->size() >= 40) {
+		stream->seek(0);
+		uint32 magic1 = stream->readUint32BE();
+		stream->readUint32BE();
+		uint32 magic2 = stream->readUint32BE();
+		stream->seek(36);
+		uint32 macr = stream->readUint32BE();
+
+		if (magic1 == MKTAG('F', 'O', 'R', 'M') &&
+				(magic2 == MKTAG('A', 'I', 'F', 'F') || magic2 == MKTAG('A', 'I', 'F', 'C')))
+			found = readAIFFCuePoints(stream, times, names);
+		else if (macr == MKTAG('M', 'A', 'C', 'R'))
+			found = readSWACuePoints(stream, times, names);
+	}
+
+	delete stream;
+
+	if (found)
+		debugC(3, kDebugSound, "AudioFileDecoder::getCuePoints(): %d cue points in '%s', first '%s' at %d ms",
+				(int)times.size(), _path.c_str(), names[0].c_str(), times[0]);
+
+	return found;
 }
 
 uint32 AudioFileDecoder::getDuration() {

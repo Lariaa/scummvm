@@ -90,12 +90,18 @@ void SoundCastMember::load() {
 			// Linked sound files always have the loop flag disabled, the same as
 			// on the first-load path below.
 			_looping = false;
-			// The cue points belonged to whatever the member held before.
+			// The cue points belonged to whatever the member held before; the new
+			// file brings its own. TKKG 13 and 14 drive their talking heads with
+			// them -- every line carries "MB"/"ME" pairs, mouth begin and mouth
+			// end -- and the speech behaviour is set up with #pUseCuePoints: 1,
+			// so without these it has nothing to pace itself against.
 			_cuePoints.clear();
 			_cuePointNames.clear();
+			((AudioFileDecoder *)_audio)->getCuePoints(_cuePoints, _cuePointNames);
 			_loaded = true;
 
-			debugC(2, kDebugLoading, "SoundCastMember::load(): cast %d now plays the linked file '%s'", _castId, linked.c_str());
+			debugC(2, kDebugLoading, "SoundCastMember::load(): cast %d now plays the linked file '%s' with %d cue points",
+					_castId, linked.c_str(), (int)_cuePoints.size());
 			return;
 		}
 
