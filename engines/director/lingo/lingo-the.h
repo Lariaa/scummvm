@@ -95,6 +95,7 @@ enum TheEntityType {
 	kTheLastRoll,
 	kTheLines,
 	kTheMachineType,
+	kTheMarkerList,
 	kTheMaxInteger,
 	kTheMemorySize,
 	kTheMenu,

@@ -114,6 +114,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheLastKey,			"lastKey",			false, 200, true },	// D2 f
 	{ kTheLastRoll,			"lastRoll",			false, 200, true },	// D2 f
 	{ kTheMachineType,		"machineType",		false, 200, true },	// D2 f
+	{ kTheMarkerList,		"markerList",		false, 800, true },	//						D8 f
 	{ kTheMaxInteger,		"maxInteger",		false, 300, true },	//		D3.1 f
 	{ kTheMemorySize,		"memorySize",		false, 200, true },	// D2 f
 	{ kTheMenu,				"menu",				true,  300, false },//		D3 p
@@ -827,6 +828,22 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		// 76 - Macintosh Quadra 840av	D4
 		// 256 - IBM PC-type machine	D3
 		d = _vm->_machineType;
+		break;
+	case kTheMarkerList:
+		// "a property list of all the markers in the movie's score. The property
+		// of each list element is the frame number, the corresponding value is
+		// the name, as a string, of the marker" -- `put the markerlist` gives
+		// `[1: "MainMenu", 15: "Ben and Dane", 26: "Help"]` (Director 8
+		// Demystified, Lingo Lexicon, p. 912). Tested, not set.
+		//
+		// TKKG 13 walks it in its addons script and died on the empty answer:
+		// `repeat with i = 1 to (the markerlist).count`.
+		d.type = PARRAY;
+		d.u.parr = new PArray;
+		if (score && score->_labels) {
+			for (auto &label : *score->_labels)
+				d.u.parr->arr.push_back(PCell(Datum((int)label->number), Datum(label->name)));
+		}
 		break;
 	case kTheMaxInteger:
 		d = 2147483647; // (2^31)-1 [max 32bit signed integer]
