@@ -1157,10 +1157,16 @@ Datum Score::createScriptInstance(BehaviorElement *behavior) {
 	if (behavior->initializerIndex == 0)
 		return instance;
 
-	// Evaluate the params
+	// Evaluate the params. b_value() only prepares the call; run it the way
+	// executeHandler() does, bounded by the frame we are on. A bare execute()
+	// runs until the whole call stack is empty, so when a behavior is
+	// instantiated from inside running Lingo -- a beginSprite handler that
+	// places another sprite, say -- it tears down the frames of its own caller
+	// and clears the stack, taking the freshly parsed proplist with it.
+	int paramFrame = g_lingo->_state->callstack.size();
 	g_lingo->push(behavior->initializerParams);
 	LB::b_value(1);
-	g_lingo->execute();
+	g_lingo->execute(paramFrame);
 
 	if (debugChannelSet(5, kDebugLingoExec)) {
 		g_lingo->printStack("  Parsed behavior parameters: ", 0);
