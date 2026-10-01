@@ -52,6 +52,9 @@ public:
 	// The palette to convert the picture through, looked up among the casts of
 	// the movie that draws it when the file gave only a member number.
 	CastMemberID clutToDrawWith();
+	// The palette the stage is showing right now; what a cached conversion is
+	// tagged with and compared against.
+	CastMemberID currentStagePalette();
 
 	bool hasField(int field) override;
 	Datum getField(int field) override;
