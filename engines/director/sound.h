@@ -269,6 +269,9 @@ public:
 	void updatePlayLists();
 
 	bool isChannelActive(int soundChannel);
+	// Index of the last cue point the channel passed, counted from zero as
+	// _cuePoints is, or -1 before the first one. Lingo counts from one.
+	int getChannelLastCuePoint(int soundChannel);
 	uint32 getChannelElapsedTime(int soundChannel);
 	SoundID getChannelLastPlayed(int soundChannel);
 	uint8 getChannelVolume(int soundChannel);

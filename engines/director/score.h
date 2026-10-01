@@ -221,6 +221,9 @@ public:
 	int _lastTempo;
 	int _waitForChannel;
 	int _waitForChannelCue;
+	// Where the channel's cue point counter stood when the wait began, so that
+	// "wait for the next cue point" knows which one is next.
+	int _waitForChannelCueStart;
 	int _waitForVideoChannel;
 	bool _waitForClick;
 	bool _waitForClickCursor;

@@ -82,6 +82,7 @@ Score::Score(Movie *movie, bool haveInteractivity) {
 	_lastTempo = 0;
 	_waitForChannel = 0;
 	_waitForChannelCue = 0;
+	_waitForChannelCueStart = -1;
 	_waitForVideoChannel = 0;
 	_cursorDirty = false;
 	_waitForClick = false;
@@ -405,14 +406,35 @@ bool Score::isWaitingForNextFrame() {
 	bool goingTo = _nextFrame && _nextFrame != _curFrameNumber;
 
 	if (_waitForChannel) {
-		if (_waitForChannelCue != 0 && _waitForChannelCue != -2) {
-			 // -1: next, -2: end, else specific cue point
-			 warning("STUB: Implement waiting for sound channel %d cue point %d", _waitForChannel, _waitForChannelCue);
-		}
+		// -1: next, -2: end, 0: unset, else a specific cue point. The score
+		// counts cue points the way Lingo does, from one, while the channel
+		// keeps a zero-based index into the sound's cue point list.
+		bool cueReached = false;
+		int lastCue = _soundManager->getChannelLastCuePoint(_waitForChannel);
 
-		if (_soundManager->isChannelActive(_waitForChannel) && !goingTo) {
+		// The tempo channel and the sound channel live in the same frame, and
+		// the wait can be set up before the new sound starts. Starting one
+		// rewinds the counter, so a lower value than we noted means we were
+		// looking at the sound before it -- begin from the start instead.
+		if (lastCue < _waitForChannelCueStart)
+			_waitForChannelCueStart = -1;
+
+		if (_waitForChannelCue > 0)
+			cueReached = lastCue + 1 >= _waitForChannelCue;
+		else if (_waitForChannelCue == -1)
+			cueReached = lastCue > _waitForChannelCueStart;
+
+		if (cueReached) {
+			debugC(5, kDebugEvents, "Score::isWaitingForNextFrame(): sound channel %d reached cue point %d, going on",
+					_waitForChannel, lastCue + 1);
+			_waitForChannel = 0;
+		} else if (_soundManager->isChannelActive(_waitForChannel) && !goingTo) {
 			keepWaiting = true;
 		} else {
+			// The sound ended without the cue point ever arriving. Waiting for
+			// the end is what -2 and 0 ask for anyway, and for the others this
+			// is the only way out -- a sound whose cue points we cannot read
+			// would otherwise hold the frame forever.
 			_waitForChannel = 0;
 		}
 	} else if (_waitForClick) {
@@ -599,12 +621,14 @@ void Score::updateNextFrameTime() {
 				// Wait for sound channel 1
 				_waitForChannel = 1;
 				_waitForChannelCue = tempoCuePoint; // -1: next, -2: end, else specific cue point
+				_waitForChannelCueStart = _soundManager->getChannelLastCuePoint(1);
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): waiting for sound channel 1, cue point %d before next frame", _waitForChannelCue);
 				_nextFrameTime = g_system->getMillis();
 			} else if (tempo == 254) {
 				// Wait for sound channel 2
 				_waitForChannel = 2;
 				_waitForChannelCue = tempoCuePoint;
+				_waitForChannelCueStart = _soundManager->getChannelLastCuePoint(2);
 				debugC(5, kDebugEvents, "Score::updateNextFrameTime(): waiting for sound channel 2, cue point %d before next frame", _waitForChannelCue);
 				_nextFrameTime = g_system->getMillis();
 			} else if (tempo == 248) {
