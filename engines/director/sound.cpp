@@ -1445,8 +1445,12 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 
 		if (tag == MKTAG('C', 'O', 'M', 'M') && size >= 18) {
 			stream->seek(body + 8);
-			Common::XPFloat extended(stream->readUint16BE(), stream->readUint64BE());
-			rate = extended.toDouble();
+			// Both halves in a defined order: as arguments to the constructor the
+			// compiler is free to read them the other way round, which takes the
+			// exponent from the middle of the mantissa and yields a rate of zero.
+			uint16 signAndExponent = stream->readUint16BE();
+			uint64 mantissa = stream->readUint64BE();
+			rate = Common::XPFloat(signAndExponent, mantissa).toDouble();
 		} else if (tag == MKTAG('M', 'A', 'R', 'K') && size >= 2) {
 			stream->seek(body);
 			uint16 count = stream->readUint16BE();
@@ -1466,8 +1470,11 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 		pos = body + size + (size & 1);
 	}
 
-	if (rate <= 0.0 || positions.empty() || positions.size() != markNames.size())
+	if (rate <= 0.0 || positions.empty() || positions.size() != markNames.size()) {
+		debugC(3, kDebugSound, "readAIFFCuePoints(): nothing usable -- rate %f, %d positions, %d names",
+				rate, (int)positions.size(), (int)markNames.size());
 		return false;
+	}
 
 	for (uint i = 0; i < positions.size(); i++) {
 		times.push_back((int32)(positions[i] / rate * 1000.0 + 0.5));
