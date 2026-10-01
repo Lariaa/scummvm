@@ -648,6 +648,12 @@ MPEGPSDecoder::MPEGVideoTrack::MPEGVideoTrack(Common::SeekableReadStream *firstP
 
 #ifdef USE_MPEG2
 	_mpegDecoder = new Image::MPEGDecoder();
+#else
+	// Without libmpeg2 sendPacket() never creates the surface and every frame
+	// comes out blank, while loadStream() still reports success. Say so once,
+	// the way the audio track does when MAD is missing -- otherwise a missing
+	// codec looks exactly like a broken video.
+	warning("Found MPEG video stream %dx%d, but no MPEG2 support compiled in", _width, _height);
 #endif
 }
 
