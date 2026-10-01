@@ -1065,8 +1065,20 @@ void DirectorSound::processCuePoints() {
 			if (cuePoint > (int32)elapsedTime)
 				break;
 
-			debugC(5, kDebugSound, "DirectorSound::processCuePoints(): cue point %d ('%s') reached on channel %d",
-					cuePoint, i < soundCast->_cuePointNames.size() ? soundCast->_cuePointNames[i].c_str() : "", it._key);
+			Common::String cueName = i < soundCast->_cuePointNames.size() ? soundCast->_cuePointNames[i] : Common::String();
+
+			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): cue point %d ('%s') reached on channel %d",
+					cuePoint, cueName.c_str(), it._key);
+
+			// "Notice that the channel is reported as sound2, which
+			// differentiates it from the sprite channels" (Director 8
+			// Demystified). The cue point number is the one Lingo counts, so
+			// one-based, as cuePointNames and cuePointTimes are.
+			Datum channelName(Common::String::format("sound%d", it._key));
+			channelName.type = SYMBOL;
+			g_lingo->_cuePointChannel = channelName;
+			g_lingo->_cuePointNumber = i + 1;
+			g_lingo->_cuePointName = cueName;
 
 			_window->getCurrentMovie()->processEvent(kEventCuePassed, i);
 
