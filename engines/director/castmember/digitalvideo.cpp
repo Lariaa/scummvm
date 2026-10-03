@@ -505,8 +505,18 @@ bool DigitalVideoCastMember::endOfVideo() {
 	// No decoder or channel means nothing is playing; avoid a null deref.
 	if (!_video || !_channel)
 		return false;
-	return (_video->endOfVideo() ||
-			(getMovieCurrentTimeMillis() >= (uint)(_channel->_stopTime*1000/getTimeScale())));
+
+	if (_video->endOfVideo())
+		return true;
+
+	// A stop time of zero means nobody set one -- either the sprite has not been
+	// placed yet or the duration is unknown, as it is for an MPEG program
+	// stream. Comparing against it would call the video finished before its
+	// first frame; let the decoder say when the stream runs out.
+	if (_channel->_stopTime <= 0)
+		return false;
+
+	return getMovieCurrentTimeMillis() >= (uint)((uint64)_channel->_stopTime * 1000 / getTimeScale());
 }
 
 Graphics::MacWidget *DigitalVideoCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
@@ -598,22 +608,37 @@ uint DigitalVideoCastMember::getTimeScale() {
 	return result;
 }
 
+// Round milliseconds up to whole ticks of the current time scale. Written out
+// because the obvious 1 + ((ms * scale - 1) / 1000) underflows at ms == 0: the
+// scale is unsigned, so 0 * scale - 1 is 0xffffffff and the answer comes back
+// as 4294968 rather than nothing at all.
+static uint millisToTicks(int millis, uint timeScale) {
+	if (millis <= 0)
+		return 0;
+
+	return 1 + (((uint)millis * timeScale - 1) / 1000);
+}
+
 uint DigitalVideoCastMember::getMovieCurrentTime() {
 	if (!_video)
 		return 0;
-	int ticks = 1 + ((_video->getTime() * getTimeScale() - 1)/1000);
-	int stamp = MIN<int>(ticks, getMovieTotalTime());
 
-	return stamp;
+	uint ticks = millisToTicks(_video->getTime(), getTimeScale());
+	uint total = getMovieTotalTime();
+
+	// A total of zero means the duration is unknown, not that the video is over
+	// -- clamping against it would peg the position at the start forever.
+	return total ? MIN(ticks, total) : ticks;
 }
 
 uint DigitalVideoCastMember::getMovieCurrentTimeMillis() {
 	if (!_video)
 		return 0;
-	int ticks = _video->getTime();
-	int stamp = MIN<int>(ticks, getMovieTotalTime());
 
-	return stamp;
+	uint millis = _video->getTime();
+	uint total = getMovieTotalTime();
+
+	return total ? MIN(millis, total) : millis;
 }
 
 
@@ -621,8 +646,10 @@ uint DigitalVideoCastMember::getMovieTotalTime() {
 	if (!_video)
 		return 0;
 
-	int ticks = 1 + ((_video->getDuration().msecs() * getTimeScale() - 1)/1000);
-	return ticks;
+	// VideoDecoder::getDuration() returns zero when the duration is unknown,
+	// which an MPEG program stream is: it carries no length in its header. Pass
+	// that through as zero so callers can tell "unknown" from "already over".
+	return millisToTicks(_video->getDuration().msecs(), getTimeScale());
 }
 
 uint DigitalVideoCastMember::getMovieTotalTimeMillis() {
