@@ -30,6 +30,7 @@
 #include "director/sprite.h"
 #include "director/castmember/castmember.h"
 #include "director/castmember/script.h"
+#include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-the.h"
 #include "director/util.h"
 
@@ -168,6 +169,7 @@ bool CastMember::hasField(int field) {
 	case kTheBackColor:
 	case kTheCastLibNum:
 	case kTheCastType:
+	case kTheColor:
 	case kTheFileName:
 	case kTheForeColor:
 	case kTheHeight:
@@ -218,6 +220,12 @@ Datum CastMember::getField(int field) {
 	case kTheFileName:
 		if (castInfo)
 			d = Datum(castInfo->directory + g_director->_dirSeparator + castInfo->fileName);
+		break;
+	case kTheColor:
+		// The same foreground colour foreColor names, but as a colour object
+		// rather than a palette index -- "independent of the monitor color
+		// depth setting", as the D8 lexicon puts it for the sprite property.
+		d = Datum(new ColorObject((int)getForeColor()));
 		break;
 	case kTheForeColor:
 		d = (int)getForeColor();
@@ -311,6 +319,14 @@ void CastMember::setField(int field, const Datum &d) {
 			_needsReload = true;
 			setModified(true);
 		}
+		return;
+	case kTheColor:
+		// Takes a colour object, but accept a plain number too: the numeric
+		// spelling is what foreColor uses and games mix the two.
+		_cast->getCastMember(_castId)->setForeColor(
+				(d.type == OBJECT && d.u.obj->getObjType() == kColorObj)
+					? ((ColorObject *)d.u.obj)->toPaletteIndex()
+					: d.asInt());
 		return;
 	case kTheForeColor:
 		_cast->getCastMember(_castId)->setForeColor(d.asInt());

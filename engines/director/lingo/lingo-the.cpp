@@ -274,6 +274,7 @@ const TheEntityField fields[] = {
 	{ kTheCast,		"backColor",	kTheBackColor,	400 },//				D4 p
 	{ kTheCast,		"castLibNum",	kTheCastLibNum,	500 },// 					D5 p
 	{ kTheCast,		"castType",		kTheCastType,	400 },//				D4 p
+	{ kTheCast,		"color",		kTheColor,		800 },//				D8 p
 	{ kTheCast,		"cuePointNames",kTheCuePointNames,600 },//						D6 p
 	{ kTheCast,		"cuePointTimes",kTheCuePointTimes,600 },//						D6 p
 	{ kTheCast,		"filename",		kTheFileName,	400 },//				D4 p
