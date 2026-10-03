@@ -647,9 +647,20 @@ uint DigitalVideoCastMember::getMovieTotalTime() {
 		return 0;
 
 	// VideoDecoder::getDuration() returns zero when the duration is unknown,
-	// which an MPEG program stream is: it carries no length in its header. Pass
-	// that through as zero so callers can tell "unknown" from "already over".
-	return millisToTicks(_video->getDuration().msecs(), getTimeScale());
+	// which an MPEG program stream is: it carries no length in its header.
+	int millis = _video->getDuration().msecs();
+
+	// The authoring tool did know, though, and wrote it into the member: the
+	// DirectMedia Xtra's payload carries the length in milliseconds, which is
+	// where _externalDurationMs comes from. Prefer the decoder, because it
+	// measured the file we actually opened, and fall back on the authored
+	// figure rather than reporting no length at all.
+	if (millis <= 0 && _externalDurationMs)
+		millis = (int)_externalDurationMs;
+
+	// Still zero means genuinely unknown -- pass that through so callers can
+	// tell it from "already over".
+	return millisToTicks(millis, getTimeScale());
 }
 
 uint DigitalVideoCastMember::getMovieTotalTimeMillis() {
