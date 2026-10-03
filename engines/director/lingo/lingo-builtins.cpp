@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/keyboard.h"
 #include "common/system.h"
 #include "common/translation.h"
 
@@ -2846,8 +2847,26 @@ void LB::b_keyPressed(int nargs) {
 		// An ASCII character. Common::KeyCode uses the lowercase ASCII value for
 		// letters, digits and space, so the character doubles as the key.
 		Common::String key = d.asString();
-		if (!key.empty())
-			down = g_director->_keysDown.contains(tolower((byte)key[0]));
+		if (!key.empty()) {
+			byte ch = tolower((byte)key[0]);
+
+			// The arrow keys are the exception: Director reports them as the Mac
+			// control characters 28 to 31, which is what processEvent() puts in
+			// _key, but _keysDown is keyed by Common::KeyCode and those are
+			// nowhere near. Map them back, or polling for an arrow never
+			// answers true -- Loewenzahn 7's pig race steers with
+			// keyPressed(numToChar(28)) and could not be moved at all.
+			Common::KeyCode code = (Common::KeyCode)ch;
+			switch (ch) {
+			case 28: code = Common::KEYCODE_LEFT; break;
+			case 29: code = Common::KEYCODE_RIGHT; break;
+			case 30: code = Common::KEYCODE_UP; break;
+			case 31: code = Common::KEYCODE_DOWN; break;
+			default: break;
+			}
+
+			down = g_director->_keysDown.contains(code);
+		}
 	}
 
 	g_lingo->push(Datum(down ? 1 : 0));
