@@ -34,6 +34,7 @@
 #include "director/sprite.h"
 #include "director/window.h"
 #include "director/castmember/text.h"
+#include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-the.h"
 
 namespace Director {
@@ -916,6 +917,7 @@ void TextCastMember::setField(int field, const Datum &d) {
 
 bool TextCastMember::hasChunkField(int field) {
 	switch (field) {
+	case kTheColor:
 	case kTheForeColor:
 	case kTheTextFont:
 	case kTheTextHeight:
@@ -932,6 +934,12 @@ Datum TextCastMember::getChunkField(int field, int start, int end) {
 	Datum d;
 
 	switch (field) {
+	case kTheColor:
+		// As for the whole member: the colour foreColor names, handed out as a
+		// colour object. Loewenzahn 7's high-score board picks out the player's
+		// own line with member("HS_Punkte").line[a].color = rgb(200, 0, 0).
+		d = Datum(new ColorObject((int)getForeColor(start, end)));
+		break;
 	case kTheForeColor:
 		d = (int)getForeColor(start, end);
 		break;
@@ -958,6 +966,11 @@ Datum TextCastMember::getChunkField(int field, int start, int end) {
 bool TextCastMember::setChunkField(int field, int start, int end, const Datum &d) {
 
 	switch (field) {
+	case kTheColor:
+		setForeColor((d.type == OBJECT && d.u.obj->getObjType() == kColorObj)
+						? ((ColorObject *)d.u.obj)->toPaletteIndex()
+						: d.asInt(), start, end);
+		return true;
 	case kTheForeColor:
 		setForeColor(d.asInt(), start, end);
 		return true;
