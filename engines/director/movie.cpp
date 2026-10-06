@@ -646,7 +646,17 @@ CastMember *Movie::getCastMember(CastMemberID memberID) {
 		// these lines, Loewenzahn 7 2493 in one run.
 		debugC(5, kDebugLoading, "Movie::getCastMember(): %s names no cast library; the film loop resolves it against its own cast",
 				memberID.asString().c_str());
-	} else if (memberID.castLib != 0) {
+	} else if (memberID.castLib == 0) {
+		// castLib 0 goes the same way, silently, and that silence hides real
+		// losses: TKKG 14's sc30 draws 7748 empty sprites on channels 19 to 75
+		// naming it, with member numbers that look nothing like empty channels
+		// (738, 281, 666, 580 ...). From D8 on a film loop cell writes 0 where
+		// it used to write -1, and getSubChannels() resolves that -- but these
+		// never reach it, and sc30's main score does not name castLib 0 at all.
+		// Say so, so one run can show who is asking.
+		debugC(5, kDebugLoading, "Movie::getCastMember(): %s names cast library 0; nothing resolves it here",
+				memberID.asString().c_str());
+	} else {
 		warning("Movie::getCastMember: Unknown castLib %d", memberID.castLib);
 	}
 	return result;
