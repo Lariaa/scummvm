@@ -1416,6 +1416,8 @@ static bool readSWACuePoints(Common::SeekableReadStream *stream, Common::Array<i
 	if (count > 0xffff || kSWACuePointTable + count * kSWACuePointSize != headerEnd)
 		return false;
 
+	uint32 skipped = 0;
+
 	for (uint32 i = 0; i < count; i++) {
 		stream->seek(kSWACuePointTable + i * kSWACuePointSize);
 		uint32 time = stream->readUint32BE();
@@ -1431,18 +1433,28 @@ static bool readSWACuePoints(Common::SeekableReadStream *stream, Common::Array<i
 		// A few records carry neither a readable name nor a sane time -- 594 of
 		// 19950 in TKKG 14. Director skips what it cannot use, and so do we,
 		// rather than hand the game a cue it would act on.
-		if (name.empty() || time > 0x7fffffff)
+		if (name.empty() || time > 0x7fffffff) {
+			skipped++;
 			continue;
+		}
 		bool printable = true;
 		for (uint j = 0; j < name.size(); j++)
 			if (name[j] < 32 || (byte)name[j] > 126)
 				printable = false;
-		if (!printable)
+		if (!printable) {
+			skipped++;
 			continue;
+		}
 
 		times.push_back((int32)time);
 		names.push_back(name);
 	}
+
+	// How many records were thrown away matters: the count a game sees is the
+	// one after this filter, and a table read at the wrong offset shows up as
+	// everything being skipped rather than as an error.
+	debugC(5, kDebugSound, "readSWACuePoints(): %d of %d records usable, %d skipped as unnamed or out of range",
+			(int)times.size(), (int)count, (int)skipped);
 
 	return !times.empty();
 }
@@ -1530,9 +1542,19 @@ bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringA
 
 	delete stream;
 
-	if (found)
+	if (found) {
 		debugC(3, kDebugSound, "AudioFileDecoder::getCuePoints(): %d cue points in '%s', first '%s' at %d ms",
 				(int)times.size(), _path.c_str(), names[0].c_str(), times[0]);
+
+		// Naming only the first one says nothing about a table that goes wrong
+		// in the middle, which is the way an offset or a rate is wrong: the
+		// count still looks right and the first entry still reads "MB" at 0 ms.
+		// The numbering is the one Lingo uses -- cuePointNames and
+		// cuePointTimes are one-based, while _lastCuePointIndex counts from 0.
+		for (uint i = 0; i < times.size(); i++)
+			debugC(5, kDebugSound, "AudioFileDecoder::getCuePoints():   %d: '%s' at %d ms",
+					(int)i + 1, names[i].c_str(), times[i]);
+	}
 
 	return found;
 }
