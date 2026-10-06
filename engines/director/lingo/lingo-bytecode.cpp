@@ -549,7 +549,15 @@ void LC::cb_v4assign() {
 	int varType = arg & 0xF;
 	Datum varId = g_lingo->pop();
 
-	Datum var = g_lingo->findVarV4(varType, varId);
+	// The id is an index into the handler's name list, not a byte offset into
+	// it -- the same reading cb_varrefpushv4 and cb_delete already use.
+	// Measured in Loewenzahn 7's pig race: DisplayHS declares ptxt as local 1
+	// and ntxt as local 2 (setlocal 1, setlocal 2), and the two `put ... after`
+	// instructions that fill them push exactly 1 and 2. Read as offsets neither
+	// is divisible by 8, both assignments are dropped, and the high score board
+	// comes up empty -- the frame it is drawn on is there, the two columns are
+	// not.
+	Datum var = g_lingo->findVarV4(varType, varId, true);
 	g_lingo->push(var);
 
 	switch (op) {
