@@ -362,6 +362,7 @@ const TheEntityField fields[] = {
 	{ kTheCast,		"textSize",		kTheTextSize,	300 },//		D3 p
 	{ kTheCast,		"textStyle",	kTheTextStyle,	300 },//		D3 p
 	{ kTheCast,		"scrollTop",	kTheScrollTop,  500 },//					D5 p
+	{ kTheCast,		"selection",	kTheSelectionField,	700 },//						D7 p
 	{ kTheCast,		"wordWrap",		kTheWordWrap,	500 },//					D5 p
 
 	// ButtonCastMember fields

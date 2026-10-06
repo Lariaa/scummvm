@@ -643,6 +643,8 @@ bool TextXtraCastMember::hasField(int field) {
 	// it for its visible height and for where it is scrolled to.
 	case kThePageHeight:
 	case kTheScrollTop:
+	// It is editable like a field too, so it also answers for its selection.
+	case kTheSelectionField:
 		return true;
 	default:
 		break;
