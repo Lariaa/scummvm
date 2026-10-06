@@ -30,6 +30,7 @@
 #include "director/lingo/lingo-object.h"
 
 namespace Graphics {
+class MacText;
 class MacWidget;
 }
 
@@ -93,6 +94,10 @@ public:
 	// the member's own rect only stands in when nothing shows it. Every member
 	// that scrolls is asked for it: fields, rich text and the Text Xtra.
 	int getPageHeight();
+
+	// The widget of the sprite showing this member, for the properties that are
+	// about what is on the Stage rather than about the member itself.
+	Graphics::MacText *getShownText();
 
 	virtual Common::String formatInfo() { return Common::String(); };
 

@@ -703,6 +703,7 @@ bool TextCastMember::hasField(int field) {
 	case kTheMargin:
 	case kThePageHeight:
 	case kTheScrollTop:
+	case kTheSelectionField:
 	case kTheWordWrap:
 		return _type == kCastText;
 	case kTheButtonType:

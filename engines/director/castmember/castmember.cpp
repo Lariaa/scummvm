@@ -22,6 +22,8 @@
 #include "common/events.h"
 #include "common/stream.h"
 
+#include "graphics/macgui/mactext.h"
+
 #include "director/director.h"
 #include "director/cast.h"
 #include "director/channel.h"
@@ -137,6 +139,20 @@ int CastMember::getPageHeight() {
 
 	// Nothing shows it, so all we know is how tall it was authored.
 	return _cast->getCastMemberInitialRect(_castId).height();
+}
+
+Graphics::MacText *CastMember::getShownText() {
+	Movie *movie = g_director->getCurrentMovie();
+	if (!movie)
+		return nullptr;
+
+	Common::Array<Channel *> &channels = movie->getScore()->_channels;
+	for (uint i = 0; i < channels.size(); i++) {
+		if (channels[i]->_sprite && channels[i]->_sprite->_cast == this && channels[i]->_widget)
+			return (Graphics::MacText *)channels[i]->_widget;
+	}
+
+	return nullptr;
 }
 
 bool CastMember::hasProp(const Common::String &propName) {
@@ -266,6 +282,23 @@ Datum CastMember::getField(int field) {
 	case kThePageHeight:
 		d = getPageHeight();
 		break;
+	case kTheSelectionField:
+		{
+			// "a linear list with two elements: the number of the starting
+			// character and the number of the ending character. If the starting
+			// and ending numbers in the return value are identical, then there
+			// are no characters selected" (D8 Demystified, Lingo Lexicon). The
+			// two numbers are therefore caret positions, counted exactly as the
+			// selStart and selEnd properties count -- the Lexicon says so itself
+			// by sending fields to those two and text members here.
+			Graphics::MacText *text = getShownText();
+
+			d.type = ARRAY;
+			d.u.farr = new FArray();
+			d.u.farr->arr.push_back((int)(text ? text->getSelectionIndex(true) : 0));
+			d.u.farr->arr.push_back((int)(text ? text->getSelectionIndex(false) : 0));
+		}
+		break;
 	/*
 	ScummVM does not do preloading so we will always return false here.
 
@@ -306,6 +339,31 @@ void CastMember::setField(int field, const Datum &d) {
 	case kTheCastType:
 	case kTheType:
 		warning("BUILDBOT: CastMember::setField(): Attempt to set read-only field %s of cast %d", g_lingo->entity2str(field), _castId);
+		return;
+	case kTheSelectionField:
+		{
+			if (d.type != ARRAY || d.u.farr->arr.size() < 2) {
+				warning("CastMember::setField(): the selection of cast %d wants a list of two, got %s", _castId, d.type2str());
+				return;
+			}
+
+			// The selection belongs to the widget, so it can only be set while
+			// one is up. A behaviour that selects in beginSprite -- the form the
+			// Lexicon itself shows, and the one Loewenzahn 7's high score list
+			// uses -- runs before the widget exists, and then there is nothing
+			// to select in yet.
+			Graphics::MacText *text = getShownText();
+			if (!text) {
+				debugC(3, kDebugLingoExec, "CastMember::setField(): nothing shows cast %d, dropping the selection", _castId);
+				return;
+			}
+
+			// Start before end, which is the order the manual asks for: "For
+			// reliable results, the selStart property should be set before the
+			// selEnd property."
+			text->setSelection(d.u.farr->arr[0].asInt(), true);
+			text->setSelection(d.u.farr->arr[1].asInt(), false);
+		}
 		return;
 	case kTheFileName:
 		if (!castInfo) {
