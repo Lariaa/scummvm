@@ -502,17 +502,7 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 
 			if (srcBpp > 1) {
 
-				// convertTo() defaults to Floyd-Steinberg, which carries each
-				// pixel's quantisation error into its neighbours -- and it has no
-				// idea which pixels are invisible. An alpha-keyed source is mostly
-				// background: TKKG 7's Frisur_03 is 57% fully transparent, and
-				// every one of those pixels is pure white, so the error of
-				// quantising white bleeds into the thin strokes that are actually
-				// drawn. Dither without diffusion when the source carries alpha,
-				// the way the indexed path already does.
-				Graphics::DitherMethod method = srcFmt.aBits() ? Graphics::kDitherNaive : Graphics::kDitherFloyd;
-
-				_ditheredImg = _picture->_surface.convertTo(g_director->_wm->_pixelformat, nullptr, 0, g_director->_wm->getPalette(), g_director->_wm->getPaletteSize(), method);
+				_ditheredImg = _picture->_surface.convertTo(g_director->_wm->_pixelformat, nullptr, 0, g_director->_wm->getPalette(), g_director->_wm->getPaletteSize());
 
 				pal = g_director->_wm->getPalette();
 			} else if (srcBpp == 1) {
