@@ -361,8 +361,10 @@ public:
 
 	// Read the cue points the file carries, in milliseconds. Both spellings are
 	// understood: an AIFF 'MARK' chunk and the table a Shockwave Audio header
-	// keeps after its fixed part.
-	bool getCuePoints(Common::Array<int32> &times, Common::StringArray &names);
+	// keeps after its fixed part. `context` says, for the log, which member
+	// asked and what else it carries; see debugDumpAIFF().
+	bool getCuePoints(Common::Array<int32> &times, Common::StringArray &names,
+			const Common::String &context = Common::String());
 
 private:
 	Common::String _path;
@@ -420,6 +422,23 @@ public:
 
 	Audio::AudioStream *getAudioStream(bool looping = false, bool forPuppet = false, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES) override;
 };
+
+/**
+ * Write out what an AIFF file holds: every chunk with its offset and length,
+ * and the contents of the four that carry something -- COMM, MARK, INST and
+ * APPL. On the sound channel at level 5, and nothing at all below it.
+ *
+ * `context` names the member that brought the file and what else it carries,
+ * so a run says whether the markers belong to a linked file or to an embedded
+ * ediM resource, and whether the member also has Director's own cupt chunk.
+ * That is the difference between markers the engine reads and markers nobody
+ * ever looks at: only a linked file is asked for its cue points, while an
+ * embedded one is handed straight to the decoder.
+ *
+ * The stream position is restored, so this can be called on a stream that is
+ * about to be handed to a decoder.
+ */
+void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &context);
 
 } // End of namespace Director
 

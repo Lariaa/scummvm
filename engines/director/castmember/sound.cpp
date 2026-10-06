@@ -67,6 +67,19 @@ void SoundCastMember::load() {
 	if (_loaded && !_needsReload)
 		return;
 
+	// Whether Director wrote its own cue point table beside the audio. It
+	// decides who reads the AIFF markers: a member with a cupt gets its cue
+	// points from there, and an embedded one without is never asked for them at
+	// all, so its MARK chunk is read by nobody. Worked out before the loop
+	// because the ediM branch returns from inside it.
+	bool hasCupt = false;
+	for (auto &it : _children) {
+		if (it.tag == MKTAG('c', 'u', 'p', 't')) {
+			hasCupt = true;
+			break;
+		}
+	}
+
 	// Setting "the fileName of member" points the member at a file on disk, and
 	// from then on that file is what it plays. The linked path below is only
 	// consulted when a member arrives with no sound data of its own, so a member
@@ -97,7 +110,9 @@ void SoundCastMember::load() {
 			// so without these it has nothing to pace itself against.
 			_cuePoints.clear();
 			_cuePointNames.clear();
-			((AudioFileDecoder *)_audio)->getCuePoints(_cuePoints, _cuePointNames);
+			((AudioFileDecoder *)_audio)->getCuePoints(_cuePoints, _cuePointNames,
+					Common::String::format("cast %d linked '%s', %s", _castId, linked.c_str(),
+							hasCupt ? "with cupt" : "no cupt"));
 			_loaded = true;
 
 			debugC(2, kDebugLoading, "SoundCastMember::load(): cast %d now plays the linked file '%s' with %d cue points",
@@ -161,6 +176,16 @@ void SoundCastMember::load() {
 
 				if (!_audio) {
 					if (format.equalsIgnoreCase("kMoaCfFormat_AIFF")) {
+						// Say what the file holds before it disappears into the
+						// decoder. This is the only place an embedded AIFF is
+						// ever opened: the cue point reader runs for linked files
+						// only, so an embedded MARK chunk is read by nobody at
+						// all. TKKG 1 alone skips 3 of them and 25 INST chunks in
+						// one session, and nothing in the log said they existed.
+						debugDumpAIFF(sndData, Common::String::format(
+								"cast %d embedded ediM, %s", _castId,
+								hasCupt ? "with cupt" : "no cupt"));
+
 						_audio = new MoaStreamDecoder(format, sndData);
 						_loaded = true;
 						return;

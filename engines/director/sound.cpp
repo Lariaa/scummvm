@@ -1459,13 +1459,28 @@ static bool readSWACuePoints(Common::SeekableReadStream *stream, Common::Array<i
 	return !times.empty();
 }
 
-// AIFF keeps its markers in a 'MARK' chunk, positioned in sample frames, so the
-// rate from 'COMM' turns them into milliseconds. TKKG 13 speaks this way where
-// TKKG 14 speaks Shockwave Audio -- same names, different container.
-static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<int32> &times, Common::StringArray &names) {
-	double rate = 0.0;
-	Common::Array<uint32> positions;
-	Common::StringArray markNames;
+void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &context) {
+	// Everything here exists for the log, so cost nothing when it is off. The
+	// chunk walk seeks per chunk and the APPL preview builds a string; debugC
+	// would do both whether the channel is listening or not.
+	if (!stream || !debugChannelSet(5, kDebugSound))
+		return;
+
+	int64 entry = stream->pos();
+
+	stream->seek(0);
+	if (stream->size() < 12 || stream->readUint32BE() != MKTAG('F', 'O', 'R', 'M')) {
+		stream->seek(entry);
+		return;
+	}
+	stream->readUint32BE();
+	uint32 form = stream->readUint32BE();
+	if (form != MKTAG('A', 'I', 'F', 'F') && form != MKTAG('A', 'I', 'F', 'C')) {
+		stream->seek(entry);
+		return;
+	}
+
+	debugC(5, kDebugSound, "AIFF (%s): %s, %d bytes", context.c_str(), tag2str(form), (int)stream->size());
 
 	int64 pos = 12;
 	while (pos + 8 <= stream->size()) {
@@ -1474,15 +1489,11 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 		uint32 size = stream->readUint32BE();
 		int64 body = pos + 8;
 
-		// An inventory of what the file actually holds. The shared AIFF decoder
-		// already names the chunks it steps over -- 4047 "Skipping AIFF 'INST'
-		// chunk", 3468 'MARK' and 671 'APPL' in the logs so far -- but only
-		// their names, only on the global debug level, and only for files that
-		// get decoded for playback. This walker sees every chunk of every file
-		// whose cue points are asked for, so it is the cheaper place to say
-		// where each one sits and how long it is.
-		debugC(5, kDebugSound, "readAIFFCuePoints(): chunk '%s' at %d, %d bytes",
-				tag2str(tag), (int)pos, (int)size);
+		// The inventory first. The shared AIFF decoder names the chunks it steps
+		// over -- the logs hold thousands of "Skipping AIFF 'INST' chunk" -- but
+		// only their names, and only for files that reach it for playback.
+		debugC(5, kDebugSound, "AIFF (%s):   chunk '%s' at %d, %d bytes",
+				context.c_str(), tag2str(tag), (int)pos, (int)size);
 
 		if (tag == MKTAG('C', 'O', 'M', 'M') && size >= 18) {
 			stream->seek(body);
@@ -1494,40 +1505,38 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 			// exponent from the middle of the mantissa and yields a rate of zero.
 			uint16 signAndExponent = stream->readUint16BE();
 			uint64 mantissa = stream->readUint64BE();
-			rate = Common::XPFloat(signAndExponent, mantissa).toDouble();
+			double rate = Common::XPFloat(signAndExponent, mantissa).toDouble();
 
 			// The rate is what turns a marker's sample frame into a time, so a
 			// marker table that lands in the wrong place is just as likely to be
 			// this number's fault as the table's.
-			debugC(5, kDebugSound, "readAIFFCuePoints():   COMM %d channels, %d frames, %d bits, rate %f -> %d ms",
-					channels, frames, bits, rate, rate > 0.0 ? (int)(frames / rate * 1000.0 + 0.5) : 0);
+			debugC(5, kDebugSound, "AIFF (%s):     COMM %d channels, %d frames, %d bits, rate %f -> %d ms",
+					context.c_str(), channels, frames, bits, rate,
+					rate > 0.0 ? (int)(frames / rate * 1000.0 + 0.5) : 0);
 		} else if (tag == MKTAG('M', 'A', 'R', 'K') && size >= 2) {
 			stream->seek(body);
 			uint16 count = stream->readUint16BE();
-			debugC(5, kDebugSound, "readAIFFCuePoints():   MARK %d markers", count);
+			debugC(5, kDebugSound, "AIFF (%s):     MARK %d markers", context.c_str(), count);
+
 			for (uint16 i = 0; i < count && stream->pos() + 7 <= body + (int64)size; i++) {
 				// The id is what an INST loop points at, so print it rather than
 				// dropping it unseen.
 				uint16 markerId = stream->readUint16BE();
 				uint32 frame = stream->readUint32BE();
-				positions.push_back(frame);
 				byte len = stream->readByte();
 				Common::String name;
 				for (byte j = 0; j < len; j++)
 					name += (char)stream->readByte();
-				markNames.push_back(name);
 				if (!(len & 1))
 					stream->readByte();	// pad to an even length
 
-				debugC(5, kDebugSound, "readAIFFCuePoints():     marker %d id %d: '%s' at frame %d",
-						i + 1, markerId, name.c_str(), frame);
+				debugC(5, kDebugSound, "AIFF (%s):       marker %d id %d: '%s' at frame %d",
+						context.c_str(), i + 1, markerId, name.c_str(), frame);
 			}
-		} else if (tag == MKTAG('I', 'N', 'S', 'T') && size >= 20 && debugChannelSet(5, kDebugSound)) {
+		} else if (tag == MKTAG('I', 'N', 'S', 'T') && size >= 20) {
 			// Twenty fixed bytes, and the two loops name marker ids rather than
-			// frames. Nothing reads them yet; a looping sound that starts over at
-			// the wrong place would show up here first. Behind an explicit channel
-			// check because nothing but the log wants it, and debugC would do the
-			// reading either way.
+			// frames. Nothing in the engine reads this chunk; a looping sound that
+			// starts over at the wrong place would show up here first.
 			stream->seek(body);
 			int8 baseNote = stream->readSByte();
 			int8 detune = stream->readSByte();
@@ -1543,16 +1552,14 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 			int16 relBegin = stream->readSint16BE();
 			int16 relEnd = stream->readSint16BE();
 
-			debugC(5, kDebugSound, "readAIFFCuePoints():   INST base %d detune %d, notes %d-%d, velocity %d-%d, gain %d dB",
-					baseNote, detune, lowNote, highNote, lowVel, highVel, gain);
-			debugC(5, kDebugSound, "readAIFFCuePoints():   INST sustain loop mode %d marker %d..%d, release loop mode %d marker %d..%d",
-					susMode, susBegin, susEnd, relMode, relBegin, relEnd);
-		} else if (tag == MKTAG('A', 'P', 'P', 'L') && size >= 4 && debugChannelSet(5, kDebugSound)) {
+			debugC(5, kDebugSound, "AIFF (%s):     INST base %d detune %d, notes %d-%d, velocity %d-%d, gain %d dB",
+					context.c_str(), baseNote, detune, lowNote, highNote, lowVel, highVel, gain);
+			debugC(5, kDebugSound, "AIFF (%s):     INST sustain loop mode %d marker %d..%d, release loop mode %d marker %d..%d",
+					context.c_str(), susMode, susBegin, susEnd, relMode, relBegin, relEnd);
+		} else if (tag == MKTAG('A', 'P', 'P', 'L') && size >= 4) {
 			// Application specific: a four-character signature and then whatever
-			// that application wanted. Say which application and show the start
-			// of it, so an unknown block stops being invisible. Behind the same
-			// channel check: building the preview string for 2249 speech files
-			// would otherwise cost something for nothing.
+			// that application wanted. Say which application and show the start of
+			// it, so an unknown block stops being invisible.
 			stream->seek(body);
 			uint32 signature = stream->readUint32BE();
 			Common::String preview;
@@ -1563,8 +1570,54 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 					preview += Common::String::format("(%c)", (char)b);
 				preview += ' ';
 			}
-			debugC(5, kDebugSound, "readAIFFCuePoints():   APPL '%s', %d bytes: %s",
-					tag2str(signature), (int)size - 4, preview.c_str());
+			debugC(5, kDebugSound, "AIFF (%s):     APPL '%s', %d bytes: %s",
+					context.c_str(), tag2str(signature), (int)size - 4, preview.c_str());
+		}
+
+		pos = body + size + (size & 1);
+	}
+
+	stream->seek(entry);
+}
+
+// AIFF keeps its markers in a 'MARK' chunk, positioned in sample frames, so the
+// rate from 'COMM' turns them into milliseconds. TKKG 13 speaks this way where
+// TKKG 14 speaks Shockwave Audio -- same names, different container.
+// debugDumpAIFF() above prints what is there; this only takes what is used.
+static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<int32> &times, Common::StringArray &names) {
+	double rate = 0.0;
+	Common::Array<uint32> positions;
+	Common::StringArray markNames;
+
+	int64 pos = 12;
+	while (pos + 8 <= stream->size()) {
+		stream->seek(pos);
+		uint32 tag = stream->readUint32BE();
+		uint32 size = stream->readUint32BE();
+		int64 body = pos + 8;
+
+		if (tag == MKTAG('C', 'O', 'M', 'M') && size >= 18) {
+			stream->seek(body + 8);
+			// Both halves in a defined order: as arguments to the constructor the
+			// compiler is free to read them the other way round, which takes the
+			// exponent from the middle of the mantissa and yields a rate of zero.
+			uint16 signAndExponent = stream->readUint16BE();
+			uint64 mantissa = stream->readUint64BE();
+			rate = Common::XPFloat(signAndExponent, mantissa).toDouble();
+		} else if (tag == MKTAG('M', 'A', 'R', 'K') && size >= 2) {
+			stream->seek(body);
+			uint16 count = stream->readUint16BE();
+			for (uint16 i = 0; i < count && stream->pos() + 7 <= body + (int64)size; i++) {
+				stream->readUint16BE();	// marker id, printed by debugDumpAIFF()
+				positions.push_back(stream->readUint32BE());
+				byte len = stream->readByte();
+				Common::String name;
+				for (byte j = 0; j < len; j++)
+					name += (char)stream->readByte();
+				markNames.push_back(name);
+				if (!(len & 1))
+					stream->readByte();	// pad to an even length
+			}
 		}
 
 		pos = body + size + (size & 1);
@@ -1584,7 +1637,8 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 	return true;
 }
 
-bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringArray &names) {
+bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringArray &names,
+		const Common::String &context) {
 	if (_path.empty())
 		return false;
 
@@ -1603,9 +1657,12 @@ bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringA
 		uint32 macr = stream->readUint32BE();
 
 		if (magic1 == MKTAG('F', 'O', 'R', 'M') &&
-				(magic2 == MKTAG('A', 'I', 'F', 'F') || magic2 == MKTAG('A', 'I', 'F', 'C')))
+				(magic2 == MKTAG('A', 'I', 'F', 'F') || magic2 == MKTAG('A', 'I', 'F', 'C'))) {
+			debugDumpAIFF(stream, context.empty()
+					? Common::String::format("linked '%s'", _path.c_str())
+					: context);
 			found = readAIFFCuePoints(stream, times, names);
-		else if (macr == MKTAG('M', 'A', 'C', 'R'))
+		} else if (macr == MKTAG('M', 'A', 'C', 'R'))
 			found = readSWACuePoints(stream, times, names);
 	}
 
