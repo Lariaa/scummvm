@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/algorithm.h"
 #include "common/memstream.h"
 #include "graphics/surface.h"
 #include "graphics/macgui/macwidget.h"
@@ -269,6 +270,41 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 
 			if (ownCast && _cast != nullptr) {
 				src._cast = _cast->getCastMember(src._castId.member, true);
+
+				// The loop's own cast is only the first place to look. TKKG 14
+				// keeps 3821 of its film loops in a movie's 74-slot internal cast
+				// while their cells name members in the scene's external one:
+				// sc01's loop cells ask for 273, 278, 281, 681, 738, 750, and
+				// Scene01.cxt holds exactly those as 'sc1m_a_0001', 'sc1m_d_0001',
+				// 'sc1m_f_0001', 'sc01up_q_0001', 'sc01up_w_0012', 'sc01up_x_0035'
+				// -- the mouth and head animations of the talking figures. Against
+				// the own cast they resolve to nothing and 7706 sprites a run draw
+				// blank.
+				//
+				// So fall through to the movie's other libraries. There is no
+				// ambiguity to weigh up: global.cxt declares 301 slots but fills
+				// only 130 of them, and every number these cells ask for is an
+				// empty slot there, so the first library that actually holds
+				// something at that number is the one that meant it. The 15014
+				// loops that do live beside their cells are answered by the line
+				// above and never reach this.
+				if (!src._cast) {
+					Movie *movie = g_director->getCurrentMovie();
+					const Common::HashMap<int, Cast *> *casts = movie ? movie->getCasts() : nullptr;
+
+					if (casts) {
+						// Lowest library number first, so the search does not
+						// depend on the hash order.
+						Common::Array<int> libs;
+						for (auto &it : *casts)
+							libs.push_back(it._key);
+						Common::sort(libs.begin(), libs.end());
+
+						for (uint i = 0; i < libs.size() && !src._cast; i++)
+							src._cast = casts->getVal(libs[i])->getCastMember(src._castId.member, true);
+					}
+				}
+
 				// Matches the bookkeeping Sprite::setCast() does; the old pointer
 				// is null here, so there is nothing to release first
 				if (src._cast)

@@ -654,8 +654,14 @@ CastMember *Movie::getCastMember(CastMemberID memberID) {
 		// it used to write -1, and getSubChannels() resolves that -- but these
 		// never reach it, and sc30's main score does not name castLib 0 at all.
 		// Say so, so one run can show who is asking.
-		debugC(5, kDebugLoading, "Movie::getCastMember(): %s names cast library 0; nothing resolves it here",
-				memberID.asString().c_str());
+		//
+		// Member 0 is the empty channel and asks the same question 295108 times
+		// in one TKKG 14 run against 1084 real members, so it stays quiet: the
+		// line exists to find the members that should have resolved, and it is
+		// no use if they are one part in 273 of it.
+		if (memberID.member != 0)
+			debugC(5, kDebugLoading, "Movie::getCastMember(): %s names cast library 0; nothing resolves it here",
+					memberID.asString().c_str());
 	} else {
 		warning("Movie::getCastMember: Unknown castLib %d", memberID.castLib);
 	}
