@@ -300,8 +300,18 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 							libs.push_back(it._key);
 						Common::sort(libs.begin(), libs.end());
 
-						for (uint i = 0; i < libs.size() && !src._cast; i++)
-							src._cast = casts->getVal(libs[i])->getCastMember(src._castId.member, true);
+						// A cell is a sprite, so a script member at that number is
+						// never the one meant -- keep looking. TKKG 14's sc01
+						// needs it: member 84 is the script "addons" in
+						// global.cst and the bitmap 'sc01down_e_0299' in
+						// Scene01.cst, one of the cells that animate a figure's
+						// head, and stopping at the first hit drew 468 blanks a
+						// run and left the hotel clerk without one.
+						for (uint i = 0; i < libs.size() && !src._cast; i++) {
+							CastMember *found = casts->getVal(libs[i])->getCastMember(src._castId.member, true);
+							if (found && found->_type != kCastLingoScript)
+								src._cast = found;
+						}
 					}
 				}
 
