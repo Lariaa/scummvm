@@ -366,6 +366,11 @@ public:
 	bool getCuePoints(Common::Array<int32> &times, Common::StringArray &names,
 			const Common::String &context = Common::String());
 
+	// Write out what the file holds, for the paths that never ask it for cue
+	// points -- "sound playFile" opens an AIFF without a cast member anywhere
+	// near it. See debugDumpAIFF().
+	void dumpChunks(const Common::String &context);
+
 private:
 	Common::String _path;
 	Common::MacResManager *_macresman;
