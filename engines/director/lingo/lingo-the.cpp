@@ -2983,6 +2983,20 @@ void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
 		}
 		g_lingo->push(d);
 		return;
+	} else if (obj.type == CHUNKREF) {
+		// A chunk of a field carries the member's own text properties, and
+		// getTheChunk() already answers for them -- but only ever got asked
+		// through `the <prop> of <chunk>`. In dot syntax the chunk arrived here
+		// and fell through to "Invalid object".
+		Common::String key = Common::String::format("%d%s", kTheCast, propName.c_str());
+		if (_theEntityFields.contains(key)) {
+			d = getTheChunk(obj, _theEntityFields[key]->field);
+		} else {
+			g_lingo->lingoError("Lingo::getObjectProp(): chunk <%s> has no property '%s'",
+					obj.asString(true).c_str(), propName.c_str());
+		}
+		g_lingo->push(d);
+		return;
 	}
 
 	if (_builtinFuncs.contains(propName) && _builtinFuncs[propName].nargs == 1) {
@@ -3105,6 +3119,20 @@ void Lingo::setObjectProp(Datum &obj, Common::String &propName, Datum &val) {
 		Common::String key = Common::String::format("%d%s", kTheSprite, propName.c_str());
 		if (_theEntityFields.contains(key)) {
 			setTheSprite(obj, _theEntityFields[key]->field, val);
+		}
+	} else if (obj.type == CHUNKREF) {
+		// The writing half of the same gap. Loewenzahn 7's high score list
+		// colours the player's own row with
+		// member("HS_Punkte").line[a].color = rgb(200, 0, 0), and that took the
+		// movie down at "Invalid object: chunk: line 1 to 1 of member 80 of
+		// castLib 1" -- the chunk resolved, there was simply nowhere to send it.
+		Common::String key = Common::String::format("%d%s", kTheCast, propName.c_str());
+		if (_theEntityFields.contains(key)) {
+			setTheChunk(obj, _theEntityFields[key]->field, val);
+			g_debugger->propWriteHook(propName);
+		} else {
+			g_lingo->lingoError("Lingo::setObjectProp: chunk <%s> has no property '%s'",
+					obj.asString(true).c_str(), propName.c_str());
 		}
 	} else {
 		g_lingo->lingoError("Lingo::setObjectProp: Invalid object: %s", obj.asString(true).c_str());
