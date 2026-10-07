@@ -90,6 +90,15 @@ void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemb
 		return;
 	}
 
+	// The third way an AIFF reaches the engine, and the only one with no cast
+	// member anywhere near it: played by name, so nothing ever asks the file for
+	// its cue points. TKKG 1 speaks entirely this way -- ten files in one
+	// session, two of them carrying a MARK chunk that nobody reads. Say which
+	// member, if any, its cue points are taken from instead.
+	af.dumpChunks(Common::String::format("channel %d playFile '%s', cue points from %s",
+			soundChannel, filename.c_str(),
+			cuePointSource.isNull() ? "nowhere" : cuePointSource.asString().c_str()));
+
 	cancelFade(soundChannel);
 	stopSound(soundChannel);
 
@@ -1683,6 +1692,19 @@ bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringA
 	}
 
 	return found;
+}
+
+void AudioFileDecoder::dumpChunks(const Common::String &context) {
+	if (_path.empty() || !debugChannelSet(5, kDebugSound))
+		return;
+
+	Common::Path newPath = findAudioPath(_path);
+	Common::SeekableReadStream *stream = Common::MacResManager::openFileOrDataFork(newPath);
+	if (!stream)
+		return;
+
+	debugDumpAIFF(stream, context);
+	delete stream;
 }
 
 uint32 AudioFileDecoder::getDuration() {
