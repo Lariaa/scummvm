@@ -845,8 +845,21 @@ void Channel::setCast(CastMemberID memberID) {
 			}
 		} else if (_sprite->_cast->_type == kCastFilmLoop ||
 					_sprite->_cast->_type == kCastMovie) {
-			// brand new film loop, reset the frame counter.
-			_filmLoopFrame = 1;
+			// Brand new film loop, back to its first cell -- which is index 0,
+			// the same value the constructor starts on. The counter indexes
+			// Score::_scoreCache directly, and that array holds score frame 1
+			// at [0]: loadFrames() counts from 1 and pushes as it goes, so
+			// there is no dummy entry in front.
+			//
+			// Starting at 1 skipped the first cell of every loop, and for a
+			// loop that does not repeat it skipped it for good --
+			// incrementFilmLoops() only advances while _filmLoopFrame is below
+			// the last index, so it never came back round. A loop of exactly
+			// one cell was then asked for a frame it does not have and drew
+			// nothing at all: "Film loop frame 1 requested, only 1 available",
+			// 46 times in one TKKG 14 session, which is a figure standing
+			// there without the head its one-cell loop holds.
+			_filmLoopFrame = 0;
 		}
 	}
 
@@ -1065,7 +1078,7 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 		}
 		// if there's a brand new film loop in the new sprite, reset the frame counter
 		if (nextSprite->_cast && nextSprite->_cast->_type == kCastFilmLoop) {
-			_filmLoopFrame = 1;
+			_filmLoopFrame = 0;
 		}
 	}
 
