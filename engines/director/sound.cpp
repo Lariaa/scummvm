@@ -1083,8 +1083,15 @@ void DirectorSound::processCuePoints() {
 
 			Common::String cueName = i < soundCast->_cuePointNames.size() ? soundCast->_cuePointNames[i] : Common::String();
 
-			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): cue point %d ('%s') reached on channel %d",
-					cuePoint, cueName.c_str(), it._key);
+			// The number, the time it is authored at, and the time it actually
+			// went out -- the last two are what decides whether a mouth moves
+			// with its line. This runs once per frame, so a cue point can only
+			// be delivered on the first frame boundary after its time; the gap
+			// between the two numbers is that wait, and it is the thing to look
+			// at when a sequence feels a frame off. The old line printed the
+			// time alone and called it the number.
+			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): cue point %d ('%s') on channel %d: due at %d ms, sent at %d ms (%d late)",
+					(int)i + 1, cueName.c_str(), it._key, cuePoint, elapsedTime, (int)elapsedTime - cuePoint);
 
 			// "Notice that the channel is reported as sound2, which
 			// differentiates it from the sprite channels" (Director 8
