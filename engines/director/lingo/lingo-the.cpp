@@ -2734,17 +2734,16 @@ Datum Lingo::getTheChunk(Datum &chunk, int field) {
 		g_lingo->lingoError("Lingo::getTheChunk(): %s not found", memberID.asString().c_str());
 		return d;
 	}
-	if (member->_type != kCastText) {
-		g_lingo->lingoError("Lingo::getTheChunk(): %s is not a field", memberID.asString().c_str());
-		return d;
-	}
-
-	if (!((TextCastMember *)member)->hasChunkField(field)) {
+	// Ask the member whether it carries the property rather than whether it is
+	// a field. Loewenzahn 7's high score board is a pair of Text Xtra members,
+	// HS_Punkte and HS_Namen, and colouring one of their lines died here at
+	// "is not a field" -- the sixth text path that only knew kCastText.
+	if (!member->hasChunkField(field)) {
 		warning("Lingo::getTheChunk(): %s has no chunk property '%s'", memberID.asString().c_str(), field2str(field));
 		return d;
 	}
 
-	d = ((TextCastMember *)member)->getChunkField(field, start, end);
+	d = member->getChunkField(field, start, end);
 
 	return d;
 }
@@ -2781,17 +2780,16 @@ void Lingo::setTheChunk(Datum &chunk, int field, Datum &d) {
 		g_lingo->lingoError("Lingo::setTheChunk(): %s not found", memberID.asString().c_str());
 		return;
 	}
-	if (member->_type != kCastText) {
-		g_lingo->lingoError("Lingo::setTheChunk(): %s is not a field", memberID.asString().c_str());
-		return;
-	}
-
-	if (!((TextCastMember *)member)->hasChunkField(field)) {
+	// Ask the member whether it carries the property rather than whether it is
+	// a field. Loewenzahn 7's high score board is a pair of Text Xtra members,
+	// HS_Punkte and HS_Namen, and colouring one of their lines died here at
+	// "is not a field" -- the sixth text path that only knew kCastText.
+	if (!member->hasChunkField(field)) {
 		warning("Lingo::setTheChunk(): %s has no chunk property '%s'", memberID.asString().c_str(), field2str(field));
 		return;
 	}
 
-	((TextCastMember *)member)->setChunkField(field, start, end, d);
+	member->setChunkField(field, start, end, d);
 }
 
 void Lingo::getObjectProp(Datum &obj, Common::String &propName) {
