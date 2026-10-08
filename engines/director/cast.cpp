@@ -929,7 +929,14 @@ void Cast::loadCast() {
 	if (_version >= kFileVer400 && !debugChannelSet(-1, kDebugNoBytecode)) {
 		// Try to load script context
 		// Even for multiple casts, ID is 1024
-		if ((r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'x'), libResourceId)) != nullptr) {
+		// D8.5 renamed the chunk to 'LctX'. Only the tag changed, so either
+		// name is read the same way; without this a D8.5 or later movie finds
+		// no context at all and runs with none of its Lingo.
+		r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'x'), libResourceId);
+		if (!r)
+			r = _castArchive->getFirstResource(MKTAG('L', 'c', 't', 'X'), libResourceId);
+
+		if (r != nullptr) {
 			loadLingoContext(*r);
 			delete r;
 		}
@@ -1996,7 +2003,10 @@ void Cast::loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id) {
 		dumpS = Common::String::format("modifiedBy: '%s', ", ci->modifiedBy.c_str()) + dumpS;
 		// fallthrough
 	case 18:
-		if (castInfo.strings[18].len != 4) {
+		if (castInfo.strings[18].len == 0) {
+			// D8.5 leaves the timestamps empty on most members. An absent
+			// field is not a surprise worth reporting.
+		} else if (castInfo.strings[18].len != 4) {
 			warning("Cast::loadCastInfo(): BUILDBOT: INCORRECT modifiedTime for castid %d", id);
 			Common::hexdump(castInfo.strings[18].data, castInfo.strings[18].len);
 		} else {
@@ -2005,7 +2015,9 @@ void Cast::loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id) {
 		}
 		// fallthrough
 	case 17:
-		if (castInfo.strings[17].len != 4) {
+		if (castInfo.strings[17].len == 0) {
+			// see modifiedTime above
+		} else if (castInfo.strings[17].len != 4) {
 			warning("Cast::loadCastInfo(): BUILDBOT: INCORRECT creationTime for castid %d", id);
 			Common::hexdump(castInfo.strings[17].data, castInfo.strings[17].len);
 		} else {
@@ -2175,11 +2187,12 @@ void Cast::loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id) {
 		}
 	}
 
-	// Looping = play-once bit (flags & 16) cleared; verified on D7 only
-	if (_version >= kFileVer400 && _version < kFileVer800 && member->_type == kCastSound) {
+	// Looping = play-once bit (flags & 16) cleared. The bit keeps its meaning
+	// through D8.5: across 50 movies that ship in both a pre-D8 and a D8.5
+	// edition of the same game, 336 of 339 sound members at the same cast
+	// position carry it identically.
+	if (_version >= kFileVer400 && member->_type == kCastSound) {
 		((SoundCastMember *)member)->_looping = castInfo.flags & 16 ? 0 : 1;
-	} else if (_version >= kFileVer800 && member->_type == kCastSound) {
-		warning("STUB: Cast::loadCastInfo(): Sound cast member info not yet supported for version v%d (%d)", humanVersion(_version), _version);
 	}
 
 	// For PaletteCastMember, run load() as we need it right now

@@ -70,6 +70,7 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0x1d, LC::c_telldone,		"" },
 	{ 0x1e, LC::cb_list,		"" },
 	{ 0x1f, LC::cb_proplist,	"" },
+	{ 0x21, LC::c_swap,			"" },
 
 	{ 0x41, LC::c_intpush,		"B" },
 	{ 0x42, LC::c_argcnoretpush,"b" },
@@ -107,6 +108,8 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0x65, LC::c_stackdrop, 	"b" },
 	{ 0x66, LC::cb_v4theentitynamepush, "bN" },
 	{ 0x67, LC::cb_call,		"bN" }, // D5+ objcall
+	{ 0x6e, LC::c_intpush,		"b" },  // D8.5+ push int
+	{ 0x70, LC::cb_objectfieldpush, "bN" }, // D8.5+ chained property
 
 	{ 0x81, LC::c_intpush,		"W" },
 	{ 0x82, LC::c_argcnoretpush,"w" },
@@ -143,6 +146,8 @@ static const LingoV4Bytecode lingoV4[] = {
 	{ 0xa5, LC::c_stackdrop, 	"w" },
 	{ 0xa6, LC::cb_v4theentitynamepush, "wN" },
 	{ 0xa7, LC::cb_call,		"wN" }, // D5+ objcall
+	{ 0xae, LC::c_intpush,		"W" },  // D8.5+ push int, signed
+	{ 0xb0, LC::cb_objectfieldpush, "wN" }, // D8.5+ chained property
 	{ 0, nullptr, nullptr }
 };
 
@@ -258,6 +263,7 @@ static const LingoV4TheEntity lingoV4TheEntity[] = {
 	{ 0x07, 0x22, kTheTimer,			kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x23, kThePreLoadRAM,		kTheNOField,		true, kTEANOArgs },
 	{ 0x07, 0x24, kTheVideoForWindowsPresent, kTheNOField,	true, kTEANOArgs }, // D5
+	{ 0x07, 0x27, kTheSoundKeepDevice,	kTheNOField,		true, kTEANOArgs }, // D8.5
 	// netPresent
 	// safePlayer
 	// soundKeepDevice
@@ -1341,11 +1347,16 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	}
 
 	// read each entry in the function table.
+	// D8.5 appended a stack size field, growing the record from 0x2a to 0x2e
+	// bytes. The table is read in one pass, so skipping it would shift every
+	// entry after the first and lose those handlers to the bounds checks below.
+	uint16 functionRecordSize = (version >= kFileVer850) ? 0x2e : 0x2a;
+
 	stream.seek(functionsOffset);
 	for (uint16 i = 0; i < functionsCount; i++) {
 		if (debugChannelSet(5, kDebugLoading)) {
 			debugC(5, kDebugLoading, "Function %d header:", i);
-			stream.hexdump(0x2a);
+			stream.hexdump(functionRecordSize);
 		}
 
 		int16 nameIndex = stream.readUint16();
@@ -1365,6 +1376,8 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 		stream.readUint16();
 		stream.readUint16();
 		stream.readUint16();
+		if (version >= kFileVer850)
+			/* uint32 stackHeight = */ stream.readUint32();
 
 		if (startOffset < codeStoreOffset) {
 			warning("Function %d start offset is out of bounds!", i);
@@ -1452,7 +1465,12 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 
 		// Size of an entry in the consts index.
 		int constEntrySize = 0;
-		if (version >= kFileVer500) {
+		// Up to D8 a constant push names its constant by byte offset into that
+		// index, so dividing by the entry size gives the entry. D8.5 passes the
+		// entry number straight up; dividing by one keeps that on one path.
+		if (version >= kFileVer850) {
+			constEntrySize = 1;
+		} else if (version >= kFileVer500) {
 			// For D5 this is uint32 type + uint32 offset
 			constEntrySize = 8;
 		} else {
@@ -1464,7 +1482,28 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 			uint8 opcode = codeStore[pointer];
 			pointer += 1;
 
-			if (opcode == 0x44 || opcode == 0x84) {
+			if (opcode == 0xef || opcode == 0xf1) {
+				// D8.5 pushes 32-bit literals through opcodes that carry a four
+				// byte operand, a width our table cannot describe. 0xef is the
+				// integer, 0xf1 the bit pattern of a float.
+				for (int j = 0; j < 5; j++) {
+					offsetList.push_back(_currentAssembly->size());
+					byteOffsets.push_back(_currentAssembly->size());
+				}
+
+				uint32 raw = READ_BE_UINT32(&codeStore[pointer]);
+				pointer += 4;
+
+				if (opcode == 0xef) {
+					code1(LC::c_intpush);
+					codeInt((int32)raw);
+				} else {
+					float value;
+					memcpy(&value, &raw, sizeof(value));
+					code1(LC::c_floatpush);
+					codeFloat(value);
+				}
+			} else if (opcode == 0x44 || opcode == 0x84) {
 				// Opcode for pushing a value from the constants table.
 				// Rewrite these to inline the constant into our bytecode.
 				offsetList.push_back(_currentAssembly->size());
@@ -1477,12 +1516,20 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 					arg = (uint8)codeStore[pointer];
 					pointer += 1;
 				}
-				// The argument is a byte offset to an entry in the consts index.
-				// As such, it should be an exact multiple of the entry size.
+				// Below D8.5 the argument is a byte offset into the consts
+				// index, so it has to land exactly on an entry.
 				if (arg % constEntrySize) {
 					warning("Opcode 0x%02x arg %d not a multiple of %d", opcode, arg, constEntrySize);
 				}
 				arg /= constEntrySize;
+				if (arg < 0 || arg >= (int)_assemblyContext->_constants.size()) {
+					// Push something rather than nothing: leaving the stack a
+					// value short takes the whole handler down later on.
+					warning("Opcode 0x%02x refers to constant %d of %d, pushing VOID",
+						opcode, arg, _assemblyContext->_constants.size());
+					code1(LC::c_voidpush);
+					continue;
+				}
 				Datum constant = _assemblyContext->_constants[arg];
 				switch (constant.type) {
 				case INT:
@@ -1629,7 +1676,7 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 					byteOffsets.push_back(_currentAssembly->size());
 					codeInt((uint)codeStore[pointer]);
 					pointer += 1;
-				} else { // 3 byte instruction
+				} else if (opcode < 0xc0) { // 3 byte instruction
 					debugC(5, kDebugCompile, "Unimplemented opcode: 0x%02x (%d, %d)", opcode, (uint)codeStore[pointer], (uint)codeStore[pointer+1]);
 					offsetList.push_back(_currentAssembly->size());
 					byteOffsets.push_back(_currentAssembly->size());
@@ -1642,6 +1689,20 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 					byteOffsets.push_back(_currentAssembly->size());
 					codeInt((uint)codeStore[pointer+1]);
 					pointer += 2;
+				} else { // 5 byte instruction
+					// Skipping only two of the four operand bytes would leave
+					// the rest of the handler reading garbage.
+					uint32 arg = READ_BE_UINT32(&codeStore[pointer]);
+					debugC(5, kDebugCompile, "Unimplemented opcode: 0x%02x (%u)", opcode, arg);
+					for (int j = 0; j < 5; j++) {
+						offsetList.push_back(_currentAssembly->size());
+						byteOffsets.push_back(_currentAssembly->size());
+					}
+					code1(LC::cb_unk2);
+					codeInt(opcode);
+					codeInt(arg >> 16);
+					codeInt(arg & 0xffff);
+					pointer += 4;
 				}
 			}
 		}
