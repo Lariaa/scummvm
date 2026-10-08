@@ -99,6 +99,15 @@ public:
 	// about what is on the Stage rather than about the member itself.
 	Graphics::MacText *getShownText();
 
+	// Director lets a chunk expression carry some of the member's own text
+	// properties -- "set the textStyle of char 2 to 4 of field "Pudge" to
+	// bold". Fields have always answered; a Text Xtra member is written to the
+	// same way and now answers too, so the question belongs on the base class
+	// rather than on one subclass.
+	virtual bool hasChunkField(int field) { return false; }
+	virtual Datum getChunkField(int field, int start, int end) { return Datum(); }
+	virtual bool setChunkField(int field, int start, int end, const Datum &value) { return false; }
+
 	virtual Common::String formatInfo() { return Common::String(); };
 
 	// Return the default bounding box of the cast member. The origin is at the registration offset.

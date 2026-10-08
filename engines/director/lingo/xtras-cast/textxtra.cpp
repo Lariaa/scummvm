@@ -30,6 +30,7 @@
 #include "director/cast.h"
 #include "director/util.h"
 #include "director/castmember/xtra.h"
+#include "director/lingo/lingo-object.h"
 #include "director/lingo/lingo-the.h"
 #include "director/lingo/xtras-cast/textxtra.h"
 #include "director/window.h"
@@ -706,6 +707,71 @@ void TextXtraCastMember::setField(int field, const Datum &d) {
 	}
 
 	CastMember::setField(field, d);
+}
+
+// A chunk of a Text Xtra member carries the colour of the text in it, the same
+// way a chunk of a field does. Loewenzahn 7's high score board is written that
+// way -- member("HS_Punkte").line[a].color = rgb(200, 0, 0) picks out the row
+// the player just earned -- and both HS_Punkte and HS_Namen are Xtra members,
+// not fields.
+//
+// Only the colour, because only the colour has been asked for. The font, size
+// and style of a chunk run through the authored style runs rather than through
+// the widget, and nothing in the corpus writes those on an Xtra; answering
+// "no" leaves a readable warning instead of a quiet wrong result.
+bool TextXtraCastMember::hasChunkField(int field) {
+	switch (field) {
+	case kTheColor:
+	case kTheForeColor:
+		return true;
+	default:
+		break;
+	}
+	return false;
+}
+
+Datum TextXtraCastMember::getChunkField(int field, int start, int end) {
+	Graphics::MacText *text = getShownText();
+	uint32 color = text ? text->getTextColor(start, end) : getForeColor();
+
+	switch (field) {
+	case kTheColor:
+		return Datum(new ColorObject((int)color));
+	case kTheForeColor:
+		return Datum((int)color);
+	default:
+		break;
+	}
+
+	return Datum();
+}
+
+bool TextXtraCastMember::setChunkField(int field, int start, int end, const Datum &d) {
+	if (field != kTheColor && field != kTheForeColor)
+		return false;
+
+	uint32 color = (field == kTheColor && d.type == OBJECT && d.u.obj->getObjType() == kColorObj)
+			? ((ColorObject *)d.u.obj)->toPaletteIndex()
+			: (uint32)d.asInt();
+
+	// The colour belongs to the widget, as it does for a field, so there has to
+	// be a sprite showing the member. The board is filled and then coloured, so
+	// by this point there is.
+	Graphics::MacText *text = getShownText();
+	if (!text) {
+		debugC(3, kDebugLingoExec, "TextXtraCastMember::setChunkField(): nothing shows cast %d, dropping the colour", _castId);
+		return true;
+	}
+
+	if (text->_wm->_pixelformat.isCLUT8()) {
+		byte r, g, b;
+		text->_wm->getPaletteEntry(color, r, g, b);
+		color = text->_wm->findBestColor(r, g, b);
+	}
+
+	text->setTextColor(color, start, end);
+	setModified(true);
+	return true;
 }
 
 Common::String TextXtraCastMember::formatInfo() {

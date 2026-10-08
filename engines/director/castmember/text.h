@@ -61,9 +61,9 @@ public:
 	Datum getField(int field) override;
 	void setField(int field, const Datum &value) override;
 
-	bool hasChunkField(int field);
-	Datum getChunkField(int field, int start, int end);
-	bool setChunkField(int field, int start, int end, const Datum &value);
+	bool hasChunkField(int field) override;
+	Datum getChunkField(int field, int start, int end) override;
+	bool setChunkField(int field, int start, int end, const Datum &value) override;
 
 	int getLineCount();
 	int getLineHeight(int line);
