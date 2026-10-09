@@ -660,7 +660,18 @@ void Window::ensureMovieIsLoaded() {
 		_currentMovie->getScore()->stopPlay();
 	}
 
-	loadNextMovie();
+	// loadNextMovie() deletes the old movie before it opens the new archive, so a
+	// failure here leaves _currentMovie null -- the step() path below would then
+	// dereference it. TKKG 10 reaches this: its startMovie calls saveMovie(),
+	// which is a stub, and then sets `the fileName of window` to the file it
+	// expected to have been written, so openArchive() is handed an empty name.
+	// The other caller, step(), has always tested the return value.
+	// Keep the name: loadNextMovie() clears _nextMovie before it can fail.
+	Common::String wanted = _nextMovie.movie;
+	if (!loadNextMovie()) {
+		warning("Window::ensureMovieIsLoaded(): Could not load '%s'", wanted.c_str());
+		return;
+	}
 
 	if (_currentMovie->getScore()->_playState == kPlayNotStarted)
 		step(); // we will load it here and move to kPlayLoaded state
