@@ -490,9 +490,20 @@ void Window::setModal(bool modal) {
 	}
 }
 
+// `the fileName of window` only records which movie the window is to show.
+// Naming a window adds it to the windowList so that its attributes can be set
+// before `open window` puts it on screen (Epstein, Director in a Nutshell,
+// chapter 6), and a window that is told something loads at that point. Loading
+// here instead ran the new movie's frame loop from inside an assignment: TKKG
+// 10's credits set the name twice in one handler, so its score window stepped
+// while that handler was still on the stack, and the second pass tore down the
+// very movie whose Lingo had not returned yet.
+//
+// The places that need the movie ask for it themselves: tell (LC::c_tell),
+// `open window` and `the visible of window` (setVisible), moveToFront, and the
+// fields that report the movie's own geometry or image.
 void Window::setFileName(Common::String filename) {
 	setNextMovie(filename);
-	ensureMovieIsLoaded();
 }
 
 void Window::reset() {
@@ -662,9 +673,8 @@ void Window::ensureMovieIsLoaded() {
 
 	// loadNextMovie() deletes the old movie before it opens the new archive, so a
 	// failure here leaves _currentMovie null -- the step() path below would then
-	// dereference it. TKKG 10 reaches this: its startMovie calls saveMovie(),
-	// which is a stub, and then sets `the fileName of window` to the file it
-	// expected to have been written, so openArchive() is handed an empty name.
+	// dereference it. TKKG 10 reached this with an empty name, from a repeated
+	// entry while its own Lingo was still running; openArchive("") then failed.
 	// The other caller, step(), has always tested the return value.
 	// Keep the name: loadNextMovie() clears _nextMovie before it can fail.
 	Common::String wanted = _nextMovie.movie;
