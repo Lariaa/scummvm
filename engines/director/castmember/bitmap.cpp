@@ -1287,11 +1287,16 @@ void BitmapCastMember::load() {
 		}
 
 		// A bitmap can be stored as embedded media instead of a BITD: the
-		// child is an ediM chunk holding a whole image file. Not only in late
-		// versions -- TKKG 6's files (version 0x4C7, D6 to ScummVM) carry 76
-		// JPEGs this way, Loewenzahn 6-8 thousands. Sounds use ediM
-		// too and name their format in the cast info, but for bitmaps that
-		// string is empty, so go by the signature.
+		// child is an ediM chunk holding a whole image file. Loewenzahn 6-8 keep
+		// thousands of bitmaps this way. Sounds use ediM too and name their
+		// format in the cast info, but for bitmaps that string is empty, so go
+		// by the signature.
+		//
+		// An ediM is not always a JPEG, and not always the picture we want: of
+		// TKKG 6's 6473 bitmaps, 76 carry one, every one of them a PICT (512
+		// zero bytes, then the opcodes) -- the Macintosh half of a hybrid title.
+		// All 76 have a BITD as well, so none of them ever reaches this branch,
+		// and the signature test below passes them over in any case.
 		if (pic == nullptr) {
 			for (auto &it : _children) {
 				if (it.tag != MKTAG('e', 'd', 'i', 'M'))
