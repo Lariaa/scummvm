@@ -1498,6 +1498,10 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 
 	debugC(5, kDebugSound, "AIFF (%s): %s, %d bytes", context.c_str(), tag2str(form), (int)stream->size());
 
+	// COMM comes before MARK in every file measured, so by the time a marker is
+	// printed this holds the length to check its position against.
+	uint32 totalFrames = 0;
+
 	int64 pos = 12;
 	while (pos + 8 <= stream->size()) {
 		stream->seek(pos);
@@ -1516,6 +1520,7 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 			uint16 channels = stream->readUint16BE();
 			uint32 frames = stream->readUint32BE();
 			uint16 bits = stream->readUint16BE();
+			totalFrames = frames;
 			// Both halves in a defined order: as arguments to the constructor the
 			// compiler is free to read them the other way round, which takes the
 			// exponent from the middle of the mantissa and yields a rate of zero.
@@ -1536,8 +1541,10 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 
 			for (uint16 i = 0; i < count && stream->pos() + 7 <= body + (int64)size; i++) {
 				// The id is what an INST loop points at, so print it rather than
-				// dropping it unseen.
-				uint16 markerId = stream->readUint16BE();
+				// dropping it unseen -- and read it the way INST does. A MarkerId
+				// is a signed short; printing it unsigned here would show the very
+				// same marker under two different numbers in one dump.
+				int16 markerId = stream->readSint16BE();
 				uint32 frame = stream->readUint32BE();
 				byte len = stream->readByte();
 				Common::String name;
@@ -1546,8 +1553,21 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 				if (!(len & 1))
 					stream->readByte();	// pad to an even length
 
-				debugC(5, kDebugSound, "AIFF (%s):       marker %d id %d: '%s' at frame %d",
-						context.c_str(), i + 1, markerId, name.c_str(), frame);
+				// Two things the format says a marker cannot be, both common
+				// enough in the corpus to be worth naming: a position past the end
+				// of the sound (5869 of 17119 markers across the TKKG archive, the
+				// value 0x53540000 alone 1856 times), and an id that is not a
+				// positive non-zero integer. Authoring tools leave uninitialised
+				// memory in these fields; a cue point built from one is simply due
+				// at a time the sound never reaches.
+				Common::String note;
+				if (totalFrames && frame > totalFrames)
+					note += Common::String::format(" -- past the end (%d frames)", totalFrames);
+				if (markerId <= 0)
+					note += " -- id should be positive and non-zero";
+
+				debugC(5, kDebugSound, "AIFF (%s):       marker %d id %d: '%s' at frame %d%s",
+						context.c_str(), i + 1, markerId, name.c_str(), frame, note.c_str());
 			}
 		} else if (tag == MKTAG('I', 'N', 'S', 'T') && size >= 20) {
 			// Twenty fixed bytes, and the two loops name marker ids rather than
