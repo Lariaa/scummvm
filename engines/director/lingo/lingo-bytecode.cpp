@@ -379,7 +379,20 @@ Datum Lingo::findVarV4(int varType, const Datum &id, bool idIsIndex) {
 			if (g_director->getVersion() >= 500) {
 				stride = 8;
 			}
-			if (idIsIndex) {
+			// The opcodes that carry a bare slot number only write an index
+			// from D8.5 on. Counted over the decompiled corpus, every
+			// `setlocal`/`getparam` operand is a multiple of 8 up to and
+			// including D8.0 -- TKKG 1 (D5), TKKG 3 (D6), TKKG 7 (D7), TKKG 9
+			// and Loewenzahn 5 (D8) -- and runs 0, 1, 2, 3 ... from D8.5 on:
+			// Loewenzahn 7 and 8, TKKG 11, 13 and 14.
+			//
+			// Reading the older form as an index loses every slot but the first.
+			// "Ein Fall fuer Muetze & Co" (D5) builds the path to its own disc
+			// with `put NewItem after thePath`, where thePath is argument 1 and
+			// the operand is 8; 151 assignments were dropped in one run, the
+			// path came out empty, getNthFileNameInFolder("") matched nothing
+			// and the game decided the CD was missing.
+			if (idIsIndex && g_director->getVersion() >= 850) {
 				// Already the number we want, so do not divide it.
 				stride = 1;
 			}
