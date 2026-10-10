@@ -79,6 +79,10 @@ public:
 
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
 
+	// A Text Xtra member is editable like a field, so a movie may point
+	// `the keyboardFocusSprite` at a sprite showing one and expect to type.
+	bool takesKeyboardFocus() const override { return true; }
+
 	bool hasField(int field) override;
 	Datum getField(int field) override;
 	void setField(int field, const Datum &value) override;

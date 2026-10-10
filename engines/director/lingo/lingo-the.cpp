@@ -24,6 +24,7 @@
 #include "common/platform.h"
 #include "director/types.h"
 #include "graphics/macgui/macbutton.h"
+#include "graphics/macgui/mactext.h"
 
 #include "director/director.h"
 #include "director/cast.h"
@@ -1483,8 +1484,19 @@ void Lingo::setTheEntity(int entity, Datum &id, int field, Datum &d) {
 		// clicked, no sprite saw keyDown/keyUp at all.
 		if (focus > 0) {
 			Channel *channel = score->getChannelById((uint16)focus);
-			if (channel && channel->_widget)
+			if (channel && channel->_widget) {
+				// The widget also has to be willing to take the keys. A field
+				// or a text member was built editable or not from its own
+				// flag, and that decision stands; a Text Xtra member has no
+				// such flag we can read, so the movie pointing the focus at it
+				// is the statement that it is to be typed into. Loewenzahn 7's
+				// pig race does exactly that, every frame, for the name its
+				// high score list asks for.
+				if (channel->_sprite->_cast && channel->_sprite->_cast->takesKeyboardFocus())
+					((Graphics::MacText *)channel->_widget)->setEditable(true);
+
 				g_director->_wm->setActiveWidget(channel->_widget);
+			}
 		} else if (focus == 0) {
 			g_director->_wm->setActiveWidget(nullptr);
 		}

@@ -28,6 +28,10 @@
 
 #include "director/director.h"
 #include "director/cast.h"
+#include "director/channel.h"
+#include "director/movie.h"
+#include "director/score.h"
+#include "director/sprite.h"
 #include "director/util.h"
 #include "director/castmember/xtra.h"
 #include "director/lingo/lingo-object.h"
@@ -633,6 +637,40 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 			bbox.left, bbox.top, bbox.width(), bbox.height(), g_director->_wm,
 			_ftext.empty() ? _text : _ftext, &macFont,
 			fg, bg, _initialRect.width(), align);
+
+	// A field or a text member hands its widget an editable flag here; this
+	// one never did, so every Text Xtra sprite came out read-only and a
+	// keystroke had nowhere to land. Loewenzahn 7's pig race asks the player
+	// for a name that way: `BehaviorScript 76 - handleinput` sits on sprite
+	// 44, which shows member 75 "nameInputMember", and points
+	// `the keyboardFocusSprite` at itself in beginSprite and again in every
+	// prepareFrame. The five letters of a name reached the behaviour, were
+	// passed on, and vanished; the high score list then showed the score with
+	// an empty name.
+	//
+	// Two things can say the sprite is to be typed into: the score's own
+	// editable flag, and the movie having given this channel the keyboard
+	// focus. The member's cast data says nothing either way -- the Text Xtra
+	// keeps that in its document, and which bit it is has not been read yet.
+	bool editable = channel->_sprite->_editable;
+	Movie *movie = g_director->getCurrentMovie();
+	if (!editable && movie && movie->_currentEditableTextChannel > 0) {
+		Score *score = movie->getScore();
+		if (score && score->getChannelById(movie->_currentEditableTextChannel) == channel)
+			editable = true;
+	}
+
+	if (editable) {
+		widget->setEditable(true);
+
+		// setEditable() deliberately does not make a widget active, so the
+		// same hand-off TextCastMember::createWidget() does is needed here:
+		// take the focus unless another editable widget already holds it.
+		Graphics::MacWidget *active = g_director->_wm->getActiveWidget();
+		if (active == nullptr || !active->isEditable())
+			g_director->_wm->setActiveWidget(widget);
+	}
+
 	widget->draw();
 	return widget;
 }
