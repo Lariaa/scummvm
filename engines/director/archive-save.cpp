@@ -103,6 +103,19 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 	Cast *cast = movie->getCast();
 	ResourceMap castResMap = _types[MKTAG('C', 'A', 'S', 't')];
 
+	// Which of the movie's casts lives in this archive? For a movie that is
+	// the internal cast, but `save castLib` hands us an external cast's own
+	// file, and its config has to come from that cast rather than from the
+	// movie's. "Peter entdeckt die Steinzeit" saves two such files,
+	// highscor.cst and test.cst, and both carry a 'DRCF' of their own.
+	Cast *ownCast = movie->getCast();
+	for (auto &it : *movie->getCasts()) {
+		if (it._value->getArchive().get() == this) {
+			ownCast = it._value;
+			break;
+		}
+	}
+
 	for (auto &it : builtResources) {
 		debugC(5, kDebugSaving, "RIFXArchive::writeToFile: writing resource '%s': index: %d, size: %d, offset = %d, index: %d",
 			tag2str(it->tag), it->index, it->size, it->offset, it->index);
@@ -133,10 +146,10 @@ bool RIFXArchive::writeToFile(Common::String filename, Movie *movie) {
 
 		case MKTAG('V', 'W', 'C', 'F'):
 		case MKTAG('D', 'R', 'C', 'F'):
-			// There is only one config resource, that is for the internal cast
-			// The external casts don't have a config
-			// movie->getCast() returns the internal cast
-			cast = movie->getCast();
+			// One config resource per file, belonging to whichever cast this
+			// archive holds -- the internal one for a movie, the external one
+			// when `save castLib` writes a cast file.
+			cast = ownCast;
 			if (cast->getConfigSize() == 0) {
 				// Unsupported version (D10+): keep the original bytes
 				debugC(7, kDebugSaving, "Saving resource %s as it is, without modification", tag2str(it->tag));
@@ -382,9 +395,14 @@ Common::Array<Resource *> RIFXArchive::rebuildResources(Movie *movie) {
 	Cast *cast = nullptr;
 	ResourceMap &castResMap = _types[MKTAG('C', 'A', 'S', 't')];
 
-	// Iterate over all the casts
+	// Iterate over the casts this archive actually holds. A movie's own file
+	// must not grow 'CASt' entries for members of an external cast, and a cast
+	// file written by `save castLib` must not grow entries for the movie's.
 	for (auto it : *(movie->getCasts())) {
 		cast = it._value;
+
+		if (cast->getArchive().get() != this)
+			continue;
 
 		// Iterate over all the loaded members of the cast to check for new cast members
 		for (auto jt : *(cast->_loadedCast)) {
