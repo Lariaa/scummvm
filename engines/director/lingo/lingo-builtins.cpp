@@ -30,6 +30,7 @@
 #include "graphics/managed_surface.h"
 
 #include "director/director.h"
+#include "director/archive.h"
 #include "director/cast.h"
 #include "director/channel.h"
 #include "director/debugger.h"
@@ -125,7 +126,7 @@ static const BuiltinProto builtins[] = {
 	{ "openDA",	 		LB::b_openDA, 		1, 1, 200, CBLTIN },	// D2 c
 	{ "openResFile",	LB::b_openResFile,	1, 1, 200, CBLTIN },	// D2 c
 	{ "openXlib",		LB::b_openXlib,		1, 1, 200, CBLTIN },	// D2 c
-	{ "save",			LB::b_save,			1, 1, 500, CBLTIN },	//				D5 c
+	{ "save",			LB::b_save,			1, 2, 500, CBLTIN },	//				D5 c
 	{ "saveMovie",		LB::b_saveMovie,	0, 1, 400, CBLTIN },	//			D4 c
 	{ "setCallBack",	LB::b_setCallBack,	2, 2, 200, CBLTIN },	// D2 c
 	{ "showResFile",	LB::b_showResFile,	0, 1, 200, CBLTIN },	// D2 c
@@ -2284,9 +2285,44 @@ void LB::b_openXlib(int nargs) {
 }
 
 void LB::b_save(int nargs) {
-	g_lingo->printSTUBWithArglist("b_save", nargs);
+	// `save castLib castRef {, pathname&newName}` writes a cast back to its
+	// own file, or to the file named in the second argument, creating it if it
+	// is not there (Director 8 Demystified, Lingo Lexicon). "Peter entdeckt
+	// die Steinzeit" is the corpus user: its installation check writes
+	// `save(castLib("test"), Systemverzeichnis & "test.cst")` and then asks
+	// FileExists whether the file arrived, and its score keeps the highscore
+	// cast with `save(castLib("highscore"))`.
+	Common::String filename;
+	if (nargs == 2)
+		filename = g_lingo->pop().asString();
 
-	g_lingo->dropStack(nargs);
+	Datum lib = g_lingo->pop();
+	if (lib.type != CASTLIBREF) {
+		warning("LB::b_save(): expected a castLib, got %s", lib.type2str());
+		return;
+	}
+
+	Movie *movie = g_director->getCurrentMovie();
+	Cast *cast = movie ? movie->getCast(CastMemberID(0, lib.u.i)) : nullptr;
+	if (!cast) {
+		warning("LB::b_save(): cast lib %d not found", lib.u.i);
+		return;
+	}
+
+	Common::SharedPtr<Archive> archive = cast->getArchive();
+	if (!archive) {
+		warning("LB::b_save(): cast lib %d has no archive to write", lib.u.i);
+		return;
+	}
+
+	// Without a name of its own the cast goes back to the file it came from.
+	// Only the last component: that is the key SavedArchive stores a movie
+	// under too, and _findSaveFile() falls back to it when a later lookup
+	// arrives with a whole path.
+	if (filename.empty())
+		filename = archive->getPathName().baseName();
+
+	archive->writeToFile(filename, movie);
 }
 
 void LB::b_saveMovie(int nargs) {
