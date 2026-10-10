@@ -39,6 +39,7 @@
 #include "director/sound.h"
 #include "director/sprite.h"
 #include "director/castmember/castmember.h"
+#include "director/castmember/bitmap.h"
 #include "director/debugger/debugtools.h"
 #include "director/picture.h"
 #include "graphics/managed_surface.h"
@@ -591,7 +592,29 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 	if (pd.ms) {
 		pd.inkBlitShape(srcRect);
 	} else if (pd.srf) {
-		pd.inkBlitSurface(srcRect, channel->getMask());
+		const Graphics::Surface *mask = channel->getMask();
+
+		// Three things can decide which pixels of a sprite arrive: the mask
+		// getMask() hands back, the srfMask the ink path set up, and the
+		// member's own alpha plane. From the outside they cannot be told
+		// apart, and TKKG 13's login screen needs them apart: its `bg`
+		// (member 13) is a 13x16 tile of plain rgb(255,204,0) that the score
+		// stretches over the whole 800x600 stage with copy ink, and the member
+		// switches useAlpha off -- so it has to arrive opaque. What reaches the
+		// screen instead are the four stripes of its alpha plane, which land
+		// on rows 225-262, 337-375, 450-487 and 562-600 once stretched; the two
+		// that are not covered by the blue bands are exactly the two yellow
+		// bars in the screenshot, to within four pixels.
+		if (debugChannelSet(4, kDebugImages) && castType == kCastBitmap) {
+			BitmapCastMember *bitmap = (BitmapCastMember *)channel->_sprite->_cast;
+			debugC(4, kDebugImages, "Window::inkBlitFrom(): %s coverage: mask %s, srfMask %s, %d bpp, useAlpha %d, matteFromAlpha %d",
+					channel->_sprite->_castId.asString().c_str(),
+					mask ? "yes" : "no", pd.srfMask ? "yes" : "no",
+					bitmap->_bitsPerPixel, bitmap->_useAlpha ? 1 : 0,
+					bitmap->_matteFromAlpha ? 1 : 0);
+		}
+
+		pd.inkBlitSurface(srcRect, mask);
 	} else if (debugChannelSet(4, kDebugImages)) {
 		// A sprite parked on an empty cast slot, or one Lingo cleared, has
 		// nothing to draw and neither has Director: that is the score's own
