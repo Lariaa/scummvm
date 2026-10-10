@@ -140,6 +140,14 @@ public:
 	// once their writer is implemented.
 	virtual bool canWriteCastData() { return false; }
 
+	// Can a sprite showing this member be typed into once the movie hands it
+	// the keyboard focus with `the keyboardFocusSprite`? A field or a text
+	// member carries its own editable flag and its widget is built that way,
+	// so only the Text Xtra says yes: it is editable like a field -- it
+	// answers `the selection` and `the scrollTop` -- but nothing we can read
+	// in its cast data says so.
+	virtual bool takesKeyboardFocus() const { return false; }
+
 	CastType _type;
 	// The cast type as stored on disk, which can differ from the in-memory
 	// _type, e.g. when a member was promoted to a more specific class
