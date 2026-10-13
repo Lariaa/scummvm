@@ -202,6 +202,8 @@ static const BuiltinProto builtins[] = {
 	{ "copyToClipBoard",LB::b_copyToClipBoard,1,1,400, CBLTIN }, 	//			D4 c
 	{ "crop",			LB::b_crop,			2, 2, 700, CBLTIN },	//							D7 c
 	{ "duplicate",		LB::b_duplicate,	1, 2, 400, CBLTIN },	//			D4 c
+	{ "intersects",		LB::b_intersects,	2, 2, 500, FBLTIN },	//				D5 f
+	{ "within",			LB::b_within,		2, 2, 500, FBLTIN },	//				D5 f
 	{ "editableText",	LB::b_editableText,	0, 0, 200, CBLTIN },	// D2
 	{ "erase",			LB::b_erase,		1, 1, 400, CBLTIN },	//			D4 c
 	{ "findEmpty",		LB::b_findEmpty,	1, 1, 400, FBLTIN },	//			D4 f
@@ -3279,6 +3281,25 @@ void LB::b_showLocals(int nargs) {
 ///////////////////
 // Score
 ///////////////////
+
+// `sprite 1 intersects 2` compiles to an opcode, `sprite(1).intersects(2)` to a
+// call -- the same operator in the two syntaxes the dictionary prints side by
+// side ("These statements provide the same test (using different syntax)",
+// D8 Demystified, sprite...intersects). Only the opcode was wired up, so the dot
+// form reached an undefined handler and stopped the movie under lingostrict.
+// "Peter entdeckt die Steinzeit" writes it that way in `S_ICH`:
+// `if sprite(me.spriteNum - 1).intersects(i) then`.
+//
+// Hand both straight to the opcode, which already carries the matte-versus-box
+// rules measured in D6.
+void LB::b_intersects(int nargs) {
+	LC::c_intersects();
+}
+
+void LB::b_within(int nargs) {
+	LC::c_within();
+}
+
 void LB::b_constrainH(int nargs) {
 	Datum num = g_lingo->pop();
 	Datum sprite = g_lingo->pop();
