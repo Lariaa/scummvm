@@ -160,8 +160,32 @@ void FileXtra::m_new(int nargs) {
 
 XOBJSTUB(FileXtra::m_DriveExists, 0)
 XOBJSTUB(FileXtra::m_DrivesToList, 0)
-XOBJSTUB(FileXtra::m_DriveFreeSpace, 0)
 XOBJSTUB(FileXtra::m_DriveIsCDROM, 0)
+
+void FileXtra::m_DriveFreeSpace(int nargs) {
+	ARGNUMCHECK(1)
+	Common::String driveName = g_lingo->pop().asString();
+
+	// The number of free bytes on the drive, 0 on error -- the successor
+	// method says so outright ("return the amount of free space on a volume
+	// ... the number of bytes available ... False (0) is returned on error",
+	// FileXtra4 documentation, fx_VolumeGetFreeBytes).
+	//
+	// As a stub this returned the error value, and a game that asks before it
+	// installs reads that as a full disk. "Peter entdeckt die Steinzeit" does:
+	// `Dateienkopieren` compares `DriveFreeSpace(systemdrive) < 8000000`, puts
+	// up "nicht genug Speicherplatz zum Installieren des Spiels" and sets
+	// `CDLauf = 1`, so the whole installation branch -- `CreateDirectory`, the
+	// file copies and the `save(castLib "test", ...)` behind them -- is never
+	// reached.
+	//
+	// Answer the same way BudAPI's baDiskInfo("free") already does: a round
+	// gibibyte, enough for any check of this kind. Nothing here writes to a
+	// host folder anyway; FileIO keeps the last path component and stores the
+	// bytes through the save file manager.
+	debugC(5, kDebugXObj, "FileXtra::m_DriveFreeSpace(\"%s\"): answering 1 GiB", driveName.c_str());
+	g_lingo->push(Datum((int)0x40000000));
+}
 XOBJSTUB(FileXtra::m_FileOpenDialog, 0)
 XOBJSTUB(FileXtra::m_FileSaveAsDialog, 0)
 XOBJSTUB(FileXtra::m_RenameFile, 0)
