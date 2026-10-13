@@ -675,6 +675,45 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 	return widget;
 }
 
+void TextXtraCastMember::updateFromWidget(Graphics::MacWidget *widget, bool spriteEditable) {
+	// Typing happens at the window manager level: the widget collects the
+	// keystrokes and nothing reads them back out unless the member does it
+	// here. TextCastMember has done so all along; this one had no override, so
+	// the letters showed on the stage and `the text of member` kept answering
+	// with the authored document.
+	//
+	// Loewenzahn 7's pig race is where that shows: `enterHS` reads
+	// `member("NameInputmember")` into `nam` and files the score under it with
+	// `addProp(gGame.hs, pts, nam)`. The player's name is on the screen, and
+	// the call in the log is `addProp([...], 15, "")` -- the score goes in, the
+	// name is empty, and the high score list shows a number with no one next
+	// to it.
+	//
+	// Asking the widget rather than the sprite covers both ways a Text Xtra
+	// sprite becomes editable (the score's own flag and `the keyboardFocusSprite`),
+	// which is the same pair createWidget() weighs up.
+	if (!widget || !widget->isEditable())
+		return;
+
+	Common::U32String content = ((Graphics::MacText *)widget)->getEditedString();
+	Common::U32String text;
+	for (uint i = 0; i < content.size(); i++)
+		text += content[i] == '\n' ? '\r' : content[i];
+
+	if (text == _text)
+		return;
+
+	_text = text;
+	// The authored runs are offsets into the text that just went away, so only
+	// the first of them can still mean anything -- the same reasoning as in
+	// setField(kTheText).
+	if (_styles.runs.size() > 1)
+		_styles.runs.resize(1);
+	if (!_styles.runs.empty())
+		_styles.runs[0].offset = 0;
+	buildFormattedText();
+}
+
 bool TextXtraCastMember::hasField(int field) {
 	switch (field) {
 	case kTheText:
