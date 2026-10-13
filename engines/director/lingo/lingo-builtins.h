@@ -108,6 +108,8 @@ void b_showGlobals(int nargs);
 void b_showLocals(int nargs);
 void b_value(int nargs);
 
+void b_intersects(int nargs);
+void b_within(int nargs);
 void b_constrainH(int nargs);
 void b_constrainV(int nargs);
 void b_copyToClipBoard(int nargs);
