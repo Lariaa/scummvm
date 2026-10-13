@@ -590,21 +590,37 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 	}
 
 	if (pd.ms) {
+		// A shape covers whatever its rect covers, and the rect is all the blit
+		// line above prints -- so a shape sprite stretched across the stage is
+		// indistinguishable from one that draws a thin outline there. TKKG 13's
+		// login screen has such a sprite: channel 35 holds the "Blocker" shape
+		// from Global.cxt over 800x600, on top of everything else, and whether
+		// it fills or outlines decides whether anything below it is visible.
+		bool filled = pd.ms->spriteType == kRectangleSprite
+				|| pd.ms->spriteType == kRoundedRectangleSprite
+				|| pd.ms->spriteType == kOvalSprite;
+		debugC(4, kDebugImages, "Window::inkBlitFrom(): %s coverage: sprite type %d, %s, ink %d, fore %d, back %d, thickness %d",
+				channel->_sprite->_castId.asString().c_str(), (int)pd.ms->spriteType,
+				filled ? "filled" : "outlined", (int)pd.ms->ink,
+				pd.ms->foreColor, pd.ms->backColor, pd.ms->lineSize);
+
 		pd.inkBlitShape(srcRect);
 	} else if (pd.srf) {
 		const Graphics::Surface *mask = channel->getMask();
 
 		// Three things can decide which pixels of a sprite arrive: the mask
 		// getMask() hands back, the srfMask the ink path set up, and the
-		// member's own alpha plane. From the outside they cannot be told
-		// apart, and TKKG 13's login screen needs them apart: its `bg`
-		// (member 13) is a 13x16 tile of plain rgb(255,204,0) that the score
-		// stretches over the whole 800x600 stage with copy ink, and the member
-		// switches useAlpha off -- so it has to arrive opaque. What reaches the
-		// screen instead are the four stripes of its alpha plane, which land
-		// on rows 225-262, 337-375, 450-487 and 562-600 once stretched; the two
-		// that are not covered by the blue bands are exactly the two yellow
-		// bars in the screenshot, to within four pixels.
+		// member's own alpha plane. From the outside they cannot be told apart,
+		// and TKKG 13's login screen needs them apart.
+		//
+		// What it has already settled: `bg` (member 13) and `bluebg` (member 18)
+		// are the only two 32-bit members of Login.dxr that arrive without a
+		// mask, and they are also the only two whose updateFlags byte 22 reads
+		// 0x20 where the other ten read 0x90 or 0x98 -- the flag is read right,
+		// those two really do switch useAlpha off, and D8 dropped D7's rule that
+		// an alpha channel only counts under matte ink. So they are meant to
+		// arrive opaque, and the alpha plane of `bg` (four diagonal stripes on
+		// 162 clear pixels out of 208) is not what covers the stage.
 		if (debugChannelSet(4, kDebugImages) && castType == kCastBitmap) {
 			BitmapCastMember *bitmap = (BitmapCastMember *)channel->_sprite->_cast;
 			debugC(4, kDebugImages, "Window::inkBlitFrom(): %s coverage: mask %s, srfMask %s, %d bpp, useAlpha %d, matteFromAlpha %d",
