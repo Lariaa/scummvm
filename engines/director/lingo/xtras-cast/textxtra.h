@@ -83,6 +83,10 @@ public:
 	// `the keyboardFocusSprite` at a sprite showing one and expect to type.
 	bool takesKeyboardFocus() const override { return true; }
 
+	// ... and what was typed has to find its way back into the member, or
+	// `the text of member` keeps answering with the authored document.
+	void updateFromWidget(Graphics::MacWidget *widget, bool spriteEditable) override;
+
 	bool hasField(int field) override;
 	Datum getField(int field) override;
 	void setField(int field, const Datum &value) override;
