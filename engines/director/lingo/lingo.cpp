@@ -1487,12 +1487,29 @@ const char *Datum::type2str(bool ilk) const {
 }
 
 int Datum::equalTo(const Datum &d, bool ignoreCase) const {
-	// VOID can only be equal to VOID and INT 0 (on the right)
+	// VOID can only be equal to VOID and INT 0, and from D6 on it is equal to it
+	// from either side. The change is measured, one version at a time, at the
+	// message window:
+	//
+	//               VOID = 0   0 = VOID
+	//     D4            1          0     (equality.lingo, run at version 400)
+	//     D5            1          0
+	//     D6            1          1
+	//     D7            1          1
+	//     D9 (MX)       1          1
+	//
+	// `put VOID = EMPTY` and `put EMPTY = VOID` answer 0 throughout, so this
+	// special case ahead of getAlignedType() stays necessary -- that would coerce
+	// both VOID and the empty string to an integer 0 and call them equal. It was
+	// just one-sided, and what that cost is the ordinary `if x = 0` on a variable
+	// that was never set, written that way round.
 	if (type == VOID && d.type == VOID) {
 		return 1;
 	} else if (type == VOID) {
 		return d.type == INT && d.u.i == 0;
 	} else if (d.type == VOID) {
+		if (g_director->getVersion() >= 600)
+			return type == INT && u.i == 0;
 		return 0;
 	}
 	int alignType = g_lingo->getAlignedType(*this, d, true);

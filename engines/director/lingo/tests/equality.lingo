@@ -257,6 +257,53 @@ scummvmAssert(not(v1 = "what"))
 scummvmAssert(v1 < "what")
 scummvmAssert(not(v1 > "what"))
 
+-- From D6, VOID is equal to the integer 0 from either side. Measured one version
+-- at a time at the message window of Director 5, 6, 7 and MX (9.0); the asserts
+-- at the top of this file run at version 400 and show the older, one-sided
+-- answer, so both belong here.
+set the scummvmVersion to 500
+scummvmAssert(VOID = 0)
+scummvmAssert(not(0 = VOID))
+
+set the scummvmVersion to 600
+scummvmAssert(VOID = 0)
+scummvmAssert(0 = VOID)
+
+set the scummvmVersion to 700
+scummvmAssert(VOID = 0)
+scummvmAssert(0 = VOID)
+scummvmAssert(not(VOID = EMPTY))
+scummvmAssert(not(EMPTY = VOID))
+scummvmAssert(not(1 = VOID))
+scummvmAssert(not(VOID = 1))
+
+set the scummvmVersion to 900
+scummvmAssert(VOID = 0)
+scummvmAssert(0 = VOID)
+
+-- Measured in the same session, and all of these already held: a cast
+-- reference is never equal to a number, and a string is never equal to a
+-- symbol -- not in either direction. TKKG 13 leans on both (`checkMembers`
+-- compares a member against a bare 0, `CursorScript` compares a cursor name
+-- against #none), and both log "Invalid equality check" without being wrong.
+scummvmAssert(not(cast 1 = 0))
+scummvmAssert(not(0 = cast 1))
+scummvmAssert(not(cast 1 = 1))
+scummvmAssert(not(1 = cast 1))
+scummvmAssert(cast 1 = cast 1)
+scummvmAssert(not("abc" = #abc))
+scummvmAssert(not(#abc = "abc"))
+scummvmAssert(symbol("abc") = #abc)
+scummvmAssert(string(#abc) = "abc")
+
+-- A point, a rect and a linear list are the same thing to `=`, in both
+-- directions. This has always worked, because eqData() routes anything
+-- array-like through compareArrays() before Datum::equalTo() sees it.
+scummvmAssert(point(1, 2) = [1, 2])
+scummvmAssert([1, 2] = point(1, 2))
+scummvmAssert(rect(0, 0, 1, 1) = [0, 0, 1, 1])
+scummvmAssert(point(1, 2) = point(1, 2))
+
 -- All test files share one engine state: leaving the version at 500 makes
 -- later files run (and miscompile field refs) under D5 semantics.
 set the scummvmVersion to 400
