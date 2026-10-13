@@ -535,20 +535,33 @@ Graphics::MacWidget *BitmapCastMember::createWidget(Common::Rect &bbox, Channel 
 				_ditheredTargetClut = currentStagePalette();
 
 				// A 16- or 32-bit source carries no palette, and the conversion
-				// above passed none: every pixel is matched against the window
-				// manager's palette by nearest colour. Naming clutToDrawWith()
-				// here would print a palette that was never consulted, which
-				// reads like a wrong-palette bug -- say what was really used.
-				// The score's idea of the current palette is printed next to it
-				// because the two can drift apart, and only then is the colour
-				// shift the palette's fault rather than the quantisation's.
-				const byte *wmPal = g_director->_wm->getPalette();
-				uint wmColors = g_director->_wm->getPaletteSize();
-				uint32 sum = 0;
-				for (uint i = 0; i < wmColors * 3; i++)
-					sum = sum * 31 + wmPal[i];
-				debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Quantising cast %d (%d bpp, no source palette) onto the window manager's %d colours, checksum 0x%08x; the score's current palette is %s",
-						_castId, srcBpp * 8, wmColors, sum, score->getCurrentPalette().asString().c_str());
+				// above passed none. What that costs depends entirely on the
+				// stage: onto an 8-bit stage every pixel is matched against the
+				// window manager's palette by nearest colour, onto a truecolour
+				// stage nothing is lost and only the channel order changes.
+				//
+				// Say which of the two it was. The line used to claim a
+				// quantisation either way, and in a truecolour title -- TKKG 13
+				// and 14 are built that way -- that sent the search for a
+				// colour fault off to the palette, where there was nothing to
+				// find.
+				//
+				// Naming clutToDrawWith() here would print a palette that was
+				// never consulted; the score's current palette is printed
+				// instead, because when it drifts from the window manager's the
+				// shift is the palette's fault rather than the conversion's.
+				if (dstBpp == 1) {
+					const byte *wmPal = g_director->_wm->getPalette();
+					uint wmColors = g_director->_wm->getPaletteSize();
+					uint32 sum = 0;
+					for (uint i = 0; i < wmColors * 3; i++)
+						sum = sum * 31 + wmPal[i];
+					debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Quantising cast %d (%d bpp, no source palette) onto the window manager's %d colours, checksum 0x%08x; the score's current palette is %s",
+							_castId, srcBpp * 8, wmColors, sum, score->getCurrentPalette().asString().c_str());
+				} else {
+					debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Reformatting cast %d (%d bpp) to the truecolour stage, no colours lost; the score's current palette is %s",
+							_castId, srcBpp * 8, score->getCurrentPalette().asString().c_str());
+				}
 			} else {
 				debugC(4, kDebugImages, "BitmapCastMember::createWidget(): Dithering cast %d from source palette %s to target palette %s", _castId, clutToDrawWith().asString().c_str(), score->getCurrentPalette().asString().c_str());
 			}
