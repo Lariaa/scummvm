@@ -771,7 +771,23 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 
 	// FAST PATH: if we're not doing any per-pixel ops,
 	// use the stock blitter. Your CPU will thank you.
-	if (!applyColor && !alpha && !ms) {
+	//
+	// Not for a source that carries an alpha channel, though. ManagedSurface's
+	// blitter skips any pixel whose alpha is zero ("Completely transparent, so
+	// skip", managed_surface.cpp), so taking this path applies the alpha -- and
+	// copy ink on a member that keeps useAlpha off is exactly the case where it
+	// must not be applied. A member that does want its alpha arrives with a
+	// mask from createMatte() and never reaches here.
+	//
+	// TKKG 13's login screen is the one that shows it: `bg` (member 13) is a
+	// 13x16 tile of plain rgb(255,204,0) whose alpha plane is clear on 78% of
+	// its pixels, stretched over the whole stage under copy ink with useAlpha
+	// off. Read back after the blit, the stage held ARGB(255, 0, 1, 0) -- the
+	// stage colour -- everywhere except in the four stripes the alpha plane
+	// leaves opaque, where the yellow did arrive.
+	//
+	// Indexed sources are unaffected and keep the fast path.
+	if (!applyColor && !alpha && !ms && !srf->format.aBits()) {
 		Common::Rect offsetRect(
 			Common::Point(abs(srcRect.left - destRect.left), abs(srcRect.top - destRect.top)),
 			destRect.width(),
