@@ -631,6 +631,30 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 		}
 
 		pd.inkBlitSurface(srcRect, mask);
+
+		// What actually landed. Every step up to here can be right and the stage
+		// still come out wrong: the ink branch writes `*dst = src` straight, so a
+		// 32-bit source hands its alpha byte on into the stage surface along with
+		// the colour, and from the log alone there is no telling a yellow pixel
+		// that arrived from one that arrived transparent.
+		//
+		// TKKG 13's login screen needs exactly that distinction. Its `bg`
+		// (member 13) is a 13x16 tile of plain rgb(255,204,0) whose alpha plane
+		// is clear on 78% of its pixels, the member switches useAlpha off, and
+		// the probe above confirms no mask of any kind reaches the blitter -- so
+		// the stage should come out solid yellow where nothing else covers it.
+		// Three points of the last full repaint (50,300), (750,300) and (400,370)
+		// are covered by this member and nothing else, and they are dark.
+		if (debugChannelSet(5, kDebugImages) && castType == kCastBitmap && blitTo
+				&& blitTo->format.bytesPerPixel == 4) {
+			int px = CLIP<int>((destRect.left + destRect.right) / 2, 0, blitTo->w - 1);
+			int py = CLIP<int>((destRect.top + destRect.bottom) / 2, 0, blitTo->h - 1);
+			uint32 got = blitTo->getPixel(px, py);
+			byte r, g, b, a;
+			blitTo->format.colorToARGB(got, a, r, g, b);
+			debugC(5, kDebugImages, "Window::inkBlitFrom(): %s landed at %d,%d: ARGB(%d, %d, %d, %d)",
+					channel->_sprite->_castId.asString().c_str(), px, py, a, r, g, b);
+		}
 	} else if (debugChannelSet(4, kDebugImages)) {
 		// A sprite parked on an empty cast slot, or one Lingo cleared, has
 		// nothing to draw and neither has Director: that is the score's own
