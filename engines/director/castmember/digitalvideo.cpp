@@ -876,13 +876,27 @@ Datum DigitalVideoCastMember::getField(int field) {
 		d = _directToStage;
 		break;
 	case kTheDuration:
-		// sometimes, we will get duration before we start video.
-		// _duration is initialized in startVideo, thus we will not get the correct number.
+		// An Xtra-backed member states its duration in its own payload, in
+		// milliseconds, and that is the unit the games read it in: Tabuleiro's
+		// DirectMedia Xtra reports `the currentTime of sprite` in milliseconds
+		// too. A QuickTime member keeps Director's ticks, which is what `the
+		// movieTime of sprite` is measured in.
 		//
-		// An Xtra-backed member states it in its own payload, so answer from
-		// there and leave the file shut -- Loewenzahn 5 reads `member.duration`
-		// in a beginSprite, long before anything plays.
-		if (_externalDurationMs && (!_video || !_video->isVideoLoaded()))
+		// Loewenzahn 5, 7 and 8 write both platforms side by side in the same
+		// handler and divide one by the other (VideoThumbBH, the scrub bar):
+		//
+		//     aktTime = float(sprite(gVideoSprite).currentTime)   -- Windows, ms
+		//     aktTime = float(sprite(gVideoSprite).movieTime)     -- Mac, ticks
+		//     ...
+		//     sprite(sn).locH = lPos + (aktTime / gDuration * w)
+		//
+		// so the two have to agree. Answering ticks here put the bar at the end
+		// of its track after three and a half seconds of a 59-second clip --
+		// 3538 ticks is the whole film, and 3538 milliseconds is nothing.
+		//
+		// This used to hold only while the file was still shut, which made the
+		// unit depend on whether anything had played yet.
+		if (_externalDurationMs)
 			d = (int)_externalDurationMs;
 		else
 			d = (int)getDuration();
