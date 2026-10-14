@@ -384,6 +384,12 @@ struct DirectorPlotData {
 	uint32 foreColor;
 	bool applyColor = false;
 
+	// The alpha bits of a fully opaque pixel in the stage's own format, or 0
+	// when the stage has no alpha channel (8- and 16-bit stages). ORed in after
+	// every ink so that nothing drawn can clear the stage's alpha -- see
+	// InkPrimitives::drawPoint().
+	uint32 dstAlphaMask = 0;
+
 	// graphics.cpp
 	void setApplyColor();
 	uint32 preprocessColor(uint32 src);
@@ -393,6 +399,7 @@ struct DirectorPlotData {
 	DirectorPlotData(DirectorEngine *d_, SpriteType s, InkType i, int a, uint32 b, uint32 f) : d(d_), sprite(s), ink(i), alpha(a), backColor(b), foreColor(f) {
 		colorWhite = d->_wm->_colorWhite;
 		colorBlack = d->_wm->_colorBlack;
+		dstAlphaMask = d->_wm->_pixelformat.aBits() ? d->_wm->_pixelformat.ARGBToColor(0xff, 0, 0, 0) : 0;
 	}
 
 	DirectorPlotData(const DirectorPlotData &old) : d(old.d), sprite(old.sprite),
@@ -401,7 +408,7 @@ struct DirectorPlotData {
 	                                                srf(old.srf), dst(old.dst),
 	                                                destRect(old.destRect), srcPoint(old.srcPoint),
 	                                                colorWhite(old.colorWhite), colorBlack(old.colorBlack),
-	                                                applyColor(old.applyColor) {
+	                                                applyColor(old.applyColor), dstAlphaMask(old.dstAlphaMask) {
 		if (old.ms) {
 			ms = new MacShape(*old.ms);
 		} else {
