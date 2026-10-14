@@ -661,8 +661,14 @@ void LC::cb_globalassign() {
 	Common::String name = g_lingo->readString();
 	Datum target(name);
 	target.type = GLOBALREF;
-	debugC(3, kDebugLingoExec, "cb_globalassign: assigning to %s", name.c_str());
 	Datum source = g_lingo->pop();
+	// The value, not just the name. A trace that only says "assigning to
+	// gDuration" leaves every number the handler works with to be reconstructed
+	// backwards from whatever it is later passed to -- which is how Loewenzahn
+	// 5's scrub bar took a detour through a wrongly suspected opcode mapping.
+	// asString() is not free, so keep it behind the channel check.
+	if (debugChannelSet(3, kDebugLingoExec))
+		debugC(3, kDebugLingoExec, "cb_globalassign: %s = %s", name.c_str(), source.asString(true).c_str());
 	g_lingo->varAssign(target, source);
 }
 
@@ -670,12 +676,20 @@ void LC::cb_objectfieldassign() {
 	Common::String fieldName = g_lingo->readString();
 	Datum value = g_lingo->pop();
 	Datum object = g_lingo->pop();
+	if (debugChannelSet(3, kDebugLingoExec))
+		debugC(3, kDebugLingoExec, "cb_objectfieldassign: %s.%s = %s", object.asString(true).c_str(), fieldName.c_str(), value.asString(true).c_str());
 	g_lingo->setObjectProp(object, fieldName, value);
 }
 
 void LC::cb_objectfieldpush() {
 	Common::String fieldName = g_lingo->readString();
 	Datum object = g_lingo->pop();
+	// Without this the dot-syntax half of an expression is invisible: reading
+	// `(the member of sprite 16).duration` showed only the `the member of
+	// sprite` part, and the property that followed looked like it was never
+	// asked for.
+	if (debugChannelSet(3, kDebugLingoExec))
+		debugC(3, kDebugLingoExec, "cb_objectfieldpush: %s.%s", object.asString(true).c_str(), fieldName.c_str());
 	g_lingo->getObjectProp(object, fieldName);
 }
 
@@ -773,8 +787,9 @@ void LC::cb_varassign() {
 	Common::String name = g_lingo->readString();
 	Datum target(name);
 	target.type = LOCALREF;
-	debugC(3, kDebugLingoExec, "cb_varassign: assigning to %s", name.c_str());
 	Datum source = g_lingo->pop();
+	if (debugChannelSet(3, kDebugLingoExec))
+		debugC(3, kDebugLingoExec, "cb_varassign: %s = %s", name.c_str(), source.asString(true).c_str());
 	// Local variables should be initialised by the script, no varCreate here
 	g_lingo->varAssign(target, source);
 }
