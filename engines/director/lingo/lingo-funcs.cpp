@@ -56,14 +56,18 @@ void Lingo::func_goto(Datum &frame, Datum &movie, bool calledfromgo) {
 		return;
 	}
 
+	// A `go` inside the current movie only marks where the play head goes next;
+	// the handler that called it runs to its end first, and only then does the
+	// score move. Measured in Director MX with a stepFrame handler that prints
+	// `the frame` on either side of a `go`: it reports the destination right
+	// away *and* the lines after the `go` still run. Freezing the state here
+	// instead would cut the handler off mid-way and let the frame loop re-enter
+	// it, which is how TKKG 14 ended up starting the next spoken line from
+	// inside the current one and playing the two in reverse order.
+	//
+	// This is what the neighbouring func_gotoloop/func_gotonext/func_gotoprevious
+	// have always done: set the frame, flag _skipFrameAdvance, keep running.
 	stage->_skipFrameAdvance = true;
-
-	// If there isn't already frozen Lingo (e.g. from a previous func_goto we haven't yet unfrozen),
-	// freeze this script context. We'll return to it after entering the next frame.
-
-	// Returning from a script with "play done" does not freeze the state. Instead it obliterates it.
-	if (!_playDone)
-		_freezeState = true;
 
 	if (movie.type != VOID) {
 		Common::String movieFilenameRaw = movie.asString();
@@ -93,6 +97,13 @@ void Lingo::func_goto(Datum &frame, Datum &movie, bool calledfromgo) {
 			score->killScriptInstances(score->getNextFrame());
 			return;
 		}
+
+		// Switching movies pulls the running script's own cast out from under it,
+		// so the rest of the handler cannot run here: freeze it and pick it up
+		// again once the new movie is in place. Returning from a script with
+		// "play done" does not freeze the state, it obliterates it.
+		if (!_playDone)
+			_freezeState = true;
 
 		// If we reached here from b_go, and the movie is getting swapped out,
 		// reset all of the custom event handlers.
