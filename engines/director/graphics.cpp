@@ -554,6 +554,24 @@ void InkPrimitives<T>::drawPoint(int x, int y, uint32 src, void *data) {
 		}
 	}
 	}
+
+	// Nothing drawn may clear the stage's alpha channel. A 32-bit member that
+	// does not use its alpha still carries one, and copy ink writes the pixel
+	// verbatim -- so those cleared pixels end up in the window's own surface,
+	// and MacWindow::draw() composes that onto the screen with blitFrom(),
+	// which skips every pixel whose alpha is zero (managed_surface.cpp). They
+	// would never arrive.
+	//
+	// This is the same blitter trap as 52103489d63 one level up: that commit
+	// kept the ink fast path off alpha-bearing sources, which stopped the alpha
+	// being applied while drawing -- and the alpha then travelled into the
+	// stage surface instead and was applied when the window was composed.
+	// TKKG 13's login kept showing the stage colour wherever the yellow tile's
+	// alpha plane is clear.
+	//
+	// The mask is zero for 8- and 16-bit stages, so this costs them an OR with
+	// nothing.
+	*dst |= (T)p->dstAlphaMask;
 }
 
 Graphics::Primitives *DirectorEngine::getInkPrimitives() {
