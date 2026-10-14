@@ -792,10 +792,10 @@ void TextXtraCastMember::setField(int field, const Datum &d) {
 // the player just earned -- and both HS_Punkte and HS_Namen are Xtra members,
 // not fields.
 //
-// Only the colour, because only the colour has been asked for. The font, size
-// and style of a chunk run through the authored style runs rather than through
-// the widget, and nothing in the corpus writes those on an Xtra; answering
-// "no" leaves a readable warning instead of a quiet wrong result.
+// Only the colour, because only the colour has been asked for. Font, size and
+// style would go the same way -- through the document's own style runs -- but
+// nothing in the corpus writes those on an Xtra; answering "no" leaves a
+// readable warning instead of a quiet wrong result.
 bool TextXtraCastMember::hasChunkField(int field) {
 	switch (field) {
 	case kTheColor:
@@ -809,6 +809,21 @@ bool TextXtraCastMember::hasChunkField(int field) {
 
 Datum TextXtraCastMember::getChunkField(int field, int start, int end) {
 	Graphics::MacText *text = getShownText();
+
+	// With no widget to ask, read the style run the chunk starts in -- that is
+	// where setChunkField() put the colour, and it is what the next widget will
+	// be built from.
+	if (!text && !_styles.runs.empty() && start >= 0) {
+		uint i = 0;
+		while (i + 1 < _styles.runs.size() && _styles.runs[i + 1].offset <= (uint32)start)
+			i++;
+
+		const TextXtra::TextStyle &s = _styles.runs[i].style;
+		if (field == kTheColor)
+			return Datum(new ColorObject(s.r, s.g, s.b));
+		return Datum((int)g_director->_wm->findBestColor(s.r, s.g, s.b));
+	}
+
 	uint32 color = text ? text->getTextColor(start, end) : getForeColor();
 
 	switch (field) {
@@ -823,30 +838,82 @@ Datum TextXtraCastMember::getChunkField(int field, int start, int end) {
 	return Datum();
 }
 
+// Make a style run begin exactly at `offset`, by splitting the one that covers
+// it. The runs are kept in ascending order, the way the document stores them.
+static void splitStyleRunAt(TextXtra::StyleRuns &styles, uint32 offset) {
+	uint i = 0;
+	while (i + 1 < styles.runs.size() && styles.runs[i + 1].offset <= offset)
+		i++;
+
+	// A run starts there already, or none reaches that far back to be split.
+	if (styles.runs[i].offset >= offset)
+		return;
+
+	TextXtra::StyleRun tail = styles.runs[i];
+	tail.offset = offset;
+	styles.runs.insert_at(i + 1, tail);
+}
+
 bool TextXtraCastMember::setChunkField(int field, int start, int end, const Datum &d) {
 	if (field != kTheColor && field != kTheForeColor)
 		return false;
 
-	uint32 color = (field == kTheColor && d.type == OBJECT && d.u.obj->getObjType() == kColorObj)
-			? ((ColorObject *)d.u.obj)->toPaletteIndex()
-			: (uint32)d.asInt();
+	// `the color` carries the components already; `the foreColor` is an index
+	// and has to be resolved against the palette to reach the style runs.
+	ColorObject *co = (field == kTheColor && d.type == OBJECT && d.u.obj->getObjType() == kColorObj)
+			? (ColorObject *)d.u.obj : nullptr;
+	uint32 color = co ? (uint32)co->toPaletteIndex() : (uint32)d.asInt();
+	byte r, g, b;
+	if (co && co->_isRGB) {
+		r = co->_r;
+		g = co->_g;
+		b = co->_b;
+	} else {
+		g_director->_wm->getPaletteEntry(color, r, g, b);
+	}
 
-	// The colour belongs to the widget, as it does for a field, so there has to
-	// be a sprite showing the member. The board is filled and then coloured, so
-	// by this point there is.
+	// Write it into the authored style runs, not just into the widget. The
+	// widget is built from _ftext, so a colour that lives only in the widget
+	// is lost the next time one is made -- and there need not be a widget at
+	// all: Loewenzahn 7 colours its high score board from DisplayHS while the
+	// race frame is still up, so no sprite shows HS_Punkte yet.
+	// A chunk the text does not have comes back as start -1 (LC::chunkRef), and
+	// that is not a request to colour from the beginning.
+	uint32 from = MIN<uint32>((uint32)MAX(start, 0), _text.size());
+	uint32 to = MIN<uint32>((uint32)MAX(end, 0), _text.size());
+
+	if (start >= 0 && !_styles.runs.empty() && to > from) {
+		splitStyleRunAt(_styles, from);
+		// Nothing follows the end of the text, so nothing to split off there.
+		if (to < _text.size())
+			splitStyleRunAt(_styles, to);
+
+		for (uint i = 0; i < _styles.runs.size(); i++) {
+			if (_styles.runs[i].offset < from)
+				continue;
+			if (_styles.runs[i].offset >= to)
+				break;
+			_styles.runs[i].style.r = r;
+			_styles.runs[i].style.g = g;
+			_styles.runs[i].style.b = b;
+		}
+
+		buildFormattedText();
+		debugC(3, kDebugLingoExec, "TextXtraCastMember::setChunkField(): cast %d chars %d..%d -> RGB(%d, %d, %d), %d style runs",
+				_castId, (int)from, (int)to, r, g, b, (int)_styles.runs.size());
+	}
+
+	// A widget that is already on the stage has to be told as well, or the
+	// change only shows after it is rebuilt.
 	Graphics::MacText *text = getShownText();
-	if (!text) {
-		debugC(3, kDebugLingoExec, "TextXtraCastMember::setChunkField(): nothing shows cast %d, dropping the colour", _castId);
-		return true;
+	if (text) {
+		uint32 widgetColor = color;
+		if (text->_wm->_pixelformat.isCLUT8())
+			widgetColor = text->_wm->findBestColor(r, g, b);
+
+		text->setTextColor(widgetColor, start, end);
 	}
 
-	if (text->_wm->_pixelformat.isCLUT8()) {
-		byte r, g, b;
-		text->_wm->getPaletteEntry(color, r, g, b);
-		color = text->_wm->findBestColor(r, g, b);
-	}
-
-	text->setTextColor(color, start, end);
 	setModified(true);
 	return true;
 }
