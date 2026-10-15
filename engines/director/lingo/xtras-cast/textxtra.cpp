@@ -356,9 +356,19 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 	if (!styleCount || styleValues.size() < styleCount + 1)
 		return false;
 
+	// The record size is read off the section rather than known, so it has to
+	// divide evenly. Where it does not, the records are not all the same length
+	// and this field map cannot place them -- TKKG 13's title card is such a
+	// document: 11 records in 906 values, three left over. Name the numbers, or
+	// the member simply comes out in the system font with nothing said.
 	uint32 recordSize = (styleValues.size() - 1) / styleCount;
-	if (recordSize * styleCount + 1 != styleValues.size() || recordSize < 45)
+	if (recordSize * styleCount + 1 != styleValues.size() || recordSize < 45) {
+		debugC(3, kDebugText, "readXMEDStyles(): %d style records in %d values do not divide evenly "
+				"(record size %d, %d left over); leaving the styles unread",
+				styleCount, (int)styleValues.size(), recordSize,
+				(int)styleValues.size() - (int)(recordSize * styleCount + 1));
 		return false;
+	}
 
 	uint32 shift = recordSize >= 83 ? 2 : 0;
 
@@ -595,6 +605,16 @@ void TextXtraCastMember::load() {
 
 				debugC(3, kDebugText, "TextXtraCastMember::load(): %d style runs, background RGB(%d, %d, %d), align %d",
 						(int)styles.runs.size(), styles.bgR, styles.bgG, styles.bgB, styles.align);
+			} else {
+				// Say so. A member whose styles do not read keeps no font, size
+				// or colour at all, and createWidget() then draws it in the
+				// system font at 12 point -- which looks like a small font
+				// rather than like a document that was never parsed. TKKG 13's
+				// title card is such a member (LoginLng.cxt member 14, 698x155,
+				// authored in EurostileT-Medi) and spent a round being read as
+				// a font problem.
+				warning("TextXtraCastMember::load(): cast %d: XMED %d holds text but no readable styles; "
+						"it will be drawn in the system font at 12 point", _castId, it.index);
 			}
 		} else {
 			warning("TextXtraCastMember::load(): XMED %d not decoded", it.index);

@@ -906,8 +906,8 @@ void BitmapCastMember::createMatte() {
 		Graphics::Surface *fromAlpha = new Graphics::Surface();
 		fromAlpha->create(src.w, src.h, Graphics::PixelFormat::createFormatCLUT8());
 
-		bool seenClear = false;
-		bool seenSolid = false;
+		uint8 lowest = 0xff;
+		uint8 highest = 0;
 
 		for (int y = 0; y < src.h; y++) {
 			for (int x = 0; x < src.w; x++) {
@@ -920,17 +920,26 @@ void BitmapCastMember::createMatte() {
 				// keeps its softness.
 				fromAlpha->setPixel(x, y, a);
 
-				if (a == 0)
-					seenClear = true;
-				else if (a == 0xff)
-					seenSolid = true;
+				lowest = MIN(lowest, a);
+				highest = MAX(highest, a);
 			}
 		}
 
-		// An all-opaque or all-clear channel says nothing about the shape --
-		// plenty of 32-bit artwork just carries a constant. Leave those to the
-		// fill.
-		if (seenClear && seenSolid) {
+		// A channel that says nothing about the shape is a *constant* one, and
+		// something has to be marked clear for there to be a shape at all. It
+		// does not have to reach full opacity anywhere: a member can be
+		// translucent everywhere it is drawn at all.
+		//
+		// Requiring a 0xff used to be the test, and it threw away a plane that
+		// was perfectly good. TKKG 14's beach animates a figure through sixteen
+		// cells (scene35.cxt members 2-17) whose alpha runs 0 to 51 -- twenty
+		// per cent, never more. Those fell back to the flood fill, which cannot
+		// key artwork that stores black under its clear pixels, so each cell
+		// painted as an opaque black rectangle over the bay. A census of the
+		// same file says the old test was both too strict and aimed at nothing:
+		// 27 of 312 32-bit members never reach 0xff, and **none at all** carries
+		// a constant plane; Scene01.cxt says 71 of 1339 and likewise none.
+		if (lowest == 0 && highest > 0) {
 			if (_matteSource) {
 				// getMatte() hands out _matteSource itself when the drawn size
 				// matches, so _matte may be the very same object.
@@ -942,12 +951,12 @@ void BitmapCastMember::createMatte() {
 			_matteSource = fromAlpha;
 			_noMatte = false;
 			_matteFromAlpha = true;
-			debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s: matte taken from the alpha channel", _castId, _name.c_str());
+			debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d, name %s: matte taken from the alpha channel, %d..%d", _castId, _name.c_str(), lowest, highest);
 			return;
 		}
 
-		debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d: alpha channel is constant (clear %d, solid %d); using the flood fill",
-				_castId, seenClear ? 1 : 0, seenSolid ? 1 : 0);
+		debugC(1, kDebugImages, "BitmapCastMember::createMatte(): cast %d: alpha channel marks nothing clear (%d..%d); using the flood fill",
+				_castId, lowest, highest);
 
 		fromAlpha->free();
 		delete fromAlpha;
