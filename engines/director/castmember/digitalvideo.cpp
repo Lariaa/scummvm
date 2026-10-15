@@ -636,7 +636,13 @@ uint DigitalVideoCastMember::getMovieCurrentTimeMillis() {
 		return 0;
 
 	uint millis = _video->getTime();
-	uint total = getMovieTotalTime();
+
+	// Clamp against the length in milliseconds, not against getMovieTotalTime():
+	// that one answers in ticks, and holding a millisecond count below a tick
+	// count pegs the position at a fraction of the film. Loewenzahn 5's scrub
+	// bar read `the currentTime of sprite` and got 3538 for the rest of a
+	// 58958 ms clip -- 3538 is the same film measured in ticks at time scale 60.
+	uint total = getMovieTotalTimeMillis();
 
 	return total ? MIN(millis, total) : millis;
 }
@@ -667,8 +673,16 @@ uint DigitalVideoCastMember::getMovieTotalTimeMillis() {
 	if (!_video)
 		return 0;
 
-	int ticks = _video->getDuration().msecs();
-	return ticks;
+	// Same two sources as getMovieTotalTime(), only left in milliseconds: the
+	// decoder first, because it measured the file that was actually opened, and
+	// the authored figure from the Xtra payload when the decoder has no length
+	// to give -- an MPEG program stream carries none in its header.
+	int millis = _video->getDuration().msecs();
+
+	if (millis <= 0 && _externalDurationMs)
+		millis = (int)_externalDurationMs;
+
+	return millis > 0 ? (uint)millis : 0;
 }
 
 void DigitalVideoCastMember::seekMovie(int stamp) {
