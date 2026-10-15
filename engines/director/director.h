@@ -390,6 +390,14 @@ struct DirectorPlotData {
 	// InkPrimitives::drawPoint().
 	uint32 dstAlphaMask = 0;
 
+	// True only for a 32-bit bitmap cast member that keeps useAlpha off: its
+	// alpha plane is authored data the ink has to ignore, so the copy-ink fast
+	// path -- which honours alpha, because ManagedSurface's blitter skips any
+	// pixel with alpha zero -- must not be taken. Every other source keeps it:
+	// in a widget's surface alpha zero means "no glyph here", and that is
+	// transparency in the ordinary sense. See Channel::getPlotData().
+	bool ignoreSrcAlpha = false;
+
 	// graphics.cpp
 	void setApplyColor();
 	uint32 preprocessColor(uint32 src);
@@ -408,7 +416,8 @@ struct DirectorPlotData {
 	                                                srf(old.srf), dst(old.dst),
 	                                                destRect(old.destRect), srcPoint(old.srcPoint),
 	                                                colorWhite(old.colorWhite), colorBlack(old.colorBlack),
-	                                                applyColor(old.applyColor), dstAlphaMask(old.dstAlphaMask) {
+	                                                applyColor(old.applyColor), dstAlphaMask(old.dstAlphaMask),
+	                                                ignoreSrcAlpha(old.ignoreSrcAlpha) {
 		if (old.ms) {
 			ms = new MacShape(*old.ms);
 		} else {

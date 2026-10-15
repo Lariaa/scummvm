@@ -144,6 +144,18 @@ DirectorPlotData Channel::getPlotData() {
 		// Add override flag for 1-bit images
 		pd.oneBitImage = true;
 	}
+
+	// A 32-bit bitmap that keeps useAlpha off wants its alpha plane ignored, so
+	// the blitter has to be kept off the fast path that honours it. Decide that
+	// here, where the cast member is in hand: in the blitter the only thing
+	// visible is that the surface has alpha bits, and a text widget's surface
+	// has those too -- there alpha zero means "no glyph", which must keep being
+	// skipped. Judging by the surface alone painted Loewenzahn 7's high score
+	// board as a black block.
+	if (_sprite->_cast && _sprite->_cast->_type == kCastBitmap) {
+		BitmapCastMember *bitmap = (BitmapCastMember *)_sprite->_cast;
+		pd.ignoreSrcAlpha = bitmap->_bitsPerPixel == 32 && !bitmap->_useAlpha;
+	}
 	// Videos are rendered as an overlay, ink doesn't affect them.
 	if (_sprite->_cast && _sprite->_cast->_type == kCastDigitalVideo) {
 		pd.ink = kInkTypeCopy;
