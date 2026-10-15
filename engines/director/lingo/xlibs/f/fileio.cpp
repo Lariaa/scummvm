@@ -289,7 +289,7 @@ FileIOError FileObject::open(const Common::String &origpath, const Common::Strin
 		// OutSaveFile is not seekable so create a separate seekable stream
 		// which will be written to the save file upon disposal
 		_outStream = new Common::MemoryWriteStreamDynamic(DisposeAfterUse::YES);
-	} else if (option.equalsIgnoreCase("append")) {
+	} else if (option.equalsIgnoreCase("append") || option.equalsIgnoreCase("readwrite")) {
 		Common::SeekableReadStream *inFile = saves->openForLoading(filename);
 		if (!inFile) {
 			// Create file if it doesn't exist.
@@ -304,6 +304,19 @@ FileIOError FileObject::open(const Common::String &origpath, const Common::Strin
 				b = inFile->readByte();
 			}
 			delete inFile;
+		}
+		if (option.equalsIgnoreCase("readwrite")) {
+			// A read/write handle answers readFile() as well, and it starts at
+			// the beginning of the file: a write overwrites what is there
+			// instead of being appended. The read side gets its own copy of the
+			// bytes, because _outStream reallocates as it grows.
+			uint32 size = (uint32)_outStream->size();
+			if (size) {
+				byte *buf = (byte *)malloc(size);
+				memcpy(buf, _outStream->getData(), size);
+				_inStream = new Common::MemoryReadStream(buf, size, DisposeAfterUse::YES);
+				_outStream->seek(0);
+			}
 		}
 	} else {
 		error("Unsupported FileIO option: '%s'", option.c_str());
@@ -396,7 +409,11 @@ void FileIO::m_openFile(int nargs) {
 	Common::String option;
 	switch (mode) {
 	case 0:
-		option = "append";
+		// Mode 0 is read *and* write, as this file's own method list says.
+		// Treating it as "append" left _inStream unset, so readFile() answered
+		// EMPTY however much the file held -- TKKG 14 reads its whole save
+		// document back with openFile(path, 0) + readFile() and saw no users.
+		option = "readwrite";
 		break;
 	case 1:
 		option = "read";
@@ -627,6 +644,12 @@ void FileIO::m_setPosition(int nargs) {
 	int pos = d.asInt();
 
 	if (me->_inStream) {
+		// A read/write handle has both streams open, and Director gives it a
+		// single file position: move the write cursor along with the read one,
+		// or a seek followed by a write lands in the wrong place.
+		if (me->_outStream && pos <= me->_outStream->size())
+			me->_outStream->seek(pos, SEEK_SET);
+
 		if (pos <= me->_inStream->size()) {
 			me->_inStream->seek(pos, SEEK_SET);
 			g_lingo->push(Datum(kErrorNone));
