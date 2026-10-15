@@ -790,12 +790,10 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 	// FAST PATH: if we're not doing any per-pixel ops,
 	// use the stock blitter. Your CPU will thank you.
 	//
-	// Not for a source that carries an alpha channel, though. ManagedSurface's
+	// Not for a 32-bit bitmap that keeps useAlpha off, though. ManagedSurface's
 	// blitter skips any pixel whose alpha is zero ("Completely transparent, so
 	// skip", managed_surface.cpp), so taking this path applies the alpha -- and
-	// copy ink on a member that keeps useAlpha off is exactly the case where it
-	// must not be applied. A member that does want its alpha arrives with a
-	// mask from createMatte() and never reaches here.
+	// such a member is exactly the case where it must not be applied.
 	//
 	// TKKG 13's login screen is the one that shows it: `bg` (member 13) is a
 	// 13x16 tile of plain rgb(255,204,0) whose alpha plane is clear on 78% of
@@ -804,8 +802,11 @@ void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Sur
 	// stage colour -- everywhere except in the four stripes the alpha plane
 	// leaves opaque, where the yellow did arrive.
 	//
-	// Indexed sources are unaffected and keep the fast path.
-	if (!applyColor && !alpha && !ms && !srf->format.aBits()) {
+	// Every other source keeps the fast path, indexed ones included. A widget's
+	// surface carries alpha as well, and there alpha zero means "nothing drawn
+	// here" rather than authored data: Channel::getPlotData() tells the two
+	// apart, because only there is the cast member in reach.
+	if (!applyColor && !alpha && !ms && !ignoreSrcAlpha) {
 		Common::Rect offsetRect(
 			Common::Point(abs(srcRect.left - destRect.left), abs(srcRect.top - destRect.top)),
 			destRect.width(),
