@@ -516,15 +516,38 @@ static bool readXMEDFlags(const Common::Array<byte> &data, uint32 &flags) {
 // 76-byte "text" payload observed in Physikus (D7): BE32 height at
 // offset 36, width at offset 40, mirroring the authored xtraRect.
 bool parseXtraData(const Common::Array<byte> &data, Common::Rect &rect) {
-	if (data.size() < 44)
+	if (data.size() < 56)
 		return false;
 
-	int32 h = READ_BE_INT32(&data[36]);
-	int32 w = READ_BE_INT32(&data[40]);
-	if (w <= 0 || h <= 0 || w > 0x4000 || h > 0x4000)
+	// The Xtra names itself in a four-character code at offset 4, and only the
+	// text one lays its data out this way. 10706 members across the German
+	// titles carry 'text'; the Flash, Cursor, QuickTime, vector, font and
+	// Shockwave members that also hang an XMED child off themselves do not, and
+	// reading a rectangle out of those gives nonsense.
+	if (memcmp(&data[4], "text", 4) != 0)
 		return false;
 
-	rect = Common::Rect((int16)w, (int16)h);
+	// The member's own rectangle, in Director's order: top, left, bottom, right.
+	//
+	// This used to read a height at offset 36 and a width at offset 40, and that
+	// cannot work: offset 36 holds 14, 12 or 0 and never a height, and offset 40
+	// is the rectangle's top, which is zero in 11081 of 11749 members. The width
+	// came out 0 every time, so the function always failed and no text Xtra
+	// member ever got its authored size -- `_initialRect` stayed 0x0 and
+	// createWidget() handed MacText a wrapping width of nothing.
+	//
+	// Measured over the 10706 'text' members, the rectangle read here is
+	// plausible in 10704. Steinzeit's lexicon pages are 612x368 and 630x352,
+	// TKKG 13's title card 698x155, TKKG 7's dossier 573x213.
+	int32 top = READ_BE_INT32(&data[40]);
+	int32 left = READ_BE_INT32(&data[44]);
+	int32 bottom = READ_BE_INT32(&data[48]);
+	int32 right = READ_BE_INT32(&data[52]);
+	if (top != 0 || left != 0 || right <= 0 || bottom <= 0
+			|| right > 0x4000 || bottom > 0x4000)
+		return false;
+
+	rect = Common::Rect((int16)right, (int16)bottom);
 	return true;
 }
 
