@@ -400,7 +400,15 @@ BitmapCastMember::BitmapCastMember(Cast *cast, uint16 castId, BitmapCastMember &
 	_pitch = source._pitch;
 	_regX = source._regX;
 	_regY = source._regY;
-	_flags2 = source._regY;
+	// _flags2 took the registration point instead of the flags, and _flags1 was
+	// not carried over at all. Both only speak up when the cast is written back:
+	// a non-zero _flags2 adds the 16-byte tail to the 'CASt' record and is
+	// written into it, so a duplicate whose regY happened to be non-zero -- that
+	// is, nearly every one -- grew a tail it never had, with a byte pair of its
+	// own height in it. _flags1 decides the D4 flags byte and, with it, the
+	// record's size.
+	_flags1 = source._flags1;
+	_flags2 = source._flags2;
 	_bytes = source._bytes;
 	_clut = source._clut;
 	_clutImplicit = source._clutImplicit;
