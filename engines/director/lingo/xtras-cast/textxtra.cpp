@@ -619,11 +619,17 @@ void TextXtraCastMember::buildFormattedText() {
 		const TextXtra::TextStyle &s = _styles.runs[i].style;
 		int fontId = fontIdFor(s.font);
 
-		// The colour components travel as 16-bit fields whose low byte MacText
-		// keeps (mactext-canvas.cpp: findBestColor(palinfo1 & 0xff, ...)), so
-		// pass the 8-bit value itself.
+		// The colour components are Mac RGBColor fields, 16 bit each, and the
+		// parser keeps their HIGH byte: MacFontRun::setValues() computes
+		// findBestColor(palinfo1 >> 8, ...). Stxt passes the file's uint16 values
+		// straight through for that reason (stxt.cpp). readXMEDStyles() has
+		// already reduced them to 8 bit, so shift them back up -- written as 8-bit
+		// values every component came out >> 8 == 0, which is black, and every
+		// styled text Xtra in every title was drawn black: TKKG 13's title card is
+		// authored white, Loewenzahn 7 colours its own high score line red through
+		// setChunkField(), and both came out the same black.
 		_ftext += Common::String::format("\001\016%04x%02x%04x%04x%04x%04x",
-				fontId, s.slant, s.size, s.r, s.g, s.b);
+				fontId, s.slant, s.size, s.r << 8, s.g << 8, s.b << 8);
 
 		for (uint32 c = from; c < to; c++) {
 			// A \001 in the text has to be doubled, or MacText reads it as the
