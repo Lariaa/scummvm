@@ -513,36 +513,32 @@ static bool readXMEDFlags(const Common::Array<byte> &data, uint32 &flags) {
 	return true;
 }
 
-// 76-byte "text" payload observed in Physikus (D7): BE32 height at
-// offset 36, width at offset 40, mirroring the authored xtraRect.
+// The member's own rectangle, as Director writes a rect: top, left, bottom,
+// right, at offsets 28 to 44 of the Xtra's payload.
+//
+// What this gets handed is `XtraCastMember::_xtraData`, which starts *after*
+// the member's symbol header -- a BE32 length, the symbol itself, and a BE32
+// payload length, twelve bytes in all for "text". A census taken on the whole
+// 'CASt' block instead put the rectangle at 40..52 and found a four-character
+// code at offset 4; in the payload the code is not there at all (it is the
+// symbol, and the promotion table has already matched it), and 40 is the
+// rectangle's last field. Reading it that way made every member fail the
+// check, which cost TKKG 13 its title, Steinzeit its lexicon text, Loewenzahn
+// 7 its high score list, and TKKG 14 a crash: `the pageHeight of member` fell
+// back on the authored height, that height was 0, and the notebook divided by
+// it. The two numbers the older code read -- offset 36 and offset 40 -- were
+// the height and the width all along.
+//
+// Measured over the payloads of TKKG 13 and 14: 351 members whose symbol is
+// "text", 349 with a plausible rectangle this way.
 bool parseXtraData(const Common::Array<byte> &data, Common::Rect &rect) {
-	if (data.size() < 56)
+	if (data.size() < 44)
 		return false;
 
-	// The Xtra names itself in a four-character code at offset 4, and only the
-	// text one lays its data out this way. 10706 members across the German
-	// titles carry 'text'; the Flash, Cursor, QuickTime, vector, font and
-	// Shockwave members that also hang an XMED child off themselves do not, and
-	// reading a rectangle out of those gives nonsense.
-	if (memcmp(&data[4], "text", 4) != 0)
-		return false;
-
-	// The member's own rectangle, in Director's order: top, left, bottom, right.
-	//
-	// This used to read a height at offset 36 and a width at offset 40, and that
-	// cannot work: offset 36 holds 14, 12 or 0 and never a height, and offset 40
-	// is the rectangle's top, which is zero in 11081 of 11749 members. The width
-	// came out 0 every time, so the function always failed and no text Xtra
-	// member ever got its authored size -- `_initialRect` stayed 0x0 and
-	// createWidget() handed MacText a wrapping width of nothing.
-	//
-	// Measured over the 10706 'text' members, the rectangle read here is
-	// plausible in 10704. Steinzeit's lexicon pages are 612x368 and 630x352,
-	// TKKG 13's title card 698x155, TKKG 7's dossier 573x213.
-	int32 top = READ_BE_INT32(&data[40]);
-	int32 left = READ_BE_INT32(&data[44]);
-	int32 bottom = READ_BE_INT32(&data[48]);
-	int32 right = READ_BE_INT32(&data[52]);
+	int32 top = READ_BE_INT32(&data[28]);
+	int32 left = READ_BE_INT32(&data[32]);
+	int32 bottom = READ_BE_INT32(&data[36]);
+	int32 right = READ_BE_INT32(&data[40]);
 	if (top != 0 || left != 0 || right <= 0 || bottom <= 0
 			|| right > 0x4000 || bottom > 0x4000)
 		return false;
