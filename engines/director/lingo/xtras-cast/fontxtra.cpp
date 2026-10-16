@@ -107,26 +107,42 @@ void FontXtraCastMember::load() {
 		r->read(buf, size);
 		delete r;
 
-		// Only hand on what the font library will recognise. FreeType's PFR
-		// driver takes the file if it starts with "PFR1", its version is at
-		// most 4 and the two bytes after that are CR/LF; TKKG 13's
-		// EurostileT-Medi is version 4 and answers all three. Anything else
-		// here is a format nobody has met yet, and guessing would mean handing
-		// FreeType a blob and reading the warning afterwards.
-		if (size < 8 || READ_BE_UINT32(buf) != MKTAG('P', 'F', 'R', '1')) {
+		// A Portable Font Resource opens with its four-character signature, a
+		// version of at most 4, and CR/LF. Only hand the font library something
+		// that answers all three; anything else is a format nobody has met yet,
+		// and guessing would mean handing FreeType a blob and reading the
+		// warning afterwards.
+		bool pfr0 = size >= 12 && READ_BE_UINT32(buf) == MKTAG('P', 'F', 'R', '0');
+		bool pfr1 = size >= 12 && READ_BE_UINT32(buf) == MKTAG('P', 'F', 'R', '1');
+		if ((!pfr0 && !pfr1) || READ_BE_UINT16(buf + 4) > 4
+				|| READ_BE_UINT16(buf + 6) != 0x0D0A || READ_BE_UINT16(buf + 8) < 58) {
 			warning("FontXtraCastMember::load(): cast %d ('%s') holds %d bytes that are not a Portable Font Resource",
 					_castId, _fontName.c_str(), size);
 			free(buf);
 			break;
 		}
 
+		// FreeType's PFR driver answers only to "PFR0" -- a file calling itself
+		// "PFR1" is refused outright, with FT_Err_Unknown_File_Format, as if no
+		// driver existed for it at all. That is what every embedded font in
+		// these games says: TKKG 13's EurostileT-Medi is "PFR1" version 4, and
+		// its sections chain up exactly the way the driver expects them to --
+		// the logical font directory at 58, the physical font section at 84 and
+		// the glyph program strings from 5116, ending 8 bytes short of the
+		// resource. Only the signature stands between it and being read, so
+		// say the word the driver listens for. Should the two formats differ
+		// anywhere past the header, the driver rejects the file a step later
+		// and the font falls back to a substitute exactly as before.
+		if (pfr1)
+			WRITE_BE_UINT32(buf, MKTAG('P', 'F', 'R', '0'));
+
 		_fontId = g_director->_wm->_fontMan->registerFontName(_fontName);
 		g_director->_wm->_fontMan->registerFontData(_fontId,
 				new Common::MemoryReadStream(buf, size, DisposeAfterUse::YES));
 		_registered = true;
 
-		debugC(3, kDebugText, "FontXtraCastMember::load(): cast %d: '%s' registered as font id %d, %d bytes of PFR",
-				_castId, _fontName.c_str(), _fontId, size);
+		debugC(3, kDebugText, "FontXtraCastMember::load(): cast %d: '%s' registered as font id %d, %d bytes of PFR%s",
+				_castId, _fontName.c_str(), _fontId, size, pfr1 ? " (signature said PFR1)" : "");
 		break;
 	}
 }
