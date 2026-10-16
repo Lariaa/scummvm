@@ -691,8 +691,14 @@ void TextXtraCastMember::load() {
 				_styles = styles;
 				buildFormattedText();
 
-				debugC(3, kDebugText, "TextXtraCastMember::load(): %d style runs, background RGB(%d, %d, %d), align %d",
-						(int)styles.runs.size(), styles.bgR, styles.bgG, styles.bgB, styles.align);
+				// Name the first run as well. The per-run line below sits on level
+				// 4 and buries a screen in thousands of lines; what a round of
+				// screenshots actually needs is one line saying which font and
+				// which colour the document asked for.
+				const TextXtra::TextStyle &f = styles.runs[0].style;
+				debugC(3, kDebugText, "TextXtraCastMember::load(): %d style runs, background RGB(%d, %d, %d), align %d; first run '%s' %d pt RGB(%d, %d, %d) slant %d",
+						(int)styles.runs.size(), styles.bgR, styles.bgG, styles.bgB, styles.align,
+						f.font.c_str(), f.size, f.r, f.g, f.b, f.slant);
 			} else {
 				// Say so. A member whose styles do not read keeps no font, size
 				// or colour at all, and createWidget() then draws it in the
@@ -739,6 +745,19 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 		const TextXtra::TextStyle &first = _styles.runs[0].style;
 		fg = g_director->_wm->findBestColor(first.r, first.g, first.b);
 		bg = g_director->_wm->findBestColor(_styles.bgR, _styles.bgG, _styles.bgB);
+	}
+
+	// What the document asked for, against what the window manager made of it.
+	// A colour that leaves readXMEDStyles() right can still arrive wrong here,
+	// and without both numbers on one line there is no telling which half is at
+	// fault: TKKG 13's title card is authored white and came out as a flat
+	// RGB(136, 136, 136) on the stage.
+	if (!_styles.runs.empty()) {
+		const TextXtra::TextStyle &firstRun = _styles.runs[0].style;
+		debugC(3, kDebugText, "TextXtraCastMember::createWidget(): cast %d: '%s' %d pt, fg RGB(%d, %d, %d) -> 0x%08x, bg RGB(%d, %d, %d) -> 0x%08x, maxWidth %d, bbox %dx%d",
+				_castId, firstRun.font.c_str(), firstRun.size, firstRun.r, firstRun.g, firstRun.b, fg,
+				_styles.bgR, _styles.bgG, _styles.bgB, bg, _initialRect.width(),
+				bbox.width(), bbox.height());
 	}
 
 	Graphics::MacText *widget = new Graphics::MacText(g_director->getCurrentWindow()->getMacWindow(),

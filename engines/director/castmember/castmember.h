@@ -62,6 +62,12 @@ public:
 	virtual void unload();
 	bool isLoaded() { return _loaded; }
 
+	// Nearly every member waits for a sprite to show it. A few have to be
+	// there before anything is drawn and are never on a sprite at all -- a
+	// font a movie carries with it is one, and nothing would ever ask it to
+	// load.
+	virtual bool loadsWithTheCast() const { return false; }
+
 	virtual bool isEditable() { return false; }
 	virtual void setEditable(bool editable) {}
 	virtual bool isModified() { return _modified; }
