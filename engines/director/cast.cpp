@@ -1801,6 +1801,13 @@ void Cast::loadCastData(Common::SeekableReadStreamEndian &stream, uint16 id, Res
 		debugCN(3, kDebugLoading, "\n");
 	}
 
+	// The children are on it now, and a font member keeps its glyphs in one.
+	// It has to install them here: no sprite ever shows such a member, so
+	// load() would never be reached, and the text members that name the font
+	// are built while the cast is still loading.
+	if (target && target->loadsWithTheCast())
+		target->load();
+
 	free(data);
 
 	// read the cast member info

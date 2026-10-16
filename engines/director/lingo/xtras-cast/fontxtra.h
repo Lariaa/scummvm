@@ -53,6 +53,9 @@ public:
 
 	void load() override;
 
+	// Nothing ever shows this member, so the cast has to load it itself.
+	bool loadsWithTheCast() const override { return true; }
+
 	Common::String formatInfo() override;
 
 	// The name the document's style runs use to ask for this font
