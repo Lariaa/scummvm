@@ -199,6 +199,21 @@ public:
 	 */
 	int registerFontName(Common::String name, int preferredId = -1);
 
+	/**
+	 * Hand the manager the bytes of a font file for an already registered
+	 * name, so that the next request for it is rendered from them instead of
+	 * falling back on a substitute. The manager takes the stream over.
+	 *
+	 * This is the same shelf the Japanese TTFs are put on; it is public
+	 * because a game can carry its own font inside its data. Director does
+	 * exactly that, as a font cast member whose payload is a Bitstream
+	 * Portable Font Resource.
+	 *
+	 * @param fontId the id registerFontName() gave the name
+	 * @param stream the font file's bytes
+	 */
+	void registerFontData(int fontId, Common::SeekableReadStream *stream);
+
 	void forceBuiltinFonts() { _builtInFonts = true; }
 	int parseSlantFromName(const Common::String &name);
 	Common::String getNameFromSlant(int slantVal);

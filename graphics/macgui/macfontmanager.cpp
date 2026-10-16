@@ -784,6 +784,26 @@ int MacFontManager::registerFontName(Common::String name, int preferredId) {
 	return id;
 }
 
+void MacFontManager::registerFontData(int fontId, Common::SeekableReadStream *stream) {
+	if (!stream)
+		return;
+
+	// Key it exactly the way generateFontSubstitute() asks for it: the cleaned
+	// name, the slant the name itself implies, and size 0. Building the key
+	// with the same call is the point -- a name like "EurostileT-Medi *" goes
+	// through cleanFontName() and parseSlantFromName() on the way in, and a
+	// hand-built "<name>-0-0" would not match what the lookup forms.
+	Common::String key = getFontName((uint16)fontId, 0, kMacFontRegular);
+
+	if (_ttfData.contains(key))
+		delete _ttfData[key];
+
+	_ttfData[key] = stream;
+
+	debugC(1, kDebugLevelMacGUI, "MacFontManager::registerFontData(): '%s' now carries its own %d bytes",
+			toPrintable(key).c_str(), (int)stream->size());
+}
+
 int MacFontManager::registerTTFFont(const TTFMap ttfList[]) {
 	int defaultValue = 1;
 	int realId = 100;

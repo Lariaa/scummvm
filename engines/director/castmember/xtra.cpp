@@ -30,6 +30,7 @@
 #include "director/lingo/lingo-the.h"
 #include "director/lingo/xtras-cast/cursorxtra.h"
 #include "director/lingo/xtras-cast/directmediaxtra.h"
+#include "director/lingo/xtras-cast/fontxtra.h"
 #include "director/lingo/xtras-cast/textxtra.h"
 
 namespace Director {
@@ -46,7 +47,7 @@ static const XtraCastMemberProto xtraCastMemberProtos[] = {
 	// "TBDIRECTMEDIA"; "DirectMedia" is its display name and the xlib side.
 	{ "TBDirectMedia", DirectMediaXtra::createCastMember },
 	{ "text", TextXtra::createCastMember },
-	{ "font", nullptr },
+	{ "font", FontXtra::createCastMember },
 	{ nullptr, nullptr },
 };
 
