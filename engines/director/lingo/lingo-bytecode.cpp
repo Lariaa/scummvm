@@ -801,7 +801,20 @@ void LC::cb_v4assign2() {
 	int varType = arg & 0xF;
 	Datum varId = g_lingo->pop();
 
-	Datum var = g_lingo->findVarV4(varType, varId);
+	// Same operand shape as cb_v4assign, so the same reading: from D8.5 on the
+	// id is an index, which is what findVarV4's own version check decides.
+	// Counted over the decompiled corpus, this opcode pushes a non-zero id at
+	// eleven places, and in the D8.5-and-later titles not one of them is a
+	// multiple of 8 -- Loewenzahn 7 writes 1 four times (`put "0" after char 4
+	// of mn`), Loewenzahn 6 and the Adventskalender 1, the Spielebox 4, 6 and
+	// 21 (`put "big" into char 5 to 7 of bnam`, the big version of a photo).
+	// Read as offsets they are all rejected and the assignment is dropped, so
+	// the name being patched keeps its old text. The one older case reads
+	// correctly either way, and findVarV4's version check keeps it that way: the
+	// Phantombild spin-off's installer pushes 56 in a D7 movie, whose locals run
+	// 0, 8, 16, 24 ... and where `setlocal 56` in the same handler names the very
+	// local the chunk is cut from.
+	Datum var = g_lingo->findVarV4(varType, varId, true);
 	Datum ref = readChunkRef(var);
 	g_lingo->push(ref);
 
