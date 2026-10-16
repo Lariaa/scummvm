@@ -356,35 +356,98 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 	if (!styleCount || styleValues.size() < styleCount + 1)
 		return false;
 
-	// The record size is read off the section rather than known, so it has to
-	// divide evenly. Where it does not, the records are not all the same length
-	// and this field map cannot place them -- TKKG 13's title card is such a
-	// document: 11 records in 906 values, three left over. Name the numbers, or
-	// the member simply comes out in the system font with nothing said.
-	uint32 recordSize = (styleValues.size() - 1) / styleCount;
-	if (recordSize * styleCount + 1 != styleValues.size() || recordSize < 45) {
-		debugC(3, kDebugText, "readXMEDStyles(): %d style records in %d values do not divide evenly "
-				"(record size %d, %d left over); leaving the styles unread",
-				styleCount, (int)styleValues.size(), recordSize,
-				(int)styleValues.size() - (int)(recordSize * styleCount + 1));
-		return false;
+	// The style records are NOT all the same length: over 525 distinct documents
+	// -- 147 in seven TKKG titles, 378 across Loewenzahn, Biolab, Ritter Rost 2
+	// and Steinzeit -- they run 80 to 85 values, and the length varies inside a
+	// single document (TKKG 13's title card: 81, 81, 83, 83, 83, 83, 81, 81, 83,
+	// 83, 83). What differs is the trailing padding. Dividing the section evenly
+	// therefore locates them only where the lengths average out, 220 of the 525,
+	// and lands on the wrong boundaries in six of those.
+	//
+	// What does mark a record is its point size, a 16.16 fixed-point number at
+	// offset 21. A value that is a positive multiple of 65536 standing for a
+	// sane point size is that field and almost nothing else, so each one found
+	// starts a record 21 values earlier. Checked against the documents that do
+	// divide evenly, where the boundaries are known: 15 of 15 reproduced exactly,
+	// no record missed and none invented. The lead-in before the first record is
+	// not always one value either -- Loewenzahn's abspann has records starting at
+	// offset 0 -- which is the second thing the even division gets wrong.
+	Common::Array<uint32> starts;
+	for (uint32 i = 21; i < styleValues.size(); i++) {
+		int32 v = styleValues[i];
+		if (v > 0 && (v % 65536) == 0 && (v >> 16) <= 400)
+			starts.push_back(i - 21);
 	}
 
-	uint32 shift = recordSize >= 83 ? 2 : 0;
+	// A style nobody uses can carry size 0 and then has no such field, so the
+	// count is the arbiter: where it does not come out, fall back on the even
+	// division, which is what this did before. Together they read 295 of the
+	// 525 documents, against 220 for the division alone.
+	uint32 recordSize = (styleValues.size() - 1) / styleCount;
+	if (starts.size() != styleCount) {
+		if (recordSize * styleCount + 1 != styleValues.size() || recordSize < 45) {
+			debugC(3, kDebugText, "readXMEDStyles(): cannot place %d style records in %d values: "
+					"%d carry a point size, and they do not divide evenly either "
+					"(record size %d, %d left over); leaving the styles unread",
+					styleCount, (int)styleValues.size(), (int)starts.size(), recordSize,
+					(int)styleValues.size() - (int)(recordSize * styleCount + 1));
+			return false;
+		}
+		starts.clear();
+		for (uint32 i = 0; i < styleCount; i++)
+			starts.push_back(1 + i * recordSize);
+	}
 
 	Common::Array<TextStyle> styles;
 	for (uint32 i = 0; i < styleCount; i++) {
-		const int32 *rec = &styleValues[1 + i * recordSize];
+		uint32 start = starts[i];
+		uint32 avail = (i + 1 < starts.size() ? starts[i + 1] : styleValues.size()) - start;
+		if (avail < 45) {
+			debugC(3, kDebugText, "readXMEDStyles(): style record %d holds only %d values; "
+					"leaving the styles unread", i, avail);
+			return false;
+		}
+
+		// Everything up to the size reads the same whatever the record is long:
+		// the white run background at offsets 15 to 17 comes out in 100% of
+		// 8000-odd records at every length from 77 to 86, which is what makes
+		// the font, the colour and the size safe to read at fixed offsets.
+		const int32 *rec = &styleValues[start];
 		TextStyle style;
 
 		style.font = (rec[0] >= 0 && (uint32)rec[0] < fonts.size()) ? fonts[rec[0]] : Common::String();
-		style.size = (uint16)(rec[19 + shift] >> 16);
-		style.r = (rec[9 + shift] >> 8) & 0xff;
-		style.g = (rec[10 + shift] >> 8) & 0xff;
-		style.b = (rec[11 + shift] >> 8) & 0xff;
-		style.slant = (rec[40 + shift] ? Graphics::kMacFontBold : 0)
-				| (rec[41 + shift] ? Graphics::kMacFontItalic : 0)
-				| (rec[42 + shift] ? Graphics::kMacFontUnderline : 0);
+		style.size = (uint16)(rec[21] >> 16);
+		style.r = (rec[11] >> 8) & 0xff;
+		style.g = (rec[12] >> 8) & 0xff;
+		style.b = (rec[13] >> 8) & 0xff;
+
+		// Past the size the record does move, so the emphasis has to be located
+		// rather than assumed. An 84-value record carries one value more
+		// between the size and the rest, and a field that nearly every record
+		// fills moves with it: it sits at offset 33 for lengths 77 to 83 (97 to
+		// 100% of them, and 34 empty) and at offset 34 for length 84 (92 to 98%,
+		// and 33 empty), never at both. Reading that field is also what works
+		// for the last record of a section, whose length the boundaries do not
+		// give. Where neither is filled the record is something else again --
+		// lengths 85 and 86 fill 31 and 36 instead -- and the emphasis is left
+		// off rather than taken from a guessed offset.
+		//
+		// The emphasis is a tri-state of 0, 1 and -1, and -1 is not "set":
+		// TKKG 13's title card has two styles in the same font at the same size
+		// differing in nothing but this field, one holding 1 and the other -1,
+		// which only reads as a bold/not-bold pair. Taking any non-zero as set
+		// turns those into bold.
+		//
+		// That the three offsets mean bold, italic and underline is inherited
+		// and unproven. It is at least not absurd: where the offsets shift the
+		// values come out a clean 0/1 with no -1 at all.
+		if (avail >= 48) {
+			int em = rec[33] ? 42 : (rec[34] ? 43 : 0);
+			if (em)
+				style.slant = (rec[em] > 0 ? Graphics::kMacFontBold : 0)
+						| (rec[em + 1] > 0 ? Graphics::kMacFontItalic : 0)
+						| (rec[em + 2] > 0 ? Graphics::kMacFontUnderline : 0);
+		}
 
 		if (!style.size)
 			style.size = 12;
