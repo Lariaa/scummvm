@@ -391,7 +391,14 @@ void InkPrimitives<T>::drawPoint(int x, int y, uint32 src, void *data) {
 			// is the mask), and the background colour is still keyed out of the
 			// ones that do -- an opaque white block vanished alongside the
 			// alpha-cleared area. So keep the key rather than copying blind.
-			*dst = (src == p->backColor) ? *dst : src;
+			//
+			// A glyph mask is the exception: it already is the exact set of
+			// pixels the letters cover, and nothing else from the widget can
+			// arrive. Keying the member's background colour out of those
+			// deletes any text set in that colour -- TKKG 13's title card is
+			// white on a white document, with a grey copy on the channel below
+			// for a shadow, and only the shadow was left on the stage.
+			*dst = (!p->glyphMask && src == p->backColor) ? *dst : src;
 		} else {
 			if (p->oneBitImage) {
 				// One-bit images have a slightly different rendering algorithm for BackgndTrans.

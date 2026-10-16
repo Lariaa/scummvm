@@ -296,6 +296,7 @@ DirectorPlotData Channel::getPlotData() {
 		// credits kept a black bar behind every line. Until the authored
 		// colours are actually read, only the letters may be drawn.
 		pd.srfMask = ((Graphics::MacText *)_widget)->getGlyphMask();
+		pd.glyphMask = true;
 	} else if (_sprite->_cast && _sprite->_cast->_type == kCastText) {
 		// kInkTypeCopy -- no mask, default rendering
 
@@ -312,8 +313,10 @@ DirectorPlotData Channel::getPlotData() {
 				|| _sprite->_ink == kInkTypeReverse || _sprite->_ink == kInkTypeGhost
 				|| _sprite->_ink == kInkTypeMask || _sprite->_ink == kInkTypeDark) {
 			Graphics::MacText *widget = ((TextCastMember *)_sprite->_cast)->getWidget();
-			if (widget)
+			if (widget) {
 				pd.srfMask = widget->getGlyphMask();
+				pd.glyphMask = true;
+			}
 		}
 	}
 

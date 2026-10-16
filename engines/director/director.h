@@ -398,6 +398,13 @@ struct DirectorPlotData {
 	// transparency in the ordinary sense. See Channel::getPlotData().
 	bool ignoreSrcAlpha = false;
 
+	// True when srfMask is a text widget's glyph mask. Such a mask already is
+	// the exact set of pixels the letters cover, so no ink may key a colour out
+	// of them: the author is free to set text in the member's own background
+	// colour. TKKG 13's title card does exactly that -- white letters on a
+	// white document, with a grey copy behind them for a shadow.
+	bool glyphMask = false;
+
 	// graphics.cpp
 	void setApplyColor();
 	uint32 preprocessColor(uint32 src);

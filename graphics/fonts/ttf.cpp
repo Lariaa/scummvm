@@ -142,7 +142,17 @@ bool TTFLibrary::loadFont(Common::SeekableReadStream *ttfFile, FT_Stream stream,
 	stream->pos = ttfFile->pos();
 	stream->size = ttfFile->size() - stream->pos;
 
-	return (FT_Open_Face(_library, &args, face_index, &face) == 0);
+	// Say why when it fails. FreeType dispatches by content, so a refusal
+	// means either that no driver claimed the data (error 2, unknown file
+	// format) or that one claimed it and found it broken (error 3) -- and
+	// without the number there is no telling a missing driver from bad
+	// bytes. Director games carry fonts of their own in formats FreeType
+	// may or may not have been built for.
+	FT_Error err = FT_Open_Face(_library, &args, face_index, &face);
+	if (err)
+		warning("TTFLibrary::loadFont(): FreeType refused %d bytes with error %d", (int)stream->size, (int)err);
+
+	return (err == 0);
 }
 
 void TTFLibrary::closeFont(FT_Face &face) {
