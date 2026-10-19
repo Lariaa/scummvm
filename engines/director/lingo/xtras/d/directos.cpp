@@ -20,6 +20,7 @@
  */
 
 #include "common/system.h"
+#include "common/formats/ini-file.h"
 
 #include "director/director.h"
 #include "director/util.h"
@@ -361,8 +362,52 @@ XOBJSTUB(DirectOSXtra::m_dosCreateFolder, 0)
 XOBJSTUB(DirectOSXtra::m_dosDeleteFolder, 0)
 XOBJSTUB(DirectOSXtra::m_dosCreateLink, 0)
 XOBJSTUB(DirectOSXtra::m_dosResolveLink, 0)
-XOBJSTUB(DirectOSXtra::m_dosReadINI, 0)
-XOBJSTUB(DirectOSXtra::m_dosWriteINI, 0)
+
+void DirectOSXtra::m_dosReadINI(int nargs) {
+	// dosReadINI string FileName, string SectionName, string KeyName
+	Common::String iniFile = g_lingo->pop().asString();
+	Common::String section = g_lingo->pop().asString();
+	Common::String key = g_lingo->pop().asString();
+
+	// Try save file first
+	Common::String saveName = savePrefix() + Common::lastPathComponent(iniFile, g_director->_dirSeparator);
+	Common::INIFile ini;
+	ini.allowNonEnglishCharacters();
+	Common::String value;
+	if (ini.loadFromSaveFile(saveName) && ini.getKey(key, section, value)) {
+		g_lingo->push(Datum(value));
+		return;
+	}
+
+	// Fall back to game tree
+	Common::Path resolved = findPath(iniFile);
+	if (!resolved.empty()) {
+		Common::INIFile bundled;
+		bundled.allowNonEnglishCharacters();
+		if (bundled.loadFromFile(resolved) && bundled.getKey(key, section, value)) {
+			g_lingo->push(Datum(value));
+			return;
+		}
+	}
+
+	g_lingo->push(Datum(Common::String()));
+}
+
+void DirectOSXtra::m_dosWriteINI(int nargs) {
+	// dosWriteINI string FileName, string SectionName, string KeyName, string Data
+	Common::String data = g_lingo->pop().asString();
+	Common::String key = g_lingo->pop().asString();
+	Common::String section = g_lingo->pop().asString();
+	Common::String iniFile = g_lingo->pop().asString();
+
+	Common::String saveName = savePrefix() + Common::lastPathComponent(iniFile, g_director->_dirSeparator);
+	Common::INIFile ini;
+	ini.allowNonEnglishCharacters();
+	ini.loadFromSaveFile(saveName);
+	ini.setKey(key, section, data);
+	g_lingo->push(Datum(ini.saveToSaveFile(saveName) ? 1 : 0));
+}
+
 XOBJSTUB(DirectOSXtra::m_dosDeleteINI, 0)
 XOBJSTUB(DirectOSXtra::m_dosGetTopWindowIDs, 0)
 XOBJSTUB(DirectOSXtra::m_dosGetAppWindowID, 0)
