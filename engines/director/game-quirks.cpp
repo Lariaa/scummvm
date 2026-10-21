@@ -167,6 +167,12 @@ struct CachedFile {
 	// Mission Code: Millennium expects the installer to have added an empty save file.
 	{"mcmillennium", Common::kPlatformWindows, "pc/players", (const byte *)"", 0},
 
+	// FFFM reads the CD path from fffinst.ini and then uses getNthFileNameInFolder() with
+	// that absolute Windows path. Overwrite with C:\ so lookups resolve against the game dir.
+	{"flugmaschinen", Common::kPlatformWindows,
+	 "fffinst.ini",
+	 (const byte *)"[path]\r\npfad=C:\\\r\n", -1},
+
 	// Noir has a config file which it expects to contain information about the system paths.
 	{"noir", Common::kPlatformWindows, "NOIRCNFG.TXT", (const byte *)"1 C:\\ C:\\", -1},
 
