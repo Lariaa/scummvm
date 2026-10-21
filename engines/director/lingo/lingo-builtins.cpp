@@ -70,7 +70,7 @@ static const BuiltinProto builtins[] = {
 	{ "log",			LB::b_log,			1, 1, 400, FBLTIN },	//			D4 f
 	{ "pi",				LB::b_pi,			0, 0, 400, FBLTIN },	//			D4 f
 	{ "power",			LB::b_power,		2, 2, 400, FBLTIN },	//			D4 f
-	{ "random",			LB::b_random,		1, 1, 200, FBLTIN },	// D2 f
+	{ "random",			LB::b_random,		1, 2, 200, FBLTIN },	// D2 f
 	{ "sin",			LB::b_sin,			1, 1, 400, FBLTIN },	//			D4 f
 	{ "sqrt",			LB::b_sqrt,			1, 1, 200, FBLTIN },	// D2 f
 	{ "tan",			LB::b_tan,			1, 1, 400, FBLTIN },	//			D4 f
@@ -698,9 +698,41 @@ void LB::b_power(int nargs) {
 }
 
 void LB::b_random(int nargs) {
+	// Director takes a second argument. The lexicon describes the one-argument
+	// form alone and writes a range as random(16) + 4 (D8 Demystified, p. 1001),
+	// but the games call it with two all the same -- one Loewenzahn 8 run does so
+	// 2615 times, once right beside the Amplitude Xtra's mouth animation.
+	int to = 0;
+	bool twoArgs = nargs > 1;
+	if (twoArgs)
+		to = g_lingo->pop().asInt();
+
 	int max = g_lingo->pop().asInt();
+
+	// Measured in Director 7.0.2 and 8.5.1 over 400 draws apiece, and the two
+	// agree line for line, so this needs no version gate: random(12, 14) answers
+	// 12, 13 and 14, and random(0, 1) answers 0 and 1, so both ends are included
+	// and the lower one may be zero. The second argument only counts while it is
+	// above the first: random(5, 5) answers 1..5 and random(14, 12) answers
+	// 1..14, so Director neither pins the result to the bound nor swaps the ends
+	// -- it drops back to the one-argument form.
+	if (twoArgs && to > max) {
+		// getRandom() takes a count and answers 0..count-1, so the span has to
+		// carry the +1 or the upper bound never comes up. Widened on the way in
+		// because the two ends may sit at opposite ends of the signed range.
+		int64 span = (int64)to - (int64)max + 1;
+		g_lingo->push(Datum((int)(max + g_director->_rnd.getRandom((int32)MIN<int64>(span, 0x7fffffff)))));
+		return;
+	}
+
 	Datum res;
-	// Output in D4/D5 seems to be bounded from 1-65535, regardless of input.
+	// The comment this replaces read "Output in D4/D5 seems to be bounded from
+	// 1-65535, regardless of input", and that is not what Director does in 7.0.2
+	// or 8.5.1: random(0) and random(-3) hand back uninitialised memory there,
+	// scattered over the whole signed 32-bit range (400 distinct values in 400
+	// draws, -2145681433 to 2146289312). Keep answering with something bounded
+	// anyway. A movie asking for a random number up to zero has already lost its
+	// footing, and a wild value would take the rest of the scene with it.
 	if (max <= 0) {
 		res = Datum((int)(g_director->_rnd.getRandom(65535) + 1));
 	} else {
