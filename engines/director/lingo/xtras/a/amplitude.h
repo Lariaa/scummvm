@@ -30,6 +30,35 @@ public:
 
 	bool hasProp(const Common::String &propName) override;
 	Datum getProp(const Common::String &propName) override;
+	void setProp(const Common::String &propName, const Datum &value, bool force = false) override;
+
+	void reset();
+
+	// Which slice of the curve the watched channel is playing right now, as an
+	// index into _curve, or -1 if there is nothing to answer.
+	int curveSlice() const;
+	// One channel's value out of that slice: 0 for the left (or mono) value,
+	// 1 for the right one.
+	int sliceValue(int slice, int side) const;
+
+	// Set by ampSetCurve(): the curve the movie generated while authoring, the
+	// sound channel it watches, the loop region in milliseconds, and whether
+	// the values are interleaved left/right.
+	Datum _curve;
+	int _soundChannel = 0;
+	int _loopStart = 0;
+	int _loopEnd = 0;
+	bool _stereo = false;
+
+	// Defaults from the AmplitudePro user guide's property reference, which
+	// documents the same properties this older xtra carries.
+	int _resolution = 15;
+	int _scale = 256;
+	bool _smoothed = false;
+	bool _useDB = false;
+
+	// What ampGetError() reports; empty means no error.
+	Common::String _error;
 };
 
 namespace AmplitudeXtra {
