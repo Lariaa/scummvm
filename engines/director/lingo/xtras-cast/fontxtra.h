@@ -22,6 +22,7 @@
 #ifndef DIRECTOR_LINGO_XTRAS_CAST_FONTXTRA_H
 #define DIRECTOR_LINGO_XTRAS_CAST_FONTXTRA_H
 
+#include "common/hashmap.h"
 #include "common/str.h"
 
 #include "director/castmember/castmember.h"
@@ -30,9 +31,18 @@ namespace Director {
 
 class XtraCastMember;
 
+struct PFRFont;
+
 namespace FontXtra {
 
 CastMember *createCastMember(Cast *cast, uint16 castId, XtraCastMember *xtra);
+
+/**
+ * Pick the advance widths worth keeping out of a parsed font: the ones for
+ * characters it actually has, dropping those that fall back on its missing
+ * character glyph and so carry that glyph's width rather than a letter's.
+ */
+void collectAdvanceWidths(const PFRFont &pfr, Common::HashMap<uint32, int32> &widths);
 
 } // End of namespace FontXtra
 
@@ -64,6 +74,8 @@ public:
 	int _fontId = -1;
 	// Whether the payload was a font the manager could be given
 	bool _registered = false;
+	// Whether its advance widths were read out and handed to the font manager
+	bool _widthsRegistered = false;
 };
 
 } // End of namespace Director

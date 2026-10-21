@@ -194,6 +194,12 @@ MacFontManager::~MacFontManager() {
 		delete it._value;
 	for (auto &it: _fontFamilies)
 		delete it;
+	// The wrappers go before the widths they point at; neither owns the font
+	// whose glyphs it borrows, that one belongs to one of the registries above.
+	for (auto &it: _measuredFonts)
+		delete it._value;
+	for (auto &it: _advanceWidths)
+		delete it._value;
 }
 
 void MacFontManager::setLocalizedFonts() {
@@ -496,6 +502,53 @@ void MacFontManager::loadWindowsFont(const Common::Path &fileName) {
 }
 
 const Font *MacFontManager::getFont(MacFont *macFont) {
+	// The id is taken down before anything resolves, because resolving can
+	// change it: an alias redirects it, and the last-resort fallback rewrites
+	// it to whichever family lent its letters. The widths belong to the font
+	// that was asked for, not to the one that ended up drawing.
+	int askedFor = macFont->getId();
+	int size = macFont->getSize();
+
+	return applyAdvanceWidths(askedFor, size, resolveFont(macFont));
+}
+
+// Every way a font can be arrived at ends here, and a font that brought its own
+// advance widths has to be measured by them whichever way that was -- the
+// registry, a generated substitute, a Unicode stand-in or the built-in
+// fallback. So the choice is made in one place and dressed in another.
+const Font *MacFontManager::applyAdvanceWidths(int fontId, int size, const Font *font) {
+	if (!font || _advanceWidths.empty() || size <= 0)
+		return font;
+
+	if (!_advanceWidths.contains(fontId))
+		return font;
+
+	// The same request must keep answering with the same pointer: isUnicodeFont()
+	// and the text machinery remember fonts by address.
+	Common::String key = Common::String::format("%d-%d", fontId, size);
+	if (_measuredFonts.contains(key))
+		return _measuredFonts[key];
+
+	AdvanceWidths *aw = _advanceWidths[fontId];
+	if (!aw->unitsPerEm)
+		return font;
+
+	const Font *measured = new MeasuredFont(font, &aw->widths, aw->unitsPerEm, size);
+	_measuredFonts[key] = measured;
+
+	// It stands in for the inner font everywhere, so it has to answer the same
+	// way about how its text is addressed. Getting this wrong squeezes the text
+	// back into a code page and loses every character above 127.
+	if (isUnicodeFont(font))
+		_unicodeFonts[measured] = true;
+
+	debugC(1, kDebugLevelMacGUI, "MacFontManager::getFont(): font id %d at %d pt is drawn by a substitute but measured by its own %d advance widths over %d units per em",
+			fontId, size, (int)aw->widths.size(), aw->unitsPerEm);
+
+	return measured;
+}
+
+const Font *MacFontManager::resolveFont(MacFont *macFont) {
 	Common::String name;
 	const Font *font = 0;
 
@@ -804,6 +857,25 @@ void MacFontManager::registerFontData(int fontId, Common::SeekableReadStream *st
 			toPrintable(key).c_str(), (int)stream->size());
 }
 
+void MacFontManager::registerFontAdvanceWidths(int fontId, const Common::HashMap<uint32, int32> &widths, int unitsPerEm) {
+	if (widths.empty() || unitsPerEm <= 0)
+		return;
+
+	// Keyed by id, not by the name-size-slant string registerFontData() uses:
+	// the widths hold for the family at every size, and the scaling happens
+	// where the size is known.
+	if (_advanceWidths.contains(fontId))
+		delete _advanceWidths[fontId];
+
+	AdvanceWidths *aw = new AdvanceWidths();
+	aw->widths = widths;
+	aw->unitsPerEm = unitsPerEm;
+	_advanceWidths[fontId] = aw;
+
+	debugC(1, kDebugLevelMacGUI, "MacFontManager::registerFontAdvanceWidths(): font id %d brought %d advance widths over %d units per em",
+			fontId, (int)widths.size(), unitsPerEm);
+}
+
 int MacFontManager::registerTTFFont(const TTFMap ttfList[]) {
 	int defaultValue = 1;
 	int realId = 100;
@@ -943,7 +1015,14 @@ void MacFontManager::generateFontSubstitute(MacFont &macFont) {
 		name = getFontName(macFont.getId(), 0, macFont.getSlant());
 		if (_ttfData.contains(name)) {
 			generateTTFFont(macFont, _ttfData[name]);
-			return;
+
+			// Only stop here if it worked. Returning either way makes a font
+			// whose data the library would not read worse off than one that
+			// brought none at all: the substitutes below are never tried, and
+			// the text falls through to the built-in font, whose widths have
+			// nothing to do with the authored ones.
+			if (_fontRegistry.contains(getFontName(macFont)))
+				return;
 		}
 	}
 #endif

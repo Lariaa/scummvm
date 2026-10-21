@@ -16,6 +16,9 @@ MODULE_OBJS = \
 	images.o \
 	metaengine.o \
 	movie.o \
+	pfr.o \
+	pfrglyph.o \
+	pfrtype1.o \
 	picture.o \
 	resource.o \
 	rte.o \

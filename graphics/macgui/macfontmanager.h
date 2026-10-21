@@ -24,6 +24,7 @@
 
 #include "common/hash-ptr.h"
 #include "common/language.h"
+#include "common/util.h"
 #include "graphics/fonts/bdf.h"
 #include "graphics/fontman.h"
 
@@ -214,6 +215,25 @@ public:
 	 */
 	void registerFontData(int fontId, Common::SeekableReadStream *stream);
 
+	/**
+	 * Hand the manager the advance widths of a font it cannot otherwise read,
+	 * so that whatever substitute draws the letters still measures the line
+	 * the way the real font would.
+	 *
+	 * Director's embedded fonts are the case this exists for. They are
+	 * Bitstream Portable Font Resources whose glyph programs no font library
+	 * here can rasterise, but whose advance widths are plain numbers in the
+	 * file. Drawing in a substitute and measuring with these keeps a line's
+	 * length, its breaks and its centring where the author put them, which is
+	 * what goes visibly wrong first -- a title set in a wider face overflows
+	 * its box or breaks onto a line that was never meant to exist.
+	 *
+	 * @param fontId the id registerFontName() gave the name
+	 * @param widths advance width per character code, in font units
+	 * @param unitsPerEm how many of those units make up the em square
+	 */
+	void registerFontAdvanceWidths(int fontId, const Common::HashMap<uint32, int32> &widths, int unitsPerEm);
+
 	void forceBuiltinFonts() { _builtInFonts = true; }
 	int parseSlantFromName(const Common::String &name);
 	Common::String getNameFromSlant(int slantVal);
@@ -248,6 +268,9 @@ private:
 	void loadFonts();
 	void loadJapaneseFonts();
 
+	const Font *resolveFont(MacFont *macFont);
+	const Font *applyAdvanceWidths(int fontId, int size, const Font *font);
+
 	void generateFontSubstitute(MacFont &macFont);
 	void generateFONTFont(MacFont &toFont, MacFont &fromFont);
 
@@ -278,6 +301,87 @@ private:
 	Common::HashMap<const Graphics::Font *, bool> _unicodeFonts;
 
 	Common::HashMap<Common::String, Common::SeekableReadStream *> _ttfData;
+
+	// The advance widths a font carried with it, by font id, waiting for a
+	// substitute to lend its letters to. See registerFontAdvanceWidths().
+	struct AdvanceWidths {
+		Common::HashMap<uint32, int32> widths;
+		int unitsPerEm = 0;
+	};
+	Common::HashMap<int, AdvanceWidths *> _advanceWidths;
+
+	// The wrappers handed out so far, by font name, so that the same request
+	// keeps answering with the same pointer -- isUnicodeFont() and the text
+	// machinery key on it.
+	Common::HashMap<Common::String, const Font *> _measuredFonts;
+};
+
+/**
+ * A font that draws with one font's glyphs and measures with another's advance
+ * widths.
+ *
+ * It exists for a font a game carries that nothing here can rasterise: the
+ * widths are read out of the file and a substitute supplies the shapes. The
+ * letters then look wrong but sit in the right places, which is the lesser of
+ * the two errors -- a line measured in the wrong widths overflows its box or
+ * breaks where it should not, and that is what a reader notices.
+ *
+ * Everything but the widths is the inner font's answer. Kerning is dropped on
+ * purpose: the inner font's pair adjustments belong to its own widths, not to
+ * these.
+ */
+class MeasuredFont : public Font {
+public:
+	MeasuredFont(const Font *glyphs, const Common::HashMap<uint32, int32> *widths, int unitsPerEm, int size)
+			: _glyphs(glyphs), _widths(widths), _unitsPerEm(unitsPerEm), _size(size) {}
+
+	int getFontHeight() const override { return _glyphs->getFontHeight(); }
+	int getFontAscent() const override { return _glyphs->getFontAscent(); }
+	int getFontDescent() const override { return _glyphs->getFontDescent(); }
+	int getFontLeading() const override { return _glyphs->getFontLeading(); }
+	Common::String getFontName() const override { return _glyphs->getFontName(); }
+
+	int getCharWidth(uint32 chr) const override {
+		int w = scaled(chr);
+		return w >= 0 ? w : _glyphs->getCharWidth(chr);
+	}
+
+	int getMaxCharWidth() const override {
+		int maxWidth = 0;
+		for (auto &it : *_widths)
+			maxWidth = MAX(maxWidth, scale(it._value));
+		return MAX(maxWidth, _glyphs->getMaxCharWidth());
+	}
+
+	// The inner font's kerning was measured against its own advances.
+	int getKerningOffset(uint32 left, uint32 right) const override { return 0; }
+
+	Common::Rect getBoundingBox(uint32 chr) const override { return _glyphs->getBoundingBox(chr); }
+
+	void drawChar(Surface *dst, uint32 chr, int x, int y, uint32 color) const override {
+		_glyphs->drawChar(dst, chr, x, y, color);
+	}
+	void drawChar(ManagedSurface *dst, uint32 chr, int x, int y, uint32 color) const override {
+		_glyphs->drawChar(dst, chr, x, y, color);
+	}
+
+private:
+	int scale(int32 units) const {
+		// Round to nearest: a title at 170 pt loses a visible amount over a
+		// line of text if every character is truncated downwards.
+		return (int)((units * (int32)_size + _unitsPerEm / 2) / _unitsPerEm);
+	}
+
+	int scaled(uint32 chr) const {
+		if (!_widths->contains(chr))
+			return -1;
+		return scale(_widths->getVal(chr));
+	}
+
+	const Font *_glyphs;
+	const Common::HashMap<uint32, int32> *_widths;
+	int _unitsPerEm;
+	int _size;
 };
 
 } // End of namespace Graphics
