@@ -27,7 +27,9 @@
 #include "director/director.h"
 #include "director/cast.h"
 #include "director/castmember/castmember.h"
+#include "director/castmember/bitmap.h"
 #include "director/movie.h"
+#include "director/picture.h"
 #include "director/window.h"
 #include "director/lingo/lingo-ast.h"
 #include "director/lingo/lingo-code.h"
@@ -1952,11 +1954,36 @@ void LM::m_imageSetAlpha(int nargs) {
 	int constant = source ? 0 : CLIP<int>(arg.asInt(), 0, 255);
 	const Graphics::PixelFormat &format = me->_surface->format;
 
+	// Director reads a grayscale alpha source as data, not as colour: the byte
+	// at each pixel is the alpha. An 8-bit member carries a palette, and
+	// Director's own grayscale and rainbow ramps both run white at index 0 to
+	// black at index 255 -- so taking the luminance of the looked-up colour
+	// turns such a mask inside out. Loewenzahn 8's Tamagotchi screen is that
+	// case: 'hg-alpha' holds 255 around the TV window and 0 inside it, so the
+	// room has to stay opaque and the window has to be the hole. Through the
+	// palette it came out the other way round: the room disappeared and the
+	// leftover stage showed in the window.
+	const Graphics::Surface *indexed = nullptr;
+	if (source && !source->_member.isNull()) {
+		Movie *movie = g_director->getCurrentMovie();
+		CastMember *sourceMember = movie ? movie->getCastMember(source->_member) : nullptr;
+
+		if (sourceMember && sourceMember->_type == kCastBitmap) {
+			Picture *pic = ((BitmapCastMember *)sourceMember)->_picture;
+			if (pic && pic->_surface.format.bytesPerPixel == 1
+				&& pic->_surface.w == me->_surface->w && pic->_surface.h == me->_surface->h)
+				indexed = &pic->_surface;
+		}
+	}
+
 	for (int y = 0; y < me->_surface->h; y++) {
 		for (int x = 0; x < me->_surface->w; x++) {
 			byte a, r, g, b;
 			format.colorToARGB(me->_surface->getPixel(x, y), a, r, g, b);
-			a = source ? (byte)imageLuminance(source->_surface, x, y) : (byte)constant;
+			if (indexed)
+				a = *(const byte *)indexed->getBasePtr(x, y);
+			else
+				a = source ? (byte)imageLuminance(source->_surface, x, y) : (byte)constant;
 			me->_surface->setPixel(x, y, format.ARGBToColor(a, r, g, b));
 		}
 	}
