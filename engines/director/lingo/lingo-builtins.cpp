@@ -106,7 +106,7 @@ static const BuiltinProto builtins[] = {
 	{ "getOne",			LB::b_getOne,		2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPos",			LB::b_getPos,		2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "getProp",		LB::b_getProp,		2, 4, 400, FBLTIN_LIST },	//			D4 f
-	{ "getPropRef",		LB::b_getPropRef,	2, 3, 400, FBLTIN_LIST },	//			D4 f
+	{ "getPropRef",		LB::b_getPropRef,	2, 4, 400, FBLTIN_LIST },	//			D4 f
 	{ "getPropAt",		LB::b_getPropAt,	2, 2, 400, FBLTIN_LIST },	//			D4 f
 	{ "list",			LB::b_list,			-1,0, 400, FBLTIN_LIST },	//			D4 f
 	{ "listP",			LB::b_listP,		1, 1, 400, FBLTIN_LIST },	//			D4 f
@@ -1496,8 +1496,19 @@ void LB::b_getPos(int nargs) {
 // Only reading is supported here; assigning through it would need a real
 // reference datum.
 void LB::b_getPropRef(int nargs) {
+	// With four arguments it is the range form: `var.char[a..b]` compiles to
+	// getPropRef(var, #char, a, b). The end used to be dropped as an excess
+	// argument, which silently turned a range into a single chunk --
+	// TKKG 14's map toolbar does `delete s2.char[1..2]` on "tbs90" to build
+	// the scene name, lost only "t", and jumped to the movie "bcs9" instead
+	// of "sc90". That movie does not exist, so the stage stayed black and
+	// the game sat there. b_getProp() took the same fix for Steinzeit.
+	Datum indexEnd;
+	if (nargs == 4)
+		indexEnd = g_lingo->pop();
+
 	Datum index;
-	if (nargs == 3)
+	if (nargs >= 3)
 		index = g_lingo->pop();
 
 	Datum prop = g_lingo->pop();
@@ -1515,7 +1526,7 @@ void LB::b_getPropRef(int nargs) {
 		int found = LC::compareArrays(LC::eqData, objValue, prop, true).u.i;
 		if (found > 0)
 			value = objValue.u.parr->arr[found - 1].v;
-	} else if (nargs == 3 && prop.type == SYMBOL) {
+	} else if (nargs >= 3 && prop.type == SYMBOL) {
 		// The chunk form on something writable: `getPropRef(var, #char, n)` is a
 		// reference to the nth chunk, which the caller then assigns through --
 		// this is what Lingo emits for `put x into char n of var`, followed by
@@ -1527,8 +1538,9 @@ void LB::b_getPropRef(int nargs) {
 		// turning "rueckC" into "rueckM".
 		ChunkType chunkType = kChunkChar;
 		if (chunkTypeFromSymbol(*prop.u.s, chunkType)) {
-			int n = index.asInt();
-			g_lingo->push(LC::chunkRef(chunkType, n, n, obj));
+			int from = index.asInt();
+			int to = (nargs == 4) ? indexEnd.asInt() : from;
+			g_lingo->push(LC::chunkRef(chunkType, from, to, obj));
 			return;
 		}
 	}
@@ -1537,6 +1549,9 @@ void LB::b_getPropRef(int nargs) {
 		g_lingo->push(value);
 		return;
 	}
+
+	// Not a chunk after all: the object and list forms take a single index,
+	// so a range end has nothing to address here.
 
 	g_lingo->push(value);
 	g_lingo->push(index);
