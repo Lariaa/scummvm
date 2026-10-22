@@ -281,13 +281,9 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 				// the own cast they resolve to nothing and 7706 sprites a run draw
 				// blank.
 				//
-				// So fall through to the movie's other libraries. There is no
-				// ambiguity to weigh up: global.cxt declares 301 slots but fills
-				// only 130 of them, and every number these cells ask for is an
-				// empty slot there, so the first library that actually holds
-				// something at that number is the one that meant it. The 15014
-				// loops that do live beside their cells are answered by the line
-				// above and never reach this.
+				// So fall through to the movie's other libraries. The 15014 loops
+				// that do live beside their cells are answered by the line above
+				// and never reach this.
 				if (!src._cast) {
 					Movie *movie = g_director->getCurrentMovie();
 					const Common::HashMap<int, Cast *> *casts = movie ? movie->getCasts() : nullptr;
@@ -300,17 +296,43 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 							libs.push_back(it._key);
 						Common::sort(libs.begin(), libs.end());
 
-						// A cell is a sprite, so a script member at that number is
-						// never the one meant -- keep looking. TKKG 14's sc01
-						// needs it: member 84 is the script "addons" in
-						// global.cst and the bitmap 'sc01down_e_0299' in
-						// Scene01.cst, one of the cells that animate a figure's
-						// head, and stopping at the first hit drew 468 blanks a
-						// run and left the hotel clerk without one.
-						for (uint i = 0; i < libs.size() && !src._cast; i++) {
+						// More than one library can hold the number, and the lowest
+						// one is not always the one meant. TKKG 14's sc01 asks for
+						// 86 and 184; global.cst answers with the text 'regex'
+						// (446x52) and the button bitmap 'ex1_Over' (111x81), while
+						// the cells meant are Scene01.cst's 'sc01down_e_0348'
+						// (30x41) and 'sc01down_k_0106' (49x65) -- the head cells of
+						// two talking figures. Six of that movie's 54 loops pick the
+						// wrong library that way and the figures lose their heads.
+						//
+						// So weigh the candidates instead of taking the first. A cell
+						// is a sprite of a known size: the sprite record carries it
+						// from the loop's second frame on (the first frame of a film
+						// loop score has no geometry at all), and the loop's own rect
+						// is the size it was authored at. A script is never a cell --
+						// member 84 is the script "addons" in global.cst and the
+						// bitmap 'sc01down_e_0299' in Scene01.cst, and stopping at
+						// the first hit drew 468 blanks a run.
+						int wantW = src._width > 0 ? src._width : _initialRect.width();
+						int wantH = src._height > 0 ? src._height : _initialRect.height();
+						int bestRank = -1;
+
+						for (uint i = 0; i < libs.size(); i++) {
 							CastMember *found = casts->getVal(libs[i])->getCastMember(src._castId.member, true);
-							if (found && found->_type != kCastLingoScript)
+							if (!found || found->_type == kCastLingoScript)
+								continue;
+
+							int rank = 0;
+							if (found->_type == kCastBitmap)
+								rank += 1;
+							if (found->_initialRect.width() == wantW && found->_initialRect.height() == wantH)
+								rank += 2;
+
+							// Ties keep the lowest library, as before.
+							if (rank > bestRank) {
+								bestRank = rank;
 								src._cast = found;
+							}
 						}
 					}
 				}
