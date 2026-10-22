@@ -48,7 +48,16 @@ enum FileIOError {
 	kErrorNoSuchDrive = -56,
 	kErrorReadOnly = -61, // undocumented
 	kErrorNoDiskInDrive = -65,
-	kErrorDirectoryNotFound = -120
+	kErrorDirectoryNotFound = -120,
+	// The four below are the Xtra's own, past the Mac OS file manager's range.
+	// Read out of FileIo.x32 ("FileIO for Director 9.0.0.r383"): its error()
+	// method is one switch over the code, and these are the cases answering
+	// "Instance has an open file", "File already exists", "File is opened
+	// read-only" and "File is opened write-only".
+	kErrorInstanceHasOpenFile = -121,
+	kErrorFileExists = -122,
+	kErrorOpenedReadOnly = -123,
+	kErrorOpenedWriteOnly = -124
 };
 
 class FileObject : public Object<FileObject> {
@@ -67,6 +76,7 @@ public:
 	Datum getProp(const Common::String &propName) override;
 
 	FileIOError open(const Common::String &origpath, const Common::String &mode);
+	FileIOError createEmpty(const Common::String &origpath);
 	void clear();
 	FileIOError saveFileError();
 	void dispose() override;
