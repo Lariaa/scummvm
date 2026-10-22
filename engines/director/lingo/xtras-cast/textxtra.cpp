@@ -775,11 +775,13 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 	// passed on, and vanished; the high score list then showed the score with
 	// an empty name.
 	//
-	// Two things can say the sprite is to be typed into: the score's own
-	// editable flag, and the movie having given this channel the keyboard
-	// focus. The member's cast data says nothing either way -- the Text Xtra
-	// keeps that in its document, and which bit it is has not been read yet.
-	bool editable = channel->_sprite->_editable;
+	// Three things can say the sprite is to be typed into: the score's own
+	// editable flag, the member's -- which a movie may set from Lingo, as
+	// TextCastMember::createWidget() reads it -- and the movie having given
+	// this channel the keyboard focus. The *authored* flag in the cast data
+	// says nothing either way: the Text Xtra keeps that in its document, and
+	// which bit it is has not been read yet.
+	bool editable = channel->_sprite->_editable || _editable;
 	Movie *movie = g_director->getCurrentMovie();
 	if (!editable && movie && movie->_currentEditableTextChannel > 0) {
 		Score *score = movie->getScore();
@@ -848,7 +850,12 @@ bool TextXtraCastMember::hasField(int field) {
 	// it for its visible height and for where it is scrolled to.
 	case kThePageHeight:
 	case kTheScrollTop:
-	// It is editable like a field too, so it also answers for its selection.
+	// It is editable like a field too, so it also answers for its selection
+	// and for the flag itself. The Spielebox's Dalli-Dalli clears the flag on
+	// the member in `hideInput` (`member("inputFeld").editable = 0`, Dalli.DIR
+	// castLib 3 member 29, an xtra); without the property that handler stopped
+	// the movie under lingostrict, before the photo could open.
+	case kTheEditable:
 	case kTheSelectionField:
 		return true;
 	default:
@@ -869,6 +876,9 @@ Datum TextXtraCastMember::getField(int field) {
 	case kTheText:
 		load();
 		d = _text.encode(Common::kUtf8);
+		break;
+	case kTheEditable:
+		d = (int)_editable;
 		break;
 	case kTheScrollTop:
 		d = _scroll;
@@ -896,6 +906,10 @@ void TextXtraCastMember::setField(int field, const Datum &d) {
 		if (!_styles.runs.empty())
 			_styles.runs[0].offset = 0;
 		buildFormattedText();
+		setModified(true);
+		return;
+	case kTheEditable:
+		_editable = d.asInt() != 0;
 		setModified(true);
 		return;
 	case kTheScrollTop:
