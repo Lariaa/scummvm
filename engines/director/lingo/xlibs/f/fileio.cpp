@@ -326,6 +326,50 @@ FileIOError FileObject::open(const Common::String &origpath, const Common::Strin
 	return kErrorNone;
 }
 
+// `createFile` makes an empty file and closes it again -- the caller still has
+// to openFile() it afterwards. Taken from FileIo.x32 ("FileIO for Director
+// 9.0.0.r383"), where the method calls CreateFileA with dwCreationDisposition
+// CREATE_NEW and then CloseHandle: an existing file keeps its contents and is
+// answered with "File already exists". TKKG 14 needs the creating half --
+// GameSave deletes the save document and asks for a fresh one before writing
+// it back.
+FileIOError FileObject::createEmpty(const Common::String &origpath) {
+	Common::SaveFileManager *saves = g_system->getSavefileManager();
+	Common::String path = origpath;
+
+	// The drives open() refuses too: E:\ is our read-only CD, and there is
+	// nothing beyond it.
+	if (origpath.hasPrefixIgnoreCase("E:\\"))
+		return kErrorIO;
+	if (origpath.size() >= 2 && origpath[1] == ':' && (toupper(origpath[0]) > 'E'))
+		return kErrorIO;
+
+	if (!path.hasSuffixIgnoreCase(".txt"))
+		path += ".txt";
+
+	Common::String filename = lastPathComponent(path, g_director->_dirSeparator);
+	Common::String prefix = savePrefix();
+	if (!filename.hasPrefixIgnoreCase(prefix))
+		filename = prefix + filename;
+
+	// CREATE_NEW: an existing file is an error, and it is left alone.
+	Common::SeekableReadStream *existing = saves->openForLoading(filename);
+	if (existing) {
+		delete existing;
+		return kErrorFileExists;
+	}
+
+	Common::OutSaveFile *out = saves->openForSaving(filename, false);
+	if (!out)
+		return saveFileError();
+	out->finalize();
+	delete out;
+
+	// The bookkeeping clear() does, so the new file can be found again
+	((SavedArchive *)SearchMan.getArchive(kSavedFilesArchive))->_addFile(filename);
+	return kErrorNone;
+}
+
 void FileObject::clear() {
 	if (_outStream) {
 		// When opening a file in write mode with FileIO, any existing data is only destroyed
@@ -440,8 +484,13 @@ void FileIO::m_closeFile(int nargs) {
 	me->clear();
 }
 
-// FIXME: split out filename-to-savegame logic from open() so we can implement createFile
-XOBJSTUB(FileIO::m_createFile, 0)
+void FileIO::m_createFile(int nargs) {
+	FileObject *me = static_cast<FileObject *>(g_lingo->_state->me.u.obj);
+	Datum d = g_lingo->pop();
+
+	me->_lastError = me->createEmpty(d.asString());
+	g_lingo->push(Datum((int)me->_lastError));
+}
 
 void FileIO::m_displayOpen(int nargs) {
 	g_lingo->push(getFileNameFromModal(false, Common::String(), Common::String(), "txt"));
