@@ -124,7 +124,6 @@ jobs:
           msbuild scummvm.sln /m /p:VcpkgEnableManifest=true /p:BuildInParallel=true /p:Configuration=${{ env.CONFIGURATION }} /p:PreferredToolArchitecture=x64 /p:Platform=${{ matrix.platform }} /v:minimal
       - name: Upload scummvm
         uses: actions/upload-artifact@v4
-        if: matrix.buildArtifacts == 'true'
         with:
           name: scummvm-${{ matrix.arch }}
           path: build-scummvm/${{ env.CONFIGURATION }}${{ matrix.arch }}/*.exe
