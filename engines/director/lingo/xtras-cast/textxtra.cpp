@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/algorithm.h"
 #include "common/endian.h"
 
 #include "graphics/fonts/macfont.h"
@@ -311,6 +312,88 @@ static int32 styleValue(const Common::Array<int32> &values, int32 start, int32 o
 	return (i >= 0 && i < (int32)values.size()) ? values[i] : 0;
 }
 
+// Neither anchor has to find every record. A style nobody uses can carry no
+// point size and a coloured background at the same time, and then nothing marks
+// it -- TKKG 13's and 14's credits are full of those. What the anchors do give
+// is fixed points, and the distance between two of them says how many records
+// lie in between: a gap of twice the usual record length holds two.
+//
+// Numbering them that way is enough, because the records left unplaced are
+// exactly the unused ones. Over the 632 documents that neither anchor resolves
+// -- 165 in TKKG, 467 across Loewenzahn -- every style the run list names lands
+// on an anchor, 632 of 632, no exception. The boundaries filled in between are
+// approximate by a value or two and belong to styles nobody asks for, whereas
+// before this the whole document was thrown away and its text drawn in the
+// system font at 12 point.
+//
+// With this layer both corpora read completely: TKKG 2804 of 2804 and
+// Loewenzahn 5969 of 5969, against 2292 and 5368 before any of it.
+static bool placeStyleRecords(const Common::Array<int32> &values,
+		const Common::Array<int32> &sizeStarts, const Common::Array<int32> &bgStarts,
+		uint32 count, Common::Array<int32> &out) {
+	Common::Array<int32> anchors = sizeStarts;
+	for (uint32 i = 0; i < bgStarts.size(); i++) {
+		bool seen = false;
+		for (uint32 j = 0; j < sizeStarts.size(); j++) {
+			if (sizeStarts[j] == bgStarts[i]) {
+				seen = true;
+				break;
+			}
+		}
+		if (!seen)
+			anchors.push_back(bgStarts[i]);
+	}
+
+	if (anchors.empty() || anchors.size() >= count)
+		return false;
+
+	Common::sort(anchors.begin(), anchors.end());
+
+	// The usual record length is the shortest distance between two neighbours:
+	// the lengths vary only in their trailing padding, so the shortest is the
+	// one with none, and rounding a gap against it is what counts the records.
+	int32 total = (int32)values.size();
+	int32 stride = 0;
+	for (uint32 i = 0; i + 1 < anchors.size(); i++) {
+		int32 gap = anchors[i + 1] - anchors[i];
+		if (gap >= 45 && (!stride || gap < stride))
+			stride = gap;
+	}
+	int32 tail = total - anchors[anchors.size() - 1];
+	if (tail >= 45 && (!stride || tail < stride))
+		stride = tail;
+	if (stride <= 0)
+		return false;
+
+	out.clear();
+
+	int32 lead = anchors[0];
+	int32 leadCount = (lead + stride / 2) / stride;
+	for (int32 j = 0; j < leadCount; j++)
+		out.push_back(lead * j / leadCount);
+
+	for (uint32 i = 0; i < anchors.size(); i++) {
+		out.push_back(anchors[i]);
+
+		int32 next = (i + 1 < anchors.size()) ? anchors[i + 1] : total;
+		int32 span = next - anchors[i];
+		int32 inGap = (span + stride / 2) / stride;
+		for (int32 j = 1; j < inGap; j++)
+			out.push_back(anchors[i] + span * j / inGap);
+	}
+
+	if (out.size() != count)
+		return false;
+
+	for (uint32 i = 0; i < count; i++) {
+		int32 end = (i + 1 < count) ? out[i + 1] : total;
+		if (end - out[i] < 45)
+			return false;
+	}
+
+	return true;
+}
+
 bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 	Common::Array<Section> sections = readSections(data);
 	if (sections.empty())
@@ -391,12 +474,21 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 
 	// A style nobody uses can carry size 0 and then has no such field, which is
 	// how TKKG 10's two title documents lose a record each. The second anchor
-	// does not depend on the style being used: every record holds the white run
-	// background as three 0xffff at offsets 15 to 17, framed by zeroes at 14 and
-	// 18 to 20. Over the 12170 records whose boundaries the size anchor does
-	// give, all four fields hold those values in 100% of them, and taken as the
-	// anchor they reproduce every one of those 2172 documents exactly -- 2172
-	// identical, none deviating -- while placing 467 more.
+	// does not depend on the style being used: the run background sits at
+	// offsets 15 to 17, framed by zeroes at 14 and 18 to 20. Over the 12170
+	// records whose boundaries the size anchor does give, those four fields hold
+	// white and zero in 100% of them, and taken as the anchor they reproduce
+	// every one of those 2172 documents exactly -- 2172 identical, none
+	// deviating -- while placing 467 more.
+	//
+	// It is a colour, though, not a constant, and requiring white is what still
+	// loses 165 TKKG and 438 Loewenzahn documents: TKKG 13's and 14's credits
+	// hold unused styles that carry no point size AND a coloured background
+	// (0xfe00, 0x9d00, 0xfe00), so neither anchor fires on them. Relaxing the
+	// test to "any non-zero triple" does not work either -- the ascent/descent/
+	// leading triple at offsets 3 to 5 has the same shape, twelve values before
+	// every real record, and a background channel may itself be 0 (confirmed in
+	// TextXtra.x32's colour parser: a zero channel is stored as plain 0).
 	Common::Array<int32> whites;
 	for (int32 i = 0; i + 2 < (int32)styleValues.size(); i++) {
 		if (styleValues[i] != 0xffff || styleValues[i + 1] != 0xffff || styleValues[i + 2] != 0xffff)
@@ -415,9 +507,12 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 	// documents and 5531 of Loewenzahn's 5969, against 2292 and 5368 without the
 	// white one.
 	uint32 recordSize = (styleValues.size() - 1) / styleCount;
+	Common::Array<int32> placed;
 	if (starts.size() != styleCount) {
 		if (whites.size() == styleCount) {
 			starts = whites;
+		} else if (placeStyleRecords(styleValues, starts, whites, styleCount, placed)) {
+			starts = placed;
 		} else if (recordSize * styleCount + 1 == styleValues.size() && recordSize >= 45) {
 			starts.clear();
 			for (uint32 i = 0; i < styleCount; i++)
