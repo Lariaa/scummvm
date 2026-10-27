@@ -910,19 +910,34 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 			_sprite->_scriptId = nextSprite->_scriptId;
 			updateScriptData(nextSprite);
 
-			// When Lingo overrides only a sprite's cast member (`set the member of
-			// sprite`) on a sprite the score is still animating, the member is
-			// auto-puppeted but the position should keep following the score --
-			// otherwise the swapped-in member is stranded at the previous member's
-			// stale loc. We re-sync the position from the score only in exactly
-			// that case: the member was puppeted to something different than the
-			// score expects, the loc itself wasn't puppeted, and the score
-			// actually specified a position this frame (kSCBStartPoint). This
-			// deliberately leaves alone sprites whose member matches the score
-			// (their own loc is authoritative) and never touches anything but the
-			// position.
-			if (!_sprite->_puppet && _sprite->getAutoPuppet(kAPCast) &&
-					_sprite->_castId != nextSprite->_castId &&
+			// When Lingo puts its own cast member into a channel, the position and
+			// the ink should keep following the score -- otherwise the swapped-in
+			// member is stranded at the previous member's stale loc and drawn with
+			// the previous member's ink.
+			//
+			// Two ways in. The score may still be animating the sprite while Lingo
+			// auto-puppeted only its member; or a script puppets a channel while it
+			// is still EMPTY, drops a member into it, and lets the playhead walk
+			// into the frame where the score places that sprite. FFFM's text pages
+			// take the second road: from frame 22 the script calls go("CdBase1"),
+			// puppetSprite(48, 1) and sets the member, and only then does the
+			// playhead reach frame 1228, where channel 48 is authored at (29,59)
+			// with Background Transparent ink. Without this the page was drawn at
+			// 0,0 with Copy -- the box in the screen corner, its white opaque.
+			//
+			// Only what the score specifies this frame is adopted, and only where
+			// Lingo has not set that property itself, so a sprite the script places
+			// or inks by hand is left alone. A sprite whose member matches the
+			// score is left alone too: there its own loc is authoritative.
+			//
+			// NOT measured against Director. Whether it adopts position and ink when
+			// the playhead enters a frame that places a puppeted channel is the open
+			// question D-8; this is built on the reading that FFFM's own page needs
+			// it, since the script puppets channel 48 while it is still empty.
+			bool memberCameFromLingo = (_sprite->getAutoPuppet(kAPCast) || _sprite->getAutoPuppet(kAPMember))
+					&& _sprite->_castId != nextSprite->_castId;
+
+			if (memberCameFromLingo &&
 					!_sprite->getAutoPuppet(kAPLoc) && !_sprite->getAutoPuppet(kAPLocH) &&
 					!_sprite->getAutoPuppet(kAPLocV) && !_sprite->getAutoPuppet(kAPBbox) &&
 					!_sprite->getAutoPuppet(kAPRect) &&
@@ -943,6 +958,18 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 					_sprite->_startPoint = nextSprite->_startPoint;
 					setDirty();
 				}
+			}
+
+			// The ink decides which pixels of the swapped-in member are drawn at
+			// all, so a member that arrives in a Background Transparent channel has
+			// to keep that ink -- and the background colour it keys against, which
+			// an empty channel reports as 0.
+			if (memberCameFromLingo && !_sprite->getAutoPuppet(kAPInk) &&
+					(nextSprite->_copyBackMask & kSCBInk) && _sprite->_ink != nextSprite->_ink) {
+				_sprite->_ink = nextSprite->_ink;
+				if (!_sprite->getAutoPuppet(kAPBackColor) && (nextSprite->_copyBackMask & kSCBBackColor))
+					_sprite->_backColor = nextSprite->_backColor;
+				setDirty();
 			}
 		} else {
 			previousCastId = _sprite->_castId;
