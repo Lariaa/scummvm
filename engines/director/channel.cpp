@@ -921,6 +921,14 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 			// deliberately leaves alone sprites whose member matches the score
 			// (their own loc is authoritative) and never touches anything but the
 			// position.
+			//
+			// The `!_puppet` is load-bearing and measured: a channel that Lingo
+			// puppeted with puppetSprite ignores the score completely. Measured in
+			// Director MX by puppeting empty channels and then walking the playhead
+			// into the frame that places them -- the score's position, its ink and
+			// even its cast member all stayed out. Only the auto-puppet case below,
+			// where Lingo wrote a member without puppeting the channel, follows the
+			// score, and only its position.
 			if (!_sprite->_puppet && _sprite->getAutoPuppet(kAPCast) &&
 					_sprite->_castId != nextSprite->_castId &&
 					!_sprite->getAutoPuppet(kAPLoc) && !_sprite->getAutoPuppet(kAPLocH) &&
