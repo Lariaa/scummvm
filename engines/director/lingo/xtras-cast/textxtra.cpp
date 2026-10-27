@@ -301,6 +301,16 @@ static Common::Array<Common::String> sectionNames(const Common::Array<byte> &dat
 // higher. Section 0004 pairs a character offset with a style number, 0008
 // names the fonts, 0000 carries the member's background colour and 0007 the
 // paragraph alignment. Field map and evidence: memory director-paige-style-runs.
+// A style record can start before the section body does -- TKKG 10's title
+// documents have no lead-in value at all, so their first record is clipped by
+// one at the front and its font number is simply not there. Reading a field
+// outside the section yields 0, which is what an absent field means everywhere
+// else in these records.
+static int32 styleValue(const Common::Array<int32> &values, int32 start, int32 offset) {
+	int32 i = start + offset;
+	return (i >= 0 && i < (int32)values.size()) ? values[i] : 0;
+}
+
 bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 	Common::Array<Section> sections = readSections(data);
 	if (sections.empty())
@@ -372,36 +382,60 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 	// no record missed and none invented. The lead-in before the first record is
 	// not always one value either -- Loewenzahn's abspann has records starting at
 	// offset 0 -- which is the second thing the even division gets wrong.
-	Common::Array<uint32> starts;
+	Common::Array<int32> starts;
 	for (uint32 i = 21; i < styleValues.size(); i++) {
 		int32 v = styleValues[i];
 		if (v > 0 && (v % 65536) == 0 && (v >> 16) <= 400)
-			starts.push_back(i - 21);
+			starts.push_back((int32)i - 21);
 	}
 
-	// A style nobody uses can carry size 0 and then has no such field, so the
-	// count is the arbiter: where it does not come out, fall back on the even
-	// division, which is what this did before. Together they read 295 of the
-	// 525 documents, against 220 for the division alone.
+	// A style nobody uses can carry size 0 and then has no such field, which is
+	// how TKKG 10's two title documents lose a record each. The second anchor
+	// does not depend on the style being used: every record holds the white run
+	// background as three 0xffff at offsets 15 to 17, framed by zeroes at 14 and
+	// 18 to 20. Over the 12170 records whose boundaries the size anchor does
+	// give, all four fields hold those values in 100% of them, and taken as the
+	// anchor they reproduce every one of those 2172 documents exactly -- 2172
+	// identical, none deviating -- while placing 467 more.
+	Common::Array<int32> whites;
+	for (int32 i = 0; i + 2 < (int32)styleValues.size(); i++) {
+		if (styleValues[i] != 0xffff || styleValues[i + 1] != 0xffff || styleValues[i + 2] != 0xffff)
+			continue;
+
+		int32 start = i - 15;
+		if (styleValue(styleValues, start, 14) || styleValue(styleValues, start, 18)
+				|| styleValue(styleValues, start, 19) || styleValue(styleValues, start, 20))
+			continue;
+
+		whites.push_back(start);
+	}
+
+	// The even division stays as the last resort, which is what this did before
+	// either anchor existed. The three together read 2657 of TKKG's 2804
+	// documents and 5531 of Loewenzahn's 5969, against 2292 and 5368 without the
+	// white one.
 	uint32 recordSize = (styleValues.size() - 1) / styleCount;
 	if (starts.size() != styleCount) {
-		if (recordSize * styleCount + 1 != styleValues.size() || recordSize < 45) {
+		if (whites.size() == styleCount) {
+			starts = whites;
+		} else if (recordSize * styleCount + 1 == styleValues.size() && recordSize >= 45) {
+			starts.clear();
+			for (uint32 i = 0; i < styleCount; i++)
+				starts.push_back(1 + (int32)(i * recordSize));
+		} else {
 			debugC(3, kDebugText, "readXMEDStyles(): cannot place %d style records in %d values: "
-					"%d carry a point size, and they do not divide evenly either "
-					"(record size %d, %d left over); leaving the styles unread",
-					styleCount, (int)styleValues.size(), (int)starts.size(), recordSize,
-					(int)styleValues.size() - (int)(recordSize * styleCount + 1));
+					"%d carry a point size, %d a white run background, and they do not divide "
+					"evenly either (record size %d, %d left over); leaving the styles unread",
+					styleCount, (int)styleValues.size(), (int)starts.size(), (int)whites.size(),
+					recordSize, (int)styleValues.size() - (int)(recordSize * styleCount + 1));
 			return false;
 		}
-		starts.clear();
-		for (uint32 i = 0; i < styleCount; i++)
-			starts.push_back(1 + i * recordSize);
 	}
 
 	Common::Array<TextStyle> styles;
 	for (uint32 i = 0; i < styleCount; i++) {
-		uint32 start = starts[i];
-		uint32 avail = (i + 1 < starts.size() ? starts[i + 1] : styleValues.size()) - start;
+		int32 start = starts[i];
+		int32 avail = (i + 1 < starts.size() ? starts[i + 1] : (int32)styleValues.size()) - start;
 		if (avail < 45) {
 			debugC(3, kDebugText, "readXMEDStyles(): style record %d holds only %d values; "
 					"leaving the styles unread", i, avail);
@@ -411,15 +445,17 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 		// Everything up to the size reads the same whatever the record is long:
 		// the white run background at offsets 15 to 17 comes out in 100% of
 		// 8000-odd records at every length from 77 to 86, which is what makes
-		// the font, the colour and the size safe to read at fixed offsets.
-		const int32 *rec = &styleValues[start];
+		// the font, the colour and the size safe to read at fixed offsets --
+		// and what the second anchor above is built on. The fields go through
+		// styleValue() because a clipped first record has none at offset 0.
 		TextStyle style;
 
-		style.font = (rec[0] >= 0 && (uint32)rec[0] < fonts.size()) ? fonts[rec[0]] : Common::String();
-		style.size = (uint16)(rec[21] >> 16);
-		style.r = (rec[11] >> 8) & 0xff;
-		style.g = (rec[12] >> 8) & 0xff;
-		style.b = (rec[13] >> 8) & 0xff;
+		int32 font = styleValue(styleValues, start, 0);
+		style.font = (font >= 0 && (uint32)font < fonts.size()) ? fonts[font] : Common::String();
+		style.size = (uint16)(styleValue(styleValues, start, 21) >> 16);
+		style.r = (styleValue(styleValues, start, 11) >> 8) & 0xff;
+		style.g = (styleValue(styleValues, start, 12) >> 8) & 0xff;
+		style.b = (styleValue(styleValues, start, 13) >> 8) & 0xff;
 
 		// Past the size the record does move, so the emphasis has to be located
 		// rather than assumed. An 84-value record carries one value more
@@ -442,11 +478,12 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 		// and unproven. It is at least not absurd: where the offsets shift the
 		// values come out a clean 0/1 with no -1 at all.
 		if (avail >= 48) {
-			int em = rec[33] ? 42 : (rec[34] ? 43 : 0);
+			int32 em = styleValue(styleValues, start, 33) ? 42
+					: (styleValue(styleValues, start, 34) ? 43 : 0);
 			if (em)
-				style.slant = (rec[em] > 0 ? Graphics::kMacFontBold : 0)
-						| (rec[em + 1] > 0 ? Graphics::kMacFontItalic : 0)
-						| (rec[em + 2] > 0 ? Graphics::kMacFontUnderline : 0);
+				style.slant = (styleValue(styleValues, start, em) > 0 ? Graphics::kMacFontBold : 0)
+						| (styleValue(styleValues, start, em + 1) > 0 ? Graphics::kMacFontItalic : 0)
+						| (styleValue(styleValues, start, em + 2) > 0 ? Graphics::kMacFontUnderline : 0);
 		}
 
 		if (!style.size)
