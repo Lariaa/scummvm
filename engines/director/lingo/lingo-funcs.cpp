@@ -75,29 +75,15 @@ void Lingo::func_goto(Datum &frame, Datum &movie, bool calledfromgo) {
 		if (!stage->setNextMovie(movieFilenameRaw))
 			return;
 
-		// Director does not reload the movie you are already in (see
-		// Window::loadNextMovie's same-movie skip). `go to frame X of movie (self)`
-		// must therefore act like an in-movie `go to frame`: if we instead stopped
-		// the score and queued a switch to the current movie, loadNextMovie would
-		// skip the load and leave the score kPlayStopped with no movie to load, so
-		// Window::step() falls through to `return false` and the engine shuts down.
-		Movie *curMovie = stage->getCurrentMovie();
-		if (curMovie && curMovie->getArchive()
-				&& stage->getFileName() == curMovie->getArchive()->getPathName().toString(g_director->_dirSeparator)) {
-			stage->_nextMovie.movie.clear();
-
-			if (frame.type == STRING) {
-				debugC(3, kDebugLingoExec, "Lingo::func_goto(): going to frame \"%s\" of current movie \"%s\"", frame.u.s->c_str(), movieFilenameRaw.c_str());
-				score->setStartToLabel(*frame.u.s);
-			} else if (frame.type != VOID) {
-				debugC(3, kDebugLingoExec, "Lingo::func_goto(): going to frame %d of current movie \"%s\"", frame.asInt(), movieFilenameRaw.c_str());
-				score->setCurrentFrame(frame.asInt());
-			}
-
-			score->killScriptInstances(score->getNextFrame());
-			return;
-		}
-
+		// `go to frame X of movie (self)` is a real branch, not an in-movie jump.
+		// Measured in Director MX, 68 runs of the D-9 probe, every one the same:
+		// stopMovie fires once, prepareMovie and startMovie twice, and the globals
+		// survive. This used to be short-circuited here, which is what froze
+		// TKKG 11 and 14 -- their startMovie handler is what consumes gComeFromMenu,
+		// and without it the scene was never built. The same-movie skip that made
+		// the short circuit necessary now applies only to a window pointed at its
+		// own file (see MovieReference::branch).
+		//
 		// Switching movies pulls the running script's own cast out from under it,
 		// so the rest of the handler cannot run here: freeze it and pick it up
 		// again once the new movie is in place. Returning from a script with
