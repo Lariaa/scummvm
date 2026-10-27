@@ -1070,10 +1070,17 @@ void DirectorSound::processCuePoints() {
 		if (soundCast->_cuePoints.empty())
 			continue;
 
-		uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
-
-		if (!elapsedTime)
+		// A cue point authored at 0 is due the moment the sound starts, and the
+		// mixer answers 0 for the elapsed time until it has consumed the first
+		// samples. Skipping the channel over that window held back the first cue
+		// of every line: over 49 lines of TKKG 14's sc01, cue 1 went out 130 to
+		// 226 ms late (mean 158), while every later cue of the same file averaged
+		// 20 ms. Ask whether the channel is playing instead -- then a cue due at 0
+		// goes out as soon as it is.
+		if (!isChannelActive(it._key))
 			continue;
+
+		uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
 
 		for (uint i = channel->lastCuePointIndex + 1; i < soundCast->_cuePoints.size(); i++) {
 			int32 cuePoint = soundCast->_cuePoints[i];
