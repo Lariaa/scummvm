@@ -109,7 +109,15 @@ struct MovieReference {
 	Common::String frameS;
 	int frameI;
 
-	MovieReference() { frameI = -1; }
+	// Whether this is a branch -- `go to movie`, `play`, the end of a played
+	// movie -- or merely a window being pointed at a file. A branch reloads even
+	// when it names the movie that is already running, measured in Director MX:
+	// stopMovie, prepareMovie and startMovie all fire again. Pointing a window at
+	// its own file must not, or jewels1's background window is torn down while
+	// something still holds it.
+	bool branch;
+
+	MovieReference() { frameI = -1; branch = true; }
 };
 
 struct StartMovie {

@@ -504,7 +504,7 @@ void Window::setModal(bool modal) {
 // `open window` and `the visible of window` (setVisible), moveToFront, and the
 // fields that report the movie's own geometry or image.
 void Window::setFileName(Common::String filename) {
-	setNextMovie(filename);
+	setNextMovie(filename, false);
 }
 
 void Window::reset() {
@@ -717,7 +717,7 @@ void Window::ensureMovieIsLoaded() {
 	if (!_currentMovie) {
 		if (_fileName.empty()) {
 			Common::String movieName = getName();
-			setNextMovie(movieName);
+			setNextMovie(movieName, false);
 		}
 	} else if (_nextMovie.movie.empty()) { // The movie is loaded and no next movie to load
 		return;
@@ -750,7 +750,7 @@ void Window::ensureMovieIsLoaded() {
 		step(); // we will load it here and move to kPlayLoaded state
 }
 
-bool Window::setNextMovie(Common::String &movieFilenameRaw) {
+bool Window::setNextMovie(Common::String &movieFilenameRaw, bool branching) {
 	_fileName = findMoviePath(movieFilenameRaw);
 
 	bool fileExists = false;
@@ -769,6 +769,7 @@ bool Window::setNextMovie(Common::String &movieFilenameRaw) {
 	}
 
 	_nextMovie.movie = _fileName.toString(g_director->_dirSeparator);
+	_nextMovie.branch = branching;
 
 	return true;
 }
@@ -830,7 +831,22 @@ bool Window::loadNextMovie() {
 	Common::Path archivePath = Common::Path(_currentPath, g_director->_dirSeparator);
 	archivePath.appendInPlace(Common::lastPathComponent(_nextMovie.movie, g_director->_dirSeparator));
 
-	if (_currentMovie && archivePath == _currentMovie->getArchive()->getPathName()) {
+	// Only a window being pointed at its own file skips the reload. A branch
+	// does reload, measured in Director MX over 68 runs of the D-9 probe: a
+	// `go to frame X of movie (the moviePath & the movieName)` fires stopMovie
+	// once and prepareMovie and startMovie twice, and the globals survive it.
+	// Three titles depend on that -- TKKG 11, 13 and 14 split their scene setup
+	// between the startMovie handler, which consumes gComeFromMenu, and the
+	// MileStone behavior, which then builds the scene. Skipping the reload left
+	// the flag for the second one, which read it, cleared it and returned
+	// without doing anything, and the playhead ran into a full-stage blocker
+	// sprite and sat there: TKKG 11's courtyard stayed empty and both games
+	// looked frozen.
+	//
+	// The skip itself stays for what it was written for (f240c049a8c): jewels1
+	// sets the fileName of a background window to the movie that window already
+	// holds, and reloading that is a use-after-free.
+	if (!_nextMovie.branch && _currentMovie && archivePath == _currentMovie->getArchive()->getPathName()) {
 		debug(0, "Window::loadNextMovie: next movie '%s' is the same as current movie, skipping load", archivePath.toString(Common::Path::kNativeSeparator).c_str());
 
 		// Jump to the correct frame
