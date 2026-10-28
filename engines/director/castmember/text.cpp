@@ -610,32 +610,24 @@ int TextCastMember::linePosToLocV(int linePos) {
 	// "This function measures the distance (in pixels) from the topmost edge
 	// of a field Cast member to a specified line of text within the Cast
 	// member" (D8 Demystified, Lingo Lexicon, p. 901). The line is the one the
-	// member displays, after word wrapping -- the neighbouring lineCount entry
-	// is explicit that Director counts lines here "not measured by number of
-	// carriage returns but by the Cast member's line wrapping", and
-	// charPosToLoc names lineCount as its companion.
-	//
-	// Measured in Director MX: for a field in Arial 24 pt with a lineHeight of
-	// 30, lines one to four answer 0, 30, 60, 90 -- the top of each line, not
-	// its baseline and not its bottom.
+	// member displays, after word wrapping. Measured in Director MX: a field
+	// 150 px wide holding one paragraph that wraps plus a second paragraph
+	// reports lineCount 4 against line.count 2, and linePosToLocV answers
+	// 0, 30, 60, 90 for lines one to four at a lineHeight of 30. So line two
+	// is one line height down, not a whole paragraph -- and lines three and
+	// four have an answer at all, although the text holds two paragraphs.
+	// The value is the top of each line, neither its baseline nor its bottom.
 	Graphics::MacText *target = getWidget();
 	if (!target) {
 		warning("TextCastMember::linePosToLocV(): no widget available, returning 0");
 		return 0;
 	}
 
-	int lineCount = target->getLineCount();
-	if (lineCount < 1)
+	// Lingo counts lines from one, and Director answers 0 for a line it does
+	// not have at either end -- measured: a two-line field answers 0 for line
+	// 0, for line 3 and for line 99.
+	if (linePos < 1 || linePos > target->getLineCount())
 		return 0;
-
-	// Lingo counts lines from one. Reading past either end is not measured;
-	// answer the edge the caller walked off, so that the documented idiom
-	// linePosToLocV(n) - linePosToLocV(n - 1) still gives a line's height at
-	// the first and the last line.
-	if (linePos < 1)
-		return 0;
-	if (linePos > lineCount)
-		return target->getTextHeight();
 
 	return target->getLineTop(linePos - 1);
 }
@@ -644,8 +636,11 @@ int TextCastMember::locVToLinePos(int locV) {
 	// "This function determines which line of text is closest to (or
 	// occupying) a given distance (in pixels) from the topmost edge of that
 	// Cast member" (D8 Demystified, Lingo Lexicon, p. 904) -- so the line
-	// whose own band covers the height, which is why feeding it a baseline
-	// from charPosToLoc works as well as feeding it a line top.
+	// whose own band covers the height, not an exact match on the line top.
+	// Measured in Director MX over four lines: asked with a line's top and
+	// asked with that line's baseline, it answers the same line number both
+	// times. A height outside the text answers the nearest end -- -5 gives
+	// line 1, 9999 gives the last line.
 	Graphics::MacText *target = getWidget();
 	if (!target) {
 		warning("TextCastMember::locVToLinePos(): no widget available, returning 0");
@@ -663,7 +658,13 @@ int TextCastMember::locToCharPos(const Common::Point &loc) {
 	// occupying) a given location in that Cast member ... The point is
 	// relative to the Cast member's upper left" (D8 Demystified, Lingo
 	// Lexicon, p. 904). The inverse of charPosToLoc, and it takes that
-	// function's own point: a baseline, not a line top.
+	// function's own point: a baseline, not a line top. Measured in
+	// Director MX as a round trip over seven characters of a wrapped,
+	// two-paragraph field: locToCharPos(charPosToLoc(n)) gives back n every
+	// time, and that includes the RETURN itself and the characters behind
+	// it. So Director counts a hard line break as one character of the text
+	// and places it at the end of its own line, which is how
+	// MacText::getChunkPosFromIndex() counts as well.
 	Graphics::MacText *target = getWidget();
 	if (!target) {
 		warning("TextCastMember::locToCharPos(): no widget available, returning 0");
