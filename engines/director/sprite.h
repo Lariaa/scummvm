@@ -112,7 +112,13 @@ public:
 
 	bool getEditable();
 
+	bool respondsToMouseEvents(bool clicksOnly);
+	// Would this sprite take a mouse message of any kind, click or rollover?
 	bool respondsToMouse();
+	// Would it take a *click*? A sprite whose script holds only rollover
+	// handlers would not -- Director lets the click through to the sprite
+	// below it. See scriptHandlesClick() in sprite.cpp.
+	bool respondsToClick();
 	bool isActive();
 	bool shouldHilite();
 	bool checkSpriteType();

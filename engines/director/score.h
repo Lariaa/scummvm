@@ -118,6 +118,7 @@ public:
 	uint16 getSpriteIDOfActiveWidget();
 	uint16 getSpriteIDFromPos(Common::Point pos);
 	uint16 getMouseSpriteIDFromPos(Common::Point pos);
+	uint16 getClickSpriteIDFromPos(Common::Point pos);
 	uint16 getActiveSpriteIDFromPos(Common::Point pos);
 	bool checkSpriteRollOver(uint16 spriteId, Common::Point pos);
 	uint16 getRollOverSpriteIDFromPos(Common::Point pos);

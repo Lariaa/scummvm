@@ -156,6 +156,9 @@ public:
 private:
 	void loadFileInfo(Common::SeekableReadStreamEndian &stream);
 
+	// Which sprite a mouse message belongs to: a click skips the sprites that
+	// only roll over, every other mouse message does not.
+	uint16 spriteUnderMouse(LEvent event, Common::Point pos);
 	void queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targetId = 0, Common::Point pos = Common::Point(-1, -1));
 	void queueSpriteEvent(Common::Queue<LingoEvent> &queue, LEvent event, int eventId, int spriteId);
 
