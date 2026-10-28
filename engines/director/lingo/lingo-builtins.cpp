@@ -5400,50 +5400,88 @@ void LB::b_windowPresent(int nargs) {
 	g_lingo->push(Datum(1));
 }
 
-void LB::b_charPosToLoc(int nargs) {
-	ARGNUMCHECK(2);
-	Datum charPos = g_lingo->pop();
-	Datum member = g_lingo->pop();
+// The four text geometry functions all take a member first and answer 0 (or
+// the empty point) for a member that is not a field, so resolve the member
+// once here. Returns nullptr when there is nothing to measure.
+static TextCastMember *textMemberToMeasure(const Datum &member, const char *caller) {
 	CastMemberID id = member.asMemberID();
 	Movie *movie = g_director->getCurrentMovie();
 	CastMember *cast = movie->getCastMember(id);
 
-	Common::Point loc;
 	if (!cast) {
-		g_lingo->lingoError("b_charPosToLoc: Could not resolve cast member %s", id.asString().c_str());
-	} else if (cast->_type != kCastText) {
-		// "In field Cast members, this function determines the coordinates
-		// occupied by a given character ... It cannot be applied to text Cast
-		// members" (D8 Demystified, Lingo Lexicon). Macromedia's own scrolling
-		// behaviour asks a text member all the same, so answer the empty point
-		// rather than stop the movie.
-		debugC(1, kDebugLingoExec, "b_charPosToLoc: %s is a %s and not a field, no location", id.asString().c_str(), castType2str(cast->_type));
-	} else {
-		loc = ((TextCastMember *)cast)->charPosToLoc(charPos.asInt());
+		g_lingo->lingoError("%s: Could not resolve cast member %s", caller, id.asString().c_str());
+		return nullptr;
 	}
+
+	if (cast->_type != kCastText) {
+		// "It cannot be applied to text Cast members" (D8 Demystified, Lingo
+		// Lexicon). Macromedia's own scrolling behaviour asks a text member
+		// all the same, so answer nothing rather than stop the movie.
+		debugC(1, kDebugLingoExec, "%s: %s is a %s and not a field, nothing to measure", caller, id.asString().c_str(), castType2str(cast->_type));
+		return nullptr;
+	}
+
+	return (TextCastMember *)cast;
+}
+
+void LB::b_charPosToLoc(int nargs) {
+	ARGNUMCHECK(2);
+	Datum charPos = g_lingo->pop();
+	Datum member = g_lingo->pop();
+
+	// "In field Cast members, this function determines the coordinates
+	// occupied by a given character in the field and returns the value as a
+	// point" (D8 Demystified, Lingo Lexicon, p. 769).
+	Common::Point loc;
+	TextCastMember *text = textMemberToMeasure(member, "b_charPosToLoc");
+	if (text)
+		loc = text->charPosToLoc(charPos.asInt());
 
 	g_lingo->push(Datum(loc));
 }
 
 void LB::b_linePosToLocV(int nargs) {
-	g_lingo->printSTUBWithArglist("b_linePosToLocV", nargs);
-	g_lingo->dropStack(nargs);
-	Datum res(0);
-	g_lingo->push(res);
+	ARGNUMCHECK(2);
+	Datum linePos = g_lingo->pop();
+	Datum member = g_lingo->pop();
+
+	int locV = 0;
+	TextCastMember *text = textMemberToMeasure(member, "b_linePosToLocV");
+	if (text)
+		locV = text->linePosToLocV(linePos.asInt());
+
+	g_lingo->push(Datum(locV));
 }
 
 void LB::b_locToCharPos(int nargs) {
-	g_lingo->printSTUBWithArglist("b_locToCharPos", nargs);
-	g_lingo->dropStack(nargs);
-	Datum res(0);
-	g_lingo->push(res);
+	ARGNUMCHECK(2);
+	Datum loc = g_lingo->pop();
+	Datum member = g_lingo->pop();
+
+	int charPos = 0;
+	TextCastMember *text = textMemberToMeasure(member, "b_locToCharPos");
+	if (text) {
+		if ((loc.type == POINT || loc.type == ARRAY) && loc.u.farr->arr.size() >= 2) {
+			charPos = text->locToCharPos(Common::Point(loc.u.farr->arr[0].asInt(), loc.u.farr->arr[1].asInt()));
+		} else {
+			g_lingo->lingoError("b_locToCharPos: expected a point, got %s", loc.type2str());
+		}
+	}
+
+	g_lingo->push(Datum(charPos));
 }
 
 void LB::b_locVToLinePos(int nargs) {
-	g_lingo->printSTUBWithArglist("b_locVToLinePos", nargs);
-	g_lingo->dropStack(nargs);
-	Datum res(0);
-	g_lingo->push(res);
+	ARGNUMCHECK(2);
+	Datum locV = g_lingo->pop();
+	Datum member = g_lingo->pop();
+
+	int linePos = 0;
+	TextCastMember *text = textMemberToMeasure(member, "b_locVToLinePos");
+	if (text)
+		linePos = text->locVToLinePos(locV.asInt());
+
+	g_lingo->push(Datum(linePos));
 }
 
 void LB::b_scrollByLine(int nargs) {

@@ -606,6 +606,76 @@ Common::Point TextCastMember::charPosToLoc(int charPos) {
 	return target->getCharPosition(charPos - 1);
 }
 
+int TextCastMember::linePosToLocV(int linePos) {
+	// "This function measures the distance (in pixels) from the topmost edge
+	// of a field Cast member to a specified line of text within the Cast
+	// member" (D8 Demystified, Lingo Lexicon, p. 901). The line is the one the
+	// member displays, after word wrapping -- the neighbouring lineCount entry
+	// is explicit that Director counts lines here "not measured by number of
+	// carriage returns but by the Cast member's line wrapping", and
+	// charPosToLoc names lineCount as its companion.
+	//
+	// Measured in Director MX: for a field in Arial 24 pt with a lineHeight of
+	// 30, lines one to four answer 0, 30, 60, 90 -- the top of each line, not
+	// its baseline and not its bottom.
+	Graphics::MacText *target = getWidget();
+	if (!target) {
+		warning("TextCastMember::linePosToLocV(): no widget available, returning 0");
+		return 0;
+	}
+
+	int lineCount = target->getLineCount();
+	if (lineCount < 1)
+		return 0;
+
+	// Lingo counts lines from one. Reading past either end is not measured;
+	// answer the edge the caller walked off, so that the documented idiom
+	// linePosToLocV(n) - linePosToLocV(n - 1) still gives a line's height at
+	// the first and the last line.
+	if (linePos < 1)
+		return 0;
+	if (linePos > lineCount)
+		return target->getTextHeight();
+
+	return target->getLineTop(linePos - 1);
+}
+
+int TextCastMember::locVToLinePos(int locV) {
+	// "This function determines which line of text is closest to (or
+	// occupying) a given distance (in pixels) from the topmost edge of that
+	// Cast member" (D8 Demystified, Lingo Lexicon, p. 904) -- so the line
+	// whose own band covers the height, which is why feeding it a baseline
+	// from charPosToLoc works as well as feeding it a line top.
+	Graphics::MacText *target = getWidget();
+	if (!target) {
+		warning("TextCastMember::locVToLinePos(): no widget available, returning 0");
+		return 0;
+	}
+
+	if (target->getLineCount() < 1)
+		return 0;
+
+	return target->getLineAtHeight(locV) + 1;
+}
+
+int TextCastMember::locToCharPos(const Common::Point &loc) {
+	// "This function determines which individual character is closest to (or
+	// occupying) a given location in that Cast member ... The point is
+	// relative to the Cast member's upper left" (D8 Demystified, Lingo
+	// Lexicon, p. 904). The inverse of charPosToLoc, and it takes that
+	// function's own point: a baseline, not a line top.
+	Graphics::MacText *target = getWidget();
+	if (!target) {
+		warning("TextCastMember::locToCharPos(): no widget available, returning 0");
+		return 0;
+	}
+
+	if (target->getLineCount() < 1)
+		return 0;
+
+	return target->getCharIndexAtPoint(loc) + 1;
+}
+
 void TextCastMember::scrollByLine(int count) {
 	Graphics::MacText *target = getWidget();
 	target->scroll(count);
