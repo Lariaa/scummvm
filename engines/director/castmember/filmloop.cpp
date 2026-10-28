@@ -253,23 +253,40 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		}
 
 		if (src._cast == nullptr) {
-			// castLib -1 means "the enclosing movie's cast", i.e. the film loop's
-			// own cast -- resolve the cell there (this is what makes e.g. the
-			// Mission to Planet X walk cycle work).
+			// A film loop cell does not name a cast library. It names an index.
 			//
-			// From D8 on, a cell in the loop's own cast carries castLib 0 instead,
-			// and it has to be resolved the same way. A census of the film loop
-			// scores says the spelling simply changed: the D8.5 Adventskalender
-			// writes -1 throughout (BW_VORN 368, BW_HINTEN 367, BW_KUECHE 363),
-			// TKKG 14 writes 0 throughout (sc01 305 of 305, sc02 218 of 218), and
-			// TKKG 11, whose scenes are partly reused, holds both side by side
-			// (sc02: 39 on -1, 183 on 0). Skipping them cost TKKG 14 its talking
-			// heads -- every cell of those loops was dropped.
-			bool ownCast = src._castId.castLib == -1
-					|| (src._castId.castLib == 0 && g_director->getVersion() >= 800);
+			// Measured in Director MX (D-11) with a loop whose four cells came
+			// from three libraries at once: the cell from the internal cast was
+			// written as -1, the two from the first external cast as 0, the one
+			// from the second external cast as 1. So a value of n means
+			// castLib n + 2, and -1 means the cast the loop itself lives in.
+			//
+			// The index is absolute, not relative to the loop: a second probe
+			// whose single cell came from the second external cast wrote 1, not
+			// 0. That rules out the other reading the first probe allowed.
+			//
+			// And it is written once and never brought up to date. Insert a
+			// library in front of the artwork afterwards and every cell of every
+			// loop is off by one -- which is exactly what both shipped titles we
+			// measured look like. TKKG 11's sc01 writes 1 where Karl's and Tim's
+			// parts are in castLib 4; TKKG 14's writes 0 where the mouths and
+			// heads are in castLib 3. Decoded literally, TKKG 11 lands on a sound
+			// called "roll over Buttons" and TKKG 14 on members that do not exist.
+			// Director draws both titles correctly, so it cannot be following the
+			// number either.
+			//
+			// The index is therefore a hint, not an address: it adds weight to one
+			// candidate and the search below decides. Below D8 a non-negative value
+			// is something else again -- TKKG 5's Sz40 has a single cell naming
+			// castLib 0 for an arm from another cut of the scene, and Director
+			// leaves it blank -- so those keep being dropped.
+			bool ownCast = src._castId.castLib == -1;
+			bool indexed = src._castId.castLib >= 0 && g_director->getVersion() >= 800;
+			int hintedLib = indexed ? src._castId.castLib + 2 : -1;
 
-			if (ownCast && _cast != nullptr) {
-				src._cast = _cast->getCastMember(src._castId.member, true);
+			if (ownCast || indexed) {
+				if (ownCast && _cast != nullptr)
+					src._cast = _cast->getCastMember(src._castId.member, true);
 
 				// The loop's own cast is only the first place to look. TKKG 14
 				// keeps 3821 of its film loops in a movie's 74-slot internal cast
@@ -283,7 +300,9 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 				//
 				// So fall through to the movie's other libraries. The 15014 loops
 				// that do live beside their cells are answered by the line above
-				// and never reach this.
+				// and never reach this. A cell carrying an index comes straight
+				// here: the library it points at is weighed with the rest rather
+				// than believed, because the index is routinely out of date.
 				if (!src._cast) {
 					Movie *movie = g_director->getCurrentMovie();
 					const Common::HashMap<int, Cast *> *casts = movie ? movie->getCasts() : nullptr;
@@ -327,6 +346,13 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 								rank += 1;
 							if (found->_initialRect.width() == wantW && found->_initialRect.height() == wantH)
 								rank += 2;
+							// The cell's own index, worth less than a size match so
+							// that a stale one cannot beat the right member. TKKG 11
+							// is why: its index points at MapMenuBar, where member 72
+							// is a sound, while Scene01's 72 is Karl standing still
+							// and 73x47 like the cell says.
+							if (libs[i] == hintedLib)
+								rank += 1;
 
 							// Ties keep the lowest library, as before.
 							if (rank > bestRank) {
@@ -341,22 +367,19 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 				// is null here, so there is nothing to release first
 				if (src._cast)
 					src._cast->incRefCount();
-			} else {
-				// Below D8, castLib 0 is not that: it is the odd cell left over from
-				// another cut of a scene, and Director leaves it blank. TKKG 5's
-				// Sz40 has exactly one, member 73 "040_1b/2_HB_ar06" -- Mr
-				// Bleibtreu's arm from scene variant 1b/2 -- inside loop 25
-				// "GS FB stizt +blinzelt", which plays variant 1a, where he is not
-				// in the room. 70 of the 303 castLib warnings in one run were that
-				// single cell; every other one named castLib -1.
-				//
-				// Everything else lands here too, and that is not always harmless:
-				// TKKG 11's sc01 writes castLib *1* in the cells of Karl_blink and
-				// Tim_blink while the artwork lives in castLib 4 (Scene01), so all
-				// six and all four cells are dropped and both boys are missing from
-				// the schoolyard -- the loops themselves stand in the score from
-				// frame 2. Six runs never showed it, because this continue said
-				// nothing. Say which cell goes and what it asked for.
+			}
+
+			// Nothing in the movie answers for this cell. Carrying it on only
+			// earns a blank and a "No source surface" somewhere further down, so
+			// drop it -- but say so. Six runs went past TKKG 11's missing boys
+			// because the old code dropped them here without a word.
+			if (!src._cast) {
+				// One of these is expected and right: below D8 a non-negative
+				// castLib is the odd cell left over from another cut of a scene,
+				// and Director leaves it blank. TKKG 5's Sz40 has exactly one,
+				// member 73 "040_1b/2_HB_ar06" -- Mr Bleibtreu's arm from scene
+				// variant 1b/2 -- inside loop 25 "GS FB stizt +blinzelt", which
+				// plays variant 1a, where he is not in the room.
 				debugC(3, kDebugImages, "FilmLoopCastMember::getSubChannels(): cast %d, frame %d: dropping cell from channel %d of loop frame %d -- it names %s, which does not resolve",
 						_castId, frame, iter.channel, iter.frame, src._castId.asString().c_str());
 				continue;
