@@ -925,7 +925,15 @@ int MacFontManager::getFamilyId(int newId, int newSlant) {
 	if (_fontInfo.contains(newId + newSlant)) {
 		return newId + newSlant;
 	}
-	warning("MacFontManager::getFamilyId(): No font with slant %d found, setting to kMacFontRegular", newSlant);
+	// Falling back on the regular cut is what Director does, not a defect.
+	// Measured in Director MX with TKKG 13's embedded EurostileT-Medi, a
+	// family with only a regular cut: at 160 pt the line stays 172 px high
+	// whether #plain or #bold is asked for, while Arial -- which does have a
+	// bold cut -- grows from 183 to 188. Director takes the request (the
+	// fontStyle reads back as [#bold]) and still draws the one cut it has.
+	// As a warning this fires for every run of such a family and buries the
+	// log.
+	debugC(5, kDebugLevelMacGUI, "MacFontManager::getFamilyId(): no font with slant %d, drawing the regular cut", newSlant);
 	return newId;
 }
 
