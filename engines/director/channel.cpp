@@ -63,6 +63,7 @@ Channel::Channel(Score *sc, Sprite *sp, int priority) {
 	_stopTime = 0;
 
 	_filmLoopFrame = 0;
+	_filmLoopFrameShown = false;
 
 	_visible = true;
 	_widgetDirty = true;
@@ -99,6 +100,7 @@ Channel& Channel::operator=(const Channel &channel) {
 	_stopTime = channel._stopTime;
 
 	_filmLoopFrame = channel._filmLoopFrame;
+	_filmLoopFrameShown = channel._filmLoopFrameShown;
 
 	_visible = channel._visible;
 	_widgetDirty = channel._widgetDirty;
@@ -876,6 +878,7 @@ void Channel::setCast(CastMemberID memberID) {
 			// 46 times in one TKKG 14 session, which is a figure standing
 			// there without the head its one-cell loop holds.
 			_filmLoopFrame = 0;
+			_filmLoopFrameShown = false;
 		}
 	}
 
@@ -1122,6 +1125,7 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 		// if there's a brand new film loop in the new sprite, reset the frame counter
 		if (nextSprite->_cast && nextSprite->_cast->_type == kCastFilmLoop) {
 			_filmLoopFrame = 0;
+			_filmLoopFrameShown = false;
 		}
 	}
 

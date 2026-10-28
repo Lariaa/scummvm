@@ -1002,6 +1002,24 @@ void Score::incrementFilmLoops() {
 		} else if (type == kCastFilmLoop && !filmLoopsFrozen) {
 			FilmLoopCastMember *fl = ((FilmLoopCastMember *)it->_sprite->_cast);
 			if (fl->_score && !fl->_score->_scoreCache.empty()) {
+				// Director draws the cell the loop stands on and steps the
+				// counter afterwards, so a freshly set counter owes its first
+				// cell one turn on the Stage before it moves on.
+				//
+				// Measured in Director MX (D-5): a three-cell looping film
+				// loop sampled over ten renders gives 1,2,3,1,2,3... with the
+				// first render showing cell 1, and after the last cell it
+				// comes back round to the first. This function runs just
+				// before Window::render() at each of its call sites, so
+				// letting the counter stand still the first time through
+				// yields exactly that sequence; advancing right away showed
+				// cell 2 first and never showed cell 1 at all until the loop
+				// wrapped -- and a loop that does not repeat never showed it.
+				if (!it->_filmLoopFrameShown) {
+					it->_filmLoopFrameShown = true;
+					continue;
+				}
+
 				if (fl->_looping) {
 					it->_filmLoopFrame += 1;
 					it->_filmLoopFrame %= fl->_score->_scoreCache.size();
