@@ -399,6 +399,44 @@ void Score::setCurrentFrame(uint16 frameId) {
 	_nextFrame = frameId;
 }
 
+// A `go` inside the current movie does not just mark where the play head goes
+// next: Director reads the destination frame into the channels straight away,
+// before the calling handler runs its next line. Measured in Director MX, two
+// movies and five runs -- a channel that was empty the line before carries the
+// destination frame's member, position and ink the line after, and the sprite
+// behaviours of the spans starting there get their beginSprite in between.
+//
+// FFFM's text pages live on that. They call go("CdBase1"), *then*
+// puppetSprite(48, 1), then set the member -- so by the time the channel is
+// puppeted it already holds the score's (29,59) and Background Transparent, and
+// the puppet freezes exactly that. Here the jump only set _nextFrame, so the
+// puppet froze an empty channel and the page was drawn at 0,0 with Copy.
+//
+// This reads the frame in; the play head still advances through the normal
+// cycle afterwards, so the frame's own events keep their usual order. Loading
+// the same frame twice is idempotent: updateCurrentFrame() then takes its
+// same-frame branch, which re-syncs the channels and is a no-op for anything
+// Lingo has since puppeted.
+void Score::applyNextFrameToChannels() {
+	if (!_nextFrame || (uint32)_nextFrame == _curFrameNumber)
+		return;
+	// Past the last frame the normal cycle has its own end-of-movie handling.
+	if (_window->_playbackPaused || (uint32)_nextFrame >= _numFrames)
+		return;
+	if (!loadFrame(_nextFrame, true))
+		return;
+
+	// Only a real delta record says anything about what the score reasserts;
+	// the blanket mask of a backwards jump would release every latch.
+	for (uint ch = 0; ch < _channels.size(); ch++) {
+		uint32 copyBackMask = _currentFrame->_sprites[ch]->_copyBackMask;
+		if (copyBackMask != static_cast<uint32>(kSCBNoMask))
+			_channels[ch]->_sprite->releaseAutoPuppet(copyBackMask);
+	}
+
+	updateSprites(kRenderModeNormal, true, true);
+}
+
 bool Score::isWaitingForNextFrame() {
 	bool keepWaiting = false;
 	debugC(8, kDebugEvents, "Score::isWaitingForNextFrame(): nextFrameTime: %d, time: %d, sound: %d, click: %d, video: %d", _nextFrameTime, g_system->getMillis(false), _waitForChannel, _waitForClick, _waitForVideoChannel);
