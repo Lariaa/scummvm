@@ -176,6 +176,13 @@ struct SoundChannel {
 	// gap in front of the first cue point; see processCuePoints().
 	uint32 streamStartTime;
 	int cueWaitPolls;
+	// The same gap seen from two steps further back: how many times the pump ran
+	// at all since the stream started, and how many of those reached this
+	// channel instead of leaving at one of the guards above the silence test.
+	// Measured in TKKG 14: the silence test is never the one that holds a line's
+	// first cue back, so the wait sits in front of it.
+	uint32 cuePumpTicksAtStart;
+	int cueVisits;
 	// Which cast member's cue points apply to what is playing. Normally that is
 	// lastPlayedSound, but a linked file is played by name and deliberately
 	// leaves that empty, so the member is remembered here instead.
@@ -203,7 +210,7 @@ struct SoundChannel {
 
 	SoundChannel(): handle(), lastPlayedSound(SoundID()), stopOnZero(true), fromLastMovie(false), volume(255), originalRate(-1),
 		pitchShiftPercent(100), fade(nullptr), puppet(SoundID()), newPuppet(false), movieChanged(false), loopPtr(nullptr),
-		lastCuePointIndex(-1), streamStartTime(0), cueWaitPolls(0), loopsRemaining(0),
+		lastCuePointIndex(-1), streamStartTime(0), cueWaitPolls(0), cuePumpTicksAtStart(0), cueVisits(0), loopsRemaining(0),
 		playListActive(false), paused(false) {}
 };
 
@@ -222,6 +229,11 @@ private:
 	Common::String _currentSoundName;
 
 	bool _enable;
+
+	// How often processCuePoints() has been entered at all. A channel's own
+	// counters are read against this, so that "the pump never ran" and "the pump
+	// ran but left before this channel" tell themselves apart.
+	uint32 _cuePumpTicks;
 
 	Common::Array<AudioDecoder *> _sampleSounds[kNumSampledMenus];
 

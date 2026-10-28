@@ -60,6 +60,7 @@ DirectorSound::DirectorSound(Window *window) : _window(window) {
 	_speaker->init();
 
 	_enable = true;
+	_cuePumpTicks = 0;
 }
 
 DirectorSound::~DirectorSound() {
@@ -84,6 +85,8 @@ void DirectorSound::noteStreamStart(int soundChannel) {
 	// of a line's first cue point against.
 	_channels[soundChannel]->streamStartTime = g_system->getMillis();
 	_channels[soundChannel]->cueWaitPolls = 0;
+	_channels[soundChannel]->cuePumpTicksAtStart = _cuePumpTicks;
+	_channels[soundChannel]->cueVisits = 0;
 }
 
 void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemberID cuePointSource) {
@@ -1056,8 +1059,14 @@ uint8 DirectorSound::getChannelFaderR(int channel) {
 }
 
 void DirectorSound::processCuePoints() {
+	_cuePumpTicks++;
+
 	for (auto &it : _channels) {
 		SoundChannel *channel = it._value;
+
+		// Counted before every guard below, so that a channel which is never
+		// looked at can be told from one the pump never reached at all.
+		channel->cueVisits++;
 
 		// A linked file names the member it was played for; everything else is
 		// found through the sound that last started on the channel.
@@ -1097,19 +1106,23 @@ void DirectorSound::processCuePoints() {
 
 		uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
 
-		// The fix above did not help: the first cue of a line is still some
-		// 159 ms late, while every later cue of the same file lands within
-		// 8 ms and fifteen of them go out dead on time. So the poll loop is
-		// fast enough and the delay sits in front of its first usable turn --
-		// either the mixer takes that long to call the channel active, or it
-		// already reports a sizeable elapsed time when it does. Say which of
-		// the two it is, once per sound.
+		// The fix above did not help, and the first run of this line said why it
+		// cannot: over 49 lines of TKKG 14's sc01 the silence test fired *zero*
+		// times, while the mixer already reported some 165 ms elapsed by the
+		// first poll that got here. The wait therefore sits in front of the
+		// silence test, and the two ways that can happen look the same from
+		// here -- the pump may not run at all in that window, or it may run and
+		// leave at one of the guards above. The tick and visit counts separate
+		// them: no ticks means the frame loop never came round, ticks without
+		// visits means this channel was passed over.
 		if (channel->streamStartTime) {
-			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): channel %d: first poll with an active channel came %d ms after the stream reached the mixer, after %d polls that found it silent; the mixer already reports %d ms elapsed, and cue point 1 is due at %d ms",
-					it._key, g_system->getMillis() - channel->streamStartTime, channel->cueWaitPolls,
+			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): channel %d: first poll with an active channel came %d ms after the stream reached the mixer, after %d pump runs, %d visits to this channel and %d polls that found it silent; the mixer already reports %d ms elapsed, and cue point 1 is due at %d ms",
+					it._key, g_system->getMillis() - channel->streamStartTime,
+					_cuePumpTicks - channel->cuePumpTicksAtStart, channel->cueVisits, channel->cueWaitPolls,
 					elapsedTime, soundCast->_cuePoints[0]);
 			channel->streamStartTime = 0;
 			channel->cueWaitPolls = 0;
+			channel->cueVisits = 0;
 		}
 
 		for (uint i = channel->lastCuePointIndex + 1; i < soundCast->_cuePoints.size(); i++) {
