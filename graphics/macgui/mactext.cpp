@@ -542,11 +542,54 @@ Common::Point MacText::getCharPosition(int index) {
 	for (uint i = 0; i < chunkNum && i < _canvas._text[lineNum].chunks.size(); i++)
 		col += _canvas._text[lineNum].chunks[i].text.size();
 
-	// Take the height first: getLineWidth() returns as soon as it reaches the
-	// column it was given, and leaves the row's height uncomputed.
-	int bottom = _canvas._text[lineNum].y + _canvas.getLineHeight(lineNum);
+	// Measure the row first: getLineWidth() returns as soon as it reaches the
+	// column it was given, and leaves the row's own metrics uncomputed.
+	int baseline = _canvas._text[lineNum].y + _canvas.getLineAscent(lineNum);
 
-	return Common::Point(_canvas.getAlignOffset(lineNum) + _canvas.getLineWidth(lineNum, false, col), bottom);
+	return Common::Point(_canvas.getAlignOffset(lineNum) + _canvas.getLineWidth(lineNum, false, col), baseline);
+}
+
+int MacText::getLineTop(int line) {
+	if (line < 0 || (uint)line >= _canvas._text.size())
+		return 0;
+
+	return _canvas._text[line].y;
+}
+
+int MacText::getLineAtHeight(int y) {
+	if (_canvas._text.empty())
+		return 0;
+
+	// Clamp before asking: past the bottom getRowCol() reaches for the
+	// canvas surface to find its right edge, and that surface is only
+	// allocated once the text has been rendered.
+	int row = 0;
+	getRowCol(0, CLIP(y, 0, _canvas._textMaxHeight), nullptr, nullptr, &row, nullptr);
+
+	return row;
+}
+
+int MacText::getCharIndexAtPoint(const Common::Point &loc) {
+	if (_canvas._text.empty())
+		return 0;
+
+	// A point past the bottom asks for the character closest to it, which is
+	// the one at that width on the last line. Clamping also keeps getRowCol()
+	// away from the canvas surface, which only exists once rendered.
+	int row = 0, col = 0;
+	getRowCol(loc.x, CLIP<int>(loc.y, 0, _canvas._textMaxHeight), nullptr, nullptr, &row, &col);
+
+	// Count up to the row the point landed in, exactly the way
+	// getChunkPosFromIndex() counts down: a hard line break is one character
+	// of the text, a soft wrap is none.
+	int index = 0;
+	for (int i = 0; i < row; i++) {
+		index += _canvas.getLineCharWidth(i);
+		if (_canvas._text[i].paragraphEnd)
+			index++;
+	}
+
+	return index + col;
 }
 
 void setTextColorCallback(MacFontRun &macFontRun, int color) {

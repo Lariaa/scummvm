@@ -1068,6 +1068,29 @@ int MacTextCanvas::getLineHeight(int line) {
 	return _text[line].height;
 }
 
+int MacTextCanvas::getLineAscent(int line) {
+	if ((uint)line >= _text.size())
+		return 0;
+
+	int ascent = 0;
+
+	for (uint i = 0; i < _text[line].chunks.size(); i++) {
+		const Font *font = _text[line].chunks[i].getFont();
+		if (!font)
+			continue;
+
+		// Font::getFontAscent() answers -1 when it does not know, so take the
+		// whole height then -- no glyph reaches above that.
+		int chunkAscent = font->getFontAscent();
+		if (chunkAscent < 0)
+			chunkAscent = font->getFontHeight();
+
+		ascent = MAX(ascent, chunkAscent);
+	}
+
+	return ascent;
+}
+
 void MacTextCanvas::recalcDims() {
 	if (_text.empty())
 		return;

@@ -167,11 +167,37 @@ public:
 	void getChunkPosFromIndex(int index, uint &lineNum, uint &chunkNum, uint &offset);
 	/**
 	 * Where a character sits in the laid-out text, in the text's own
-	 * coordinates: x is its left edge, y the bottom of the line holding it.
+	 * coordinates: x is its left edge, y the baseline of the line holding it.
 	 *
 	 * @param index 0-based character offset into the text
 	 */
 	Common::Point getCharPosition(int index);
+
+	/**
+	 * The top edge of a laid-out line, in the text's own coordinates.
+	 *
+	 * @param line 0-based line number, counted after word wrapping
+	 */
+	int getLineTop(int line);
+
+	/**
+	 * Which laid-out line covers a given height, in the text's own
+	 * coordinates. A height above or below the text answers the first or the
+	 * last line.
+	 *
+	 * @param y distance from the top of the text
+	 * @return 0-based line number, counted after word wrapping
+	 */
+	int getLineAtHeight(int y);
+
+	/**
+	 * Which character covers a given point, in the text's own coordinates.
+	 * The inverse of getCharPosition().
+	 *
+	 * @param loc point measured from the top left of the text
+	 * @return 0-based character offset into the text
+	 */
+	int getCharIndexAtPoint(const Common::Point &loc);
 	void getRowCol(int x, int y, int *sx, int *sy, int *row, int *col, int *chunk_ = nullptr);
 	void getLineCharacter(int x, int y, int *sx, int *sy, int *line, int *character, int *chunk_ = nullptr);
 	Common::U32String getTextChunk(int startRow, int startCol, int endRow, int endCol, bool formatted = false, bool newlines = true);
