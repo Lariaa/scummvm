@@ -72,6 +72,12 @@ public:
 
 	// Where the given character sits inside the member, counting from one.
 	Common::Point charPosToLoc(int charPos);
+	// How far down the member the given line sits, counting from one.
+	int linePosToLocV(int linePos);
+	// Which line covers a height, and which character a point. Both count
+	// from one, and both answer 0 for a member that has no text laid out.
+	int locVToLinePos(int locV);
+	int locToCharPos(const Common::Point &loc);
 
 	Common::String getTextFont();
 	Common::String getTextFont(int start, int end);
