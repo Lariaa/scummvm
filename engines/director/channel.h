@@ -126,6 +126,11 @@ public:
 
 	// Used in film loops
 	uint _filmLoopFrame;
+	// Director draws the cell a film loop stands on and only steps the counter
+	// afterwards, so a counter that has just been set has a cell still owed to
+	// it. This records whether that first cell has had its turn.
+	// See Score::incrementFilmLoops().
+	bool _filmLoopFrameShown;
 
 	Common::Rect _rollOverBbox;
 	Common::Rect _lastRenderedBbox;
