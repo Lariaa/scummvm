@@ -349,6 +349,16 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 				// "GS FB stizt +blinzelt", which plays variant 1a, where he is not
 				// in the room. 70 of the 303 castLib warnings in one run were that
 				// single cell; every other one named castLib -1.
+				//
+				// Everything else lands here too, and that is not always harmless:
+				// TKKG 11's sc01 writes castLib *1* in the cells of Karl_blink and
+				// Tim_blink while the artwork lives in castLib 4 (Scene01), so all
+				// six and all four cells are dropped and both boys are missing from
+				// the schoolyard -- the loops themselves stand in the score from
+				// frame 2. Six runs never showed it, because this continue said
+				// nothing. Say which cell goes and what it asked for.
+				debugC(3, kDebugImages, "FilmLoopCastMember::getSubChannels(): cast %d, frame %d: dropping cell from channel %d of loop frame %d -- it names %s, which does not resolve",
+						_castId, frame, iter.channel, iter.frame, src._castId.asString().c_str());
 				continue;
 			}
 		}
