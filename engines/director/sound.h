@@ -170,6 +170,12 @@ struct SoundChannel {
 	int originalRate;
 	FadeParams *fade;
 	int lastCuePointIndex;
+
+	// When the stream now playing was handed to the mixer, and how many cue
+	// point polls have since found the channel silent. Only used to report the
+	// gap in front of the first cue point; see processCuePoints().
+	uint32 streamStartTime;
+	int cueWaitPolls;
 	// Which cast member's cue points apply to what is playing. Normally that is
 	// lastPlayedSound, but a linked file is played by name and deliberately
 	// leaves that empty, so the member is remembered here instead.
@@ -197,7 +203,8 @@ struct SoundChannel {
 
 	SoundChannel(): handle(), lastPlayedSound(SoundID()), stopOnZero(true), fromLastMovie(false), volume(255), originalRate(-1),
 		pitchShiftPercent(100), fade(nullptr), puppet(SoundID()), newPuppet(false), movieChanged(false), loopPtr(nullptr),
-		lastCuePointIndex(-1), loopsRemaining(0), playListActive(false), paused(false) {}
+		lastCuePointIndex(-1), streamStartTime(0), cueWaitPolls(0), loopsRemaining(0),
+		playListActive(false), paused(false) {}
 };
 
 class DirectorSound {
@@ -223,6 +230,8 @@ public:
 	~DirectorSound();
 
 	SoundChannel *getChannel(int soundChannel);
+	// Remembers when a stream reached the mixer, for the cue point diagnosis.
+	void noteStreamStart(int soundChannel);
 	void playFile(Common::String filename, int soundChannel, CastMemberID cuePointSource = CastMemberID());
 	void playMCI(Audio::AudioStream &stream, uint32 from, uint32 to);
 	void playStream(Audio::AudioStream &stream, int soundChannel);
