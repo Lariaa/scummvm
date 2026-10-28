@@ -147,6 +147,20 @@ public:
 	 */
 	int getLineWidth(int line, bool enforce = false, int col = -1);
 	int getLineHeight(int line);
+
+	/**
+	 * Returns the line's ascent: the distance from the top of the line to the
+	 * baseline its glyphs sit on.
+	 *
+	 * Like the height, this is the largest value among the line's chunks, so a
+	 * line mixing fonts is as tall above the baseline as its tallest font
+	 * needs. A font that does not know its own ascent is taken at its full
+	 * height, which is the most it could be.
+	 *
+	 * @param line Line number
+	 * @return ascent in pixels, or 0 for non-existent lines
+	 */
+	int getLineAscent(int line);
 	int getLineCharWidth(int line, bool enforce = false);
 
 	void splitString(const Common::U32String &str, int curLine, MacFontRun &defaultFormatting);
