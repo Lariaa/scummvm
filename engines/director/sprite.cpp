@@ -392,16 +392,32 @@ bool Sprite::getEditable() {
 	return _editable || _cast->isEditable();
 }
 
-static bool scriptHandlesMouse(ScriptContext *script) {
+// A click goes only to a sprite that handles clicks. Rollover handlers do not
+// count: measured in Director MX (D-7f) with three stacked shapes, where the
+// topmost carried a script holding nothing but on mouseEnter and on mouseLeave.
+// Both of those fired with the currentSpriteNum of that top sprite, so its
+// script was live and reachable -- and a click in the middle of it went to the
+// sprite below all the same, with the clickOn reporting that lower sprite. So
+// such a sprite is a rollover target and not a click target.
+//
+// This is what the Adventskalender's day 2 is built on: ch 60 M2SoundPlay lies
+// over two buttons and does nothing but play a sound and show a preview on
+// rollover. Counting its handlers as click handlers made it swallow every click
+// meant for the buttons beneath it.
+static bool scriptHandlesClick(ScriptContext *script) {
 	return script && (script->_eventHandlers.contains(kEventMouseDown)
 				   || script->_eventHandlers.contains(kEventMouseUp)
-				   || script->_eventHandlers.contains(kEventMouseWithin)
-				   || script->_eventHandlers.contains(kEventMouseEnter)
-				   || script->_eventHandlers.contains(kEventMouseLeave)
 				   || script->_eventHandlers.contains(kEventMouseUpOutSide));
 }
 
-bool Sprite::respondsToMouse() {
+static bool scriptHandlesMouse(ScriptContext *script) {
+	return scriptHandlesClick(script)
+		|| (script && (script->_eventHandlers.contains(kEventMouseWithin)
+					|| script->_eventHandlers.contains(kEventMouseEnter)
+					|| script->_eventHandlers.contains(kEventMouseLeave)));
+}
+
+bool Sprite::respondsToMouseEvents(bool clicksOnly) {
 	if (_moveable)
 		return true;
 
@@ -423,21 +439,30 @@ bool Sprite::respondsToMouse() {
 	// gate the dispatcher already applies.
 	if (g_director->getVersion() >= 600) {
 		for (uint i = 0; i < _behaviors.size(); i++) {
-			if (scriptHandlesMouse(_movie->getScriptContext(kScoreScript, _behaviors[i].memberID)))
+			ScriptContext *behavior = _movie->getScriptContext(kScoreScript, _behaviors[i].memberID);
+			if (clicksOnly ? scriptHandlesClick(behavior) : scriptHandlesMouse(behavior))
 				return true;
 		}
 	}
 
 	ScriptContext *spriteScript = _movie->getScriptContext(kScoreScript, _scriptId);
 	if (spriteScript && (spriteScript->_eventHandlers.contains(kEventGeneric)
-					  || scriptHandlesMouse(spriteScript)))
+					  || (clicksOnly ? scriptHandlesClick(spriteScript) : scriptHandlesMouse(spriteScript))))
 		return true;
 
 	ScriptContext *castScript = _movie->getScriptContext(kCastScript, _castId);
-	if (scriptHandlesMouse(castScript))
+	if (clicksOnly ? scriptHandlesClick(castScript) : scriptHandlesMouse(castScript))
 		return true;
 
 	return false;
+}
+
+bool Sprite::respondsToMouse() {
+	return respondsToMouseEvents(false);
+}
+
+bool Sprite::respondsToClick() {
+	return respondsToMouseEvents(true);
 }
 
 bool Sprite::isActive() {

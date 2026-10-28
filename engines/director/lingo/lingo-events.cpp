@@ -154,7 +154,7 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 		if (g_director->getVersion() < 400)
 			spriteId = _score->getActiveSpriteIDFromPos(event.mousePos);
 		else
-			spriteId = _score->getMouseSpriteIDFromPos(event.mousePos);
+			spriteId = spriteUnderMouse(event.event, event.mousePos);
 
 		debugC(3, kDebugEvents, "Movie::resolveScriptEvent(%s): id: %d sourceType: %s, handlerType: %s, pos: [%d, %d], spriteId: %d",
 			leventType2str(event.event), event.eventId, scriptType2str(event.scriptType),
@@ -484,6 +484,24 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 	}
 }
 
+// Which sprite does this message belong to? A click stops at the topmost
+// sprite that handles clicks and runs past the ones that only roll over --
+// measured in Director MX, see Sprite::scriptHandlesClick(). Every other
+// mouse message still goes to the topmost sprite that takes mouse messages of
+// any kind, or the rollover sprite the click just passed would stop getting
+// its own events.
+uint16 Movie::spriteUnderMouse(LEvent event, Common::Point pos) {
+	switch (event) {
+	case kEventMouseDown:
+	case kEventMouseUp:
+	case kEventRightMouseDown:
+	case kEventRightMouseUp:
+		return _score->getClickSpriteIDFromPos(pos);
+	default:
+		return _score->getMouseSpriteIDFromPos(pos);
+	}
+}
+
 void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targetId, Common::Point pos) {
 	if (_nextEventId < 0)
 		_nextEventId = 0;
@@ -502,7 +520,7 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 		if (targetId != 0) {
 			pointedSpriteId = targetId;
 		} else if (event != kEventPrepareFrame) {
-			pointedSpriteId = _score->getMouseSpriteIDFromPos(pos);
+			pointedSpriteId = spriteUnderMouse(event, pos);
 		}
 	}
 
@@ -621,7 +639,7 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 		 * for the same event will be ignored unless the pass command was called.
 		 */
 
-		uint16 spriteId = _score->getMouseSpriteIDFromPos(pos);
+		uint16 spriteId = spriteUnderMouse(event, pos);
 		Sprite *sprite = _score->getSpriteById(spriteId);
 
 		switch (event) {

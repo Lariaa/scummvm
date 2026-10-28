@@ -1910,15 +1910,26 @@ uint16 Score::getSpriteIDFromPos(Common::Point pos) {
 // handler count. A behavior with e.g. only an on beginSprite handler must not capture
 // clicks, or the dispatcher would drop the resolved event and the click would never
 // reach a lower click-catcher sprite (e.g. TKKG5 Sz140's box-pushing playfield).
-static bool instancesHandleMouse(Channel *channel) {
-	static const LEvent mouseEvents[] = { kEventMouseDown, kEventMouseUp, kEventMouseWithin,
-										  kEventMouseEnter, kEventMouseLeave, kEventMouseUpOutSide };
+// Rollover handlers are left out when only clicks count, for the reason
+// Sprite::scriptHandlesClick() sets out: a rollover sprite is not a click
+// target, and treating it as one swallows the click meant for the sprite
+// beneath it.
+static bool instancesHandleMouse(Channel *channel, bool clicksOnly) {
+	static const LEvent clickEvents[] = { kEventMouseDown, kEventMouseUp, kEventMouseUpOutSide };
+	static const LEvent rollOverEvents[] = { kEventMouseWithin, kEventMouseEnter, kEventMouseLeave };
 	for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
 		const Datum &scriptInstance = channel->_scriptInstanceList[i];
 		if (scriptInstance.type != OBJECT || !scriptInstance.u.obj)
 			continue;
-		for (int j = 0; j < ARRAYSIZE(mouseEvents); j++) {
-			const char *name = g_lingo->_eventHandlerTypes[mouseEvents[j]];
+		for (int j = 0; j < ARRAYSIZE(clickEvents); j++) {
+			const char *name = g_lingo->_eventHandlerTypes[clickEvents[j]];
+			if (name && scriptInstance.u.obj->getMethod(name).type != VOIDSYM)
+				return true;
+		}
+		if (clicksOnly)
+			continue;
+		for (int j = 0; j < ARRAYSIZE(rollOverEvents); j++) {
+			const char *name = g_lingo->_eventHandlerTypes[rollOverEvents[j]];
 			if (name && scriptInstance.u.obj->getMethod(name).type != VOIDSYM)
 				return true;
 		}
@@ -1929,7 +1940,22 @@ static bool instancesHandleMouse(Channel *channel) {
 uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
-		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToMouse() || instancesHandleMouse(_channels[i])))
+		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToMouse() || instancesHandleMouse(_channels[i], false)))
+			return i;
+		else if (test == kCollisionHole)
+			break;
+	}
+
+	return 0;
+}
+
+// The same walk, but for a click: it stops at the topmost sprite that handles
+// clicks and runs past the ones that only roll over. Measured in Director MX
+// (D-7f) -- see Sprite::scriptHandlesClick().
+uint16 Score::getClickSpriteIDFromPos(Common::Point pos) {
+	for (int i = _channels.size() - 1; i >= 0; i--) {
+		CollisionTest test = _channels[i]->isMouseIn(pos);
+		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToClick() || instancesHandleMouse(_channels[i], true)))
 			return i;
 		else if (test == kCollisionHole)
 			break;
