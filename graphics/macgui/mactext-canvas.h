@@ -149,18 +149,22 @@ public:
 	int getLineHeight(int line);
 
 	/**
-	 * Returns the line's ascent: the distance from the top of the line to the
-	 * baseline its glyphs sit on.
+	 * Returns one chunk's ascent: the distance from the top of its line down
+	 * to the baseline of its own font.
 	 *
-	 * Like the height, this is the largest value among the line's chunks, so a
-	 * line mixing fonts is as tall above the baseline as its tallest font
-	 * needs. A font that does not know its own ascent is taken at its full
-	 * height, which is the most it could be.
+	 * Note this is NOT where the chunk's glyphs are drawn in a line that mixes
+	 * fonts -- render() puts them all on the line's common baseline, the
+	 * largest ascent in the row. It is the figure Director reports for a
+	 * character, which is a different thing; see MacText::getCharPosition().
+	 *
+	 * A font that does not know its own ascent is taken at its full height,
+	 * which is the most it could be.
 	 *
 	 * @param line Line number
-	 * @return ascent in pixels, or 0 for non-existent lines
+	 * @param chunk Chunk number within the line
+	 * @return ascent in pixels, or 0 if there is no such chunk
 	 */
-	int getLineAscent(int line);
+	int getChunkAscent(int line, int chunk);
 	int getLineCharWidth(int line, bool enforce = false);
 
 	void splitString(const Common::U32String &str, int curLine, MacFontRun &defaultFormatting);

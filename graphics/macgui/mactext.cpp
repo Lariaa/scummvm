@@ -544,7 +544,19 @@ Common::Point MacText::getCharPosition(int index) {
 
 	// Measure the row first: getLineWidth() returns as soon as it reaches the
 	// column it was given, and leaves the row's own metrics uncomputed.
-	int baseline = _canvas._text[lineNum].y + _canvas.getLineAscent(lineNum);
+	//
+	// The ascent is the one belonging to the character's own chunk, not the
+	// row's largest. In a row that mixes font sizes that is NOT where the
+	// glyph is drawn -- render() puts every chunk on the row's common
+	// baseline -- but it is the figure Director reports, measured in
+	// Director MX: a field reading "ABCDEFGH" in Arial, four characters at
+	// 12 pt and four at 48 pt, answers y = 14 inside the small run and 47
+	// inside the large one, which are exactly the two fonts' own ascents
+	// (Arial alone gives 14 at 12 pt and 47 at 48 pt). The row's lineHeight
+	// is 58, the large font's, so Director takes the height from the whole
+	// row and the baseline from the one run. Games read this number, so this
+	// is the number to answer.
+	int baseline = _canvas._text[lineNum].y + _canvas.getChunkAscent(lineNum, chunkNum);
 
 	return Common::Point(_canvas.getAlignOffset(lineNum) + _canvas.getLineWidth(lineNum, false, col), baseline);
 }
