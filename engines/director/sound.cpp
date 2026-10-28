@@ -25,6 +25,7 @@
 
 #include "audio/audiostream.h"
 #include "common/file.h"
+#include "common/system.h"
 #include "common/macresman.h"
 #include "common/substream.h"
 #include "common/xpfloat.h"
@@ -75,6 +76,16 @@ SoundChannel *DirectorSound::getChannel(int soundChannel) {
 	return _channels[soundChannel];
 }
 
+void DirectorSound::noteStreamStart(int soundChannel) {
+	if (!assertChannel(soundChannel))
+		return;
+
+	// Diagnosis only: the clock processCuePoints() measures the gap in front
+	// of a line's first cue point against.
+	_channels[soundChannel]->streamStartTime = g_system->getMillis();
+	_channels[soundChannel]->cueWaitPolls = 0;
+}
+
 void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemberID cuePointSource) {
 	if (!assertChannel(soundChannel))
 		return;
@@ -106,6 +117,7 @@ void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemb
 	debugC(1, kDebugSound, "DirectorSound::playFile(): channel %d, '%s', enabled: %d, volume: %d (default %d)",
 		soundChannel, filename.c_str(), _enable, getChannelVolume(soundChannel), g_director->_defaultVolume);
 	_mixer->playStream(Audio::Mixer::kSFXSoundType, &_channels[soundChannel]->handle, sound, -1, getChannelVolume(soundChannel));
+	noteStreamStart(soundChannel);
 	_channels[soundChannel]->originalRate = (int)_mixer->getChannelRate(_channels[soundChannel]->handle);
 	if (_channels[soundChannel]->pitchShiftPercent != 100) {
 		_mixer->setChannelRate(_channels[soundChannel]->handle, _channels[soundChannel]->originalRate*_channels[soundChannel]->pitchShiftPercent/100);
@@ -173,6 +185,7 @@ void DirectorSound::playStream(Audio::AudioStream &stream, int soundChannel) {
 
 
 	_mixer->playStream(Audio::Mixer::kSFXSoundType, &_channels[soundChannel]->handle, &stream, -1, getChannelVolume(soundChannel));
+	noteStreamStart(soundChannel);
 	_channels[soundChannel]->originalRate = (int)_mixer->getChannelRate(_channels[soundChannel]->handle);
 	if (_channels[soundChannel]->pitchShiftPercent != 100) {
 		_mixer->setChannelRate(_channels[soundChannel]->handle, _channels[soundChannel]->originalRate*_channels[soundChannel]->pitchShiftPercent/100);
@@ -1077,10 +1090,27 @@ void DirectorSound::processCuePoints() {
 		// 226 ms late (mean 158), while every later cue of the same file averaged
 		// 20 ms. Ask whether the channel is playing instead -- then a cue due at 0
 		// goes out as soon as it is.
-		if (!isChannelActive(it._key))
+		if (!isChannelActive(it._key)) {
+			channel->cueWaitPolls++;
 			continue;
+		}
 
 		uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
+
+		// The fix above did not help: the first cue of a line is still some
+		// 159 ms late, while every later cue of the same file lands within
+		// 8 ms and fifteen of them go out dead on time. So the poll loop is
+		// fast enough and the delay sits in front of its first usable turn --
+		// either the mixer takes that long to call the channel active, or it
+		// already reports a sizeable elapsed time when it does. Say which of
+		// the two it is, once per sound.
+		if (channel->streamStartTime) {
+			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): channel %d: first poll with an active channel came %d ms after the stream reached the mixer, after %d polls that found it silent; the mixer already reports %d ms elapsed, and cue point 1 is due at %d ms",
+					it._key, g_system->getMillis() - channel->streamStartTime, channel->cueWaitPolls,
+					elapsedTime, soundCast->_cuePoints[0]);
+			channel->streamStartTime = 0;
+			channel->cueWaitPolls = 0;
+		}
 
 		for (uint i = channel->lastCuePointIndex + 1; i < soundCast->_cuePoints.size(); i++) {
 			int32 cuePoint = soundCast->_cuePoints[i];
