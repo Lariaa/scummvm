@@ -134,6 +134,11 @@ void Lingo::func_goto(Datum &frame, Datum &movie, bool calledfromgo) {
 	// Since the frames are not going to be consecutive, we might run into
 	// an endge case, so better kill behaviors proactively.
 	score->killScriptInstances(score->getNextFrame());
+
+	// Director reads the destination frame into the channels right here, before
+	// the calling handler runs its next line -- see Score::applyNextFrameToChannels().
+	// The play head still advances through the normal cycle afterwards.
+	score->applyNextFrameToChannels();
 }
 
 void Lingo::func_gotoloop() {
