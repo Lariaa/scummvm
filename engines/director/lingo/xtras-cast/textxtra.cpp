@@ -114,7 +114,25 @@ static Common::Array<Section> readSections(const Common::Array<byte> &data) {
 // repeat it as often as the byte after them says. A blob (0x00 length ','
 // bytes) counts as one value and is skipped here -- only the font table and
 // the text hold those, and both are read on their own.
-static Common::Array<int32> sectionValues(const Common::Array<byte> &data, const Section &sec) {
+//
+// `perSlot` is for the two sections that are not value streams at all but
+// tables of two-field entries, a character offset and a record number. There
+// a repeat byte stands for exactly ONE field however high its low nibble is,
+// because that nibble is the field's own type marker -- the same 0x01/0x02
+// the spelled-out values carry, 0x02 for the offset and 0x01 for the number.
+// Over 13482 files the markers alternate 02, 01, 02, 01 in 3951 of 3951 run
+// tables and 2811 of 2811 paragraph tables, and reading one value per token
+// makes every one of them come out with `count` entries, ascending offsets
+// and in-range record numbers. Expanding the nibble instead breaks 116 run
+// tables and 31 paragraph tables, and no table in the corpus carries a
+// 0xc1/0xc2, whose count is explicit and stays honoured either way.
+//
+// In the style records of section 0006 the nibble really is a count, which
+// is why this is a flag rather than a change for everyone: the white run
+// background is stored there as one 0xffff plus two repeat bytes, and only
+// expanding them puts the font, the colour and the point size on the offsets
+// the records are read at.
+static Common::Array<int32> sectionValues(const Common::Array<byte> &data, const Section &sec, bool perSlot = false) {
 	Common::Array<int32> out;
 	uint32 i = sec.start;
 
@@ -139,7 +157,7 @@ static Common::Array<int32> sectionValues(const Common::Array<byte> &data, const
 			i = j;
 		} else if (c == 0x81 || c == 0x82) {
 			int32 last = out.empty() ? 0 : out.back();
-			for (int n = c & 0xf; n > 0; n--)
+			for (int n = perSlot ? 1 : (c & 0xf); n > 0; n--)
 				out.push_back(last);
 			i++;
 		} else if ((c == 0xc1 || c == 0xc2) && i + 1 < sec.end) {
@@ -415,10 +433,10 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 			}
 			break;
 		case 0x0004:
-			runValues = sectionValues(data, sec);
+			runValues = sectionValues(data, sec, true);
 			break;
 		case 0x0005:
-			paraRunValues = sectionValues(data, sec);
+			paraRunValues = sectionValues(data, sec, true);
 			break;
 		case 0x0006:
 			styleValues = sectionValues(data, sec);
@@ -591,8 +609,15 @@ bool readXMEDStyles(const Common::Array<byte> &data, StyleRuns &out) {
 	// with a last entry one past the end of the text.
 	for (uint32 i = 0; i + 1 < runValues.size(); i += 2) {
 		uint32 index = (uint32)runValues[i + 1];
-		if (index >= styles.size())
+		if (index >= styles.size()) {
+			// Dropping one silently is how TKKG 10's title card lost the run
+			// that sets its second line, and nothing in the log said so: the
+			// member simply drew that line in the style of the one before it.
+			debugC(3, kDebugText, "readXMEDStyles(): run %d starts at character %d and names style %d, "
+					"but the document holds %d; leaving the run out",
+					i / 2, runValues[i], index, (int)styles.size());
 			continue;
+		}
 
 		StyleRun run;
 		run.offset = (uint32)MAX<int32>(0, runValues[i]);
