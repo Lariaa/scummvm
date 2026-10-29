@@ -1092,19 +1092,21 @@ void DirectorSound::processCuePoints() {
 		if (soundCast->_cuePoints.empty())
 			continue;
 
-		// A cue point authored at 0 is due the moment the sound starts, and the
-		// mixer answers 0 for the elapsed time until it has consumed the first
-		// samples. Skipping the channel over that window held back the first cue
-		// of every line: over 49 lines of TKKG 14's sc01, cue 1 went out 130 to
-		// 226 ms late (mean 158), while every later cue of the same file averaged
-		// 20 ms. Ask whether the channel is playing instead -- then a cue due at 0
-		// goes out as soon as it is.
-		if (!isChannelActive(it._key)) {
+		uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
+
+		// This guard once looked like the reason a line's first cue point went
+		// out some 160 ms late in TKKG 14, since a cue authored at 0 cannot fire
+		// while the mixer still answers 0. Asking isChannelActive() instead
+		// changed the figure by one millisecond, and the counters below then
+		// showed why: the pump does not run at all in that window, so what it
+		// would have asked never came up. That measurement turned out to be
+		// about a path TKKG 14 does not even take -- its Soundplay_Obj has no
+		// cuePassed handler and times the mouths itself off sound(3).currentTime
+		// -- so the swap had nothing to show for itself and is gone again.
+		if (!elapsedTime) {
 			channel->cueWaitPolls++;
 			continue;
 		}
-
-		uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
 
 		// The fix above did not help, and the first run of this line said why it
 		// cannot: over 49 lines of TKKG 14's sc01 the silence test fired *zero*
