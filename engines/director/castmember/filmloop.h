@@ -82,6 +82,11 @@ public:
 	void writeSCVWResource(Common::SeekableWriteStream *writeStream, uint32 offset);
 	uint32 getSCVWResourceSize();
 
+	// Which library the cells carrying this castLib value really come from.
+	// Decided once for the whole loop, because a per-cell guess is not stable
+	// from frame to frame -- see the comment on the definition.
+	Cast *castForCellLib(int cellLib);
+
 	// raw CASt flag word; MovieCastMember reads its enableScripts bit (0x10)
 	uint32 _flags;
 	bool _enableSound;
@@ -100,6 +105,12 @@ public:
 	uint32 _cachedForeColor;
 	uint32 _cachedBackColor;
 	uint16 _cachedMovieFrame;
+
+	// castLib value as the cells spell it -> the library it was decided to mean.
+	// A null entry means the vote found nothing and the per-cell search decides.
+	// Thrown away when the movie changes, since the numbers are that movie's.
+	Common::HashMap<int, Cast *> _cellCasts;
+	Movie *_cellCastsMovie;
 
 	Score *_score;
 };
