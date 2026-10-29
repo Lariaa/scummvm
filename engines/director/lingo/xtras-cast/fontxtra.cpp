@@ -170,8 +170,11 @@ void FontXtraCastMember::load() {
 		if (parsed) {
 			FontXtra::collectAdvanceWidths(pfr, widths);
 			if (!widths.empty()) {
+				// The ascent and the descent come from the auxiliary records
+				// and may be absent; 0 then leaves the substitute's own.
 				g_director->_wm->_fontMan->registerFontAdvanceWidths(_fontId, widths,
-						pfr.physical.metricsResolution);
+						pfr.physical.metricsResolution,
+						pfr.physical.ascent, pfr.physical.descent);
 				_widthsRegistered = true;
 			}
 		} else {

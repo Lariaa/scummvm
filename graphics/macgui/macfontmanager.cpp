@@ -533,7 +533,7 @@ const Font *MacFontManager::applyAdvanceWidths(int fontId, int size, const Font 
 	if (!aw->unitsPerEm)
 		return font;
 
-	const Font *measured = new MeasuredFont(font, &aw->widths, aw->unitsPerEm, size);
+	const Font *measured = new MeasuredFont(font, &aw->widths, aw->unitsPerEm, size, aw->ascent, aw->descent);
 	_measuredFonts[key] = measured;
 
 	// It stands in for the inner font everywhere, so it has to answer the same
@@ -542,8 +542,9 @@ const Font *MacFontManager::applyAdvanceWidths(int fontId, int size, const Font 
 	if (isUnicodeFont(font))
 		_unicodeFonts[measured] = true;
 
-	debugC(1, kDebugLevelMacGUI, "MacFontManager::getFont(): font id %d at %d pt is drawn by a substitute but measured by its own %d advance widths over %d units per em",
-			fontId, size, (int)aw->widths.size(), aw->unitsPerEm);
+	debugC(1, kDebugLevelMacGUI, "MacFontManager::getFont(): font id %d at %d pt is drawn by a substitute but measured by its own %d advance widths over %d units per em; a line of it stands %d high instead of %d",
+			fontId, size, (int)aw->widths.size(), aw->unitsPerEm,
+			measured->getFontHeight(), font->getFontHeight());
 
 	return measured;
 }
@@ -857,7 +858,8 @@ void MacFontManager::registerFontData(int fontId, Common::SeekableReadStream *st
 			toPrintable(key).c_str(), (int)stream->size());
 }
 
-void MacFontManager::registerFontAdvanceWidths(int fontId, const Common::HashMap<uint32, int32> &widths, int unitsPerEm) {
+void MacFontManager::registerFontAdvanceWidths(int fontId, const Common::HashMap<uint32, int32> &widths, int unitsPerEm,
+		int ascent, int descent) {
 	if (widths.empty() || unitsPerEm <= 0)
 		return;
 
@@ -870,10 +872,12 @@ void MacFontManager::registerFontAdvanceWidths(int fontId, const Common::HashMap
 	AdvanceWidths *aw = new AdvanceWidths();
 	aw->widths = widths;
 	aw->unitsPerEm = unitsPerEm;
+	aw->ascent = MAX(0, ascent);
+	aw->descent = MAX(0, descent);
 	_advanceWidths[fontId] = aw;
 
-	debugC(1, kDebugLevelMacGUI, "MacFontManager::registerFontAdvanceWidths(): font id %d brought %d advance widths over %d units per em",
-			fontId, (int)widths.size(), unitsPerEm);
+	debugC(1, kDebugLevelMacGUI, "MacFontManager::registerFontAdvanceWidths(): font id %d brought %d advance widths over %d units per em, rising %d and falling %d",
+			fontId, (int)widths.size(), unitsPerEm, aw->ascent, aw->descent);
 }
 
 int MacFontManager::registerTTFFont(const TTFMap ttfList[]) {
