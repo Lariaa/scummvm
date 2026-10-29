@@ -145,6 +145,14 @@ Cast *FilmLoopCastMember::castForCellLib(int cellLib) {
 	// drawable counts, and a size that matches counts extra. For Karl_blink that is
 	// seven bitmaps in Scene01 against two in MapMenuBar, where the other five
 	// numbers are sounds -- no single frame has to decide anything.
+	//
+	// The index the cells carry deliberately counts for nothing in that vote.
+	// D-11 measured what it means -- -1 is the internal cast, n is the (n+1)th
+	// external one -- and the same probe showed it is written once and never
+	// brought up to date, so in both titles we have it points at the wrong
+	// library. Letting it break a tie was enough to lose 'Bird': 45 points
+	// against 45, and a loop 88 pixels wide drew the map's character buttons.
+	// Knowing what a number means is not the same as being able to use it.
 	if (casts && _score) {
 		Common::HashMap<int, Common::Point> wanted;
 
@@ -179,17 +187,27 @@ Cast *FilmLoopCastMember::castForCellLib(int cellLib) {
 				if (!found || found->_type == kCastLingoScript || found->_initialRect.isEmpty())
 					continue;
 
-				score += 2;
-				if (found->_initialRect.width() == it._value.x && found->_initialRect.height() == it._value.y)
-					score += 1;
-			}
-
-			// The index the cells carry, as a tie-breaker only. It is right when
-			// nobody inserted a library in front of the artwork afterwards, and
-			// wrong in both titles we measured, so it may not outweigh a member
-			// that is actually there.
-			if (cellLib >= 0 && libs[i] == cellLib + 2)
 				score += 1;
+
+				// A cell is composited into the loop's own rectangle, so a member
+				// much bigger than the loop was never one of its cells. This is
+				// what tells TKKG 11's 'Bird' apart: the loop is 88x35 and its 22
+				// cells are the titmouse frames in Scene01, 45x31 and thereabouts,
+				// while MapMenuBar answers the same 22 numbers with the map's
+				// character buttons -- 'Tim' at 100x112, 'gaby' at 92x106. Both
+				// libraries hold every number, so counting them alone ends 22 to
+				// 22; only the size says which set can be a bird.
+				if (found->_initialRect.width() <= _initialRect.width()
+						&& found->_initialRect.height() <= _initialRect.height())
+					score += 2;
+
+				// And the size the score actually wrote for this cell, where it
+				// wrote one. A loop that drives several members through a single
+				// channel only sizes it once, so this is the sharpest signal when
+				// it fires and silent the rest of the time.
+				if (found->_initialRect.width() == it._value.x && found->_initialRect.height() == it._value.y)
+					score += 2;
+			}
 
 			if (score > bestScore) {
 				bestScore = score;
