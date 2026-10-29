@@ -1021,6 +1021,21 @@ void MacFontManager::generateFontSubstitute(MacFont &macFont) {
 	if (!(_mode & MacGUIConstants::kWMModeForceMacFonts)) {
 		// Check if we have TTF data for this font.
 		name = getFontName(macFont.getId(), 0, macFont.getSlant());
+
+		// A font that brought its own data usually brought one cut of it, and
+		// registerFontData() files it under the regular slant. Asking only for
+		// the exact slant therefore missed it whenever the document wanted bold
+		// or italic: TKKG 10's title is 'EurostileT-Medi *' at slant 1, the data
+		// sits under 'EurostileT-Medi *-0-0', and the lookup for
+		// 'EurostileT-Medi *-1-0' came up empty -- so the title was drawn by a
+		// substitute while being measured by Eurostile's own advance widths,
+		// which is the worst of both. Fall back to the regular cut; Director
+		// does the same for this font, measured: plain and bold are both 172 px
+		// tall at 160 pt, while Arial, which has a real bold cut, goes 183 ->
+		// 188.
+		if (!_ttfData.contains(name) && macFont.getSlant() != kMacFontRegular)
+			name = getFontName(macFont.getId(), 0, kMacFontRegular);
+
 		if (_ttfData.contains(name)) {
 			generateTTFFont(macFont, _ttfData[name]);
 
