@@ -705,6 +705,16 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		break;
 	case kTheFrameTempo:
 		d = score->_currentFrameRate;
+
+		// On the sound channel, odd as that looks, because this is the number a
+		// game divides into 1000 to get the window it accepts a cue point in.
+		// TKKG 14 does exactly that once per spoken line
+		// (pCuepointPrecision = 1000 / the frameTempo), so a wrong tempo widens
+		// or narrows its lip sync, and a zero would be a division by zero in
+		// Lingo. Keeping it on kDebugSound means the one run that measures the
+		// mouths does not need a second flag, which would change the timing it
+		// is trying to measure.
+		debugC(3, kDebugSound, "Lingo::getTheEntity(): the frameTempo = %d", score->_currentFrameRate);
 		break;
 	case kTheFrameTransition:
 		d = score->_currentFrame->_mainChannels.trans.toMultiplex();
