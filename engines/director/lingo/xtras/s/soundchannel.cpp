@@ -146,8 +146,22 @@ Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 	// currentTime being set; currentTime is the absolute position within it. We
 	// have one clock, so both report it -- Loewenzahn 3's intro compares
 	// sound(1).currentTime against a list of cue times in milliseconds.
-	if (propName.equalsIgnoreCase("currentTime") || propName.equalsIgnoreCase("elapsedTime"))
-		return Datum((int)sound->getChannelElapsedTime(_channel));
+	if (propName.equalsIgnoreCase("currentTime") || propName.equalsIgnoreCase("elapsedTime")) {
+		int elapsed = (int)sound->getChannelElapsedTime(_channel);
+
+		// This is the clock the games time themselves against, so say what they
+		// are told and when. TKKG 14's Soundplay_Obj reads it once per stepFrame
+		// and, whenever the answer has not moved since the last look, carries on
+		// with the milliSeconds instead -- capped at 250 ms, after which its idea
+		// of the position simply stops. The mouths follow that, not the engine's
+		// own cue points, which it never asks for. Printing the wall clock beside
+		// the value is what makes a stall visible: two reads far apart in time
+		// with the same number are the case that breaks the lip sync.
+		debugC(3, kDebugSound, "SoundChannelObject::getProp(): channel %d, %s = %d ms, read at %d ms",
+				_channel, propName.c_str(), elapsed, (int)g_system->getMillis());
+
+		return Datum(elapsed);
+	}
 
 	if (propName.equalsIgnoreCase("member")) {
 		SoundID last = sound->getChannelLastPlayed(_channel);
