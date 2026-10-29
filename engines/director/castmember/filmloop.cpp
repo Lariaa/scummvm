@@ -426,6 +426,23 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			src._backColor = parentBackColor;
 		}
 
+		// The score loader resolves a sprite against the library its record names,
+		// and for a film loop cell that number is an index -- a stale one. What it
+		// found is therefore not the cell's member, and keeping it skips the vote
+		// below entirely, because that only runs for an unresolved cell.
+		//
+		// It bites exactly where a cell's number also exists in the cast the loop
+		// lives in. TKKG 11's 'Bird' is the worst case in its scene: ten of its
+		// twenty-two numbers are film loops of sc01's own 25-slot internal cast, so
+		// eleven of its thirty-six frames drew 'goDown' at 800x414, 'Karl_blink' at
+		// 159x408 or -- at frame 25, number 19 -- the bird loop itself, while the
+		// other twenty-five frames drew the titmouse the vote found in Scene01.
+		// That alternation is the flicker. Gaby_blink and Gaby_speak collide on one
+		// number each; Karl_blink and Tim_blink on none, which is why they came out
+		// whole once the vote was there.
+		if (src._cast && src._castId.castLib >= 0 && g_director->getVersion() >= 800)
+			src._cast = nullptr;
+
 		if (src._cast == nullptr) {
 			// A film loop cell does not name a cast library. It names an index.
 			//
