@@ -55,6 +55,7 @@ FilmLoopCastMember::FilmLoopCastMember(Cast *cast, uint16 castId, Common::Seekab
 	_score = nullptr;
 	_flags = 0;
 	_subchannelsValid = false;
+	_cellCastsMovie = nullptr;
 
 	if (cast->_version >= kFileVer300) {
 		_initialRect = Movie::readRect(stream);
@@ -90,6 +91,7 @@ FilmLoopCastMember::FilmLoopCastMember(Cast *cast, uint16 castId, FilmLoopCastMe
 		_score = new Score(*source._score);
 	_subchannels = source._subchannels;
 	_subchannelsValid = false;
+	_cellCastsMovie = nullptr;
 	_looping = source._looping;
 }
 
@@ -108,6 +110,100 @@ bool FilmLoopCastMember::isModified() {
 		return true;
 
 	return false;
+}
+
+Cast *FilmLoopCastMember::castForCellLib(int cellLib) {
+	Movie *movie = g_director->getCurrentMovie();
+
+	// A shared cast's members outlive the movie that borrowed them, and the
+	// library numbers are the borrowing movie's. Throw the answer away when the
+	// question changes -- the palette table two files over is keyed by library
+	// number without doing this, and it has been wrong for years because of it.
+	if (_cellCastsMovie != movie) {
+		_cellCasts.clear();
+		_cellCastsMovie = movie;
+	}
+
+	if (_cellCasts.contains(cellLib))
+		return _cellCasts[cellLib];
+
+	Cast *best = nullptr;
+	const Common::HashMap<int, Cast *> *casts = movie ? movie->getCasts() : nullptr;
+
+	// Deciding this per cell does not work, and TKKG 11 is why. A cell's recorded
+	// size is the channel's current size, which the score only writes when it
+	// changes: the first frame of a loop carries none at all, and a blink cell
+	// that merely swaps the member number keeps the size of the one before it.
+	// Karl_blink's frame 0 reports 0x0 for four of its six cells and 116x17 for a
+	// fifth whose member is 21x5, so a size-weighted guess picks a different
+	// library there than in the frames around it -- and Karl loses an arm once per
+	// cycle.
+	//
+	// A film loop is a selection out of one score, though, and its cells come from
+	// one library. So ask the question once for the whole loop and let the cells
+	// vote: every member the loop asks for that a library actually holds as a
+	// drawable counts, and a size that matches counts extra. For Karl_blink that is
+	// seven bitmaps in Scene01 against two in MapMenuBar, where the other five
+	// numbers are sounds -- no single frame has to decide anything.
+	if (casts && _score) {
+		Common::HashMap<int, Common::Point> wanted;
+
+		for (uint f = 0; f < _score->_scoreCache.size(); f++) {
+			Common::Array<Sprite *> &sprites = _score->_scoreCache[f]->_sprites;
+			for (uint c = 0; c < sprites.size(); c++) {
+				Sprite *s = sprites[c];
+				if (!s || s->_castId.isNull() || s->_castId.castLib != cellLib)
+					continue;
+
+				Common::Point &size = wanted.getOrCreateVal(s->_castId.member);
+				// The first size the score writes for this member, not the last:
+				// frame 0 has none and the frames after it do.
+				if (size.x == 0 && s->_width > 0 && s->_height > 0)
+					size = Common::Point(s->_width, s->_height);
+			}
+		}
+
+		Common::Array<int> libs;
+		for (auto &it : *casts)
+			libs.push_back(it._key);
+		Common::sort(libs.begin(), libs.end());
+
+		int bestScore = 0;
+		for (uint i = 0; i < libs.size(); i++) {
+			int score = 0;
+			for (auto &it : wanted) {
+				CastMember *found = casts->getVal(libs[i])->getCastMember(it._key, true);
+				// A cell is a sprite. A script is never one, and neither is a
+				// sound -- MapMenuBar answers four of Karl's numbers with
+				// "roll over Buttons" and friends, which have no rectangle at all.
+				if (!found || found->_type == kCastLingoScript || found->_initialRect.isEmpty())
+					continue;
+
+				score += 2;
+				if (found->_initialRect.width() == it._value.x && found->_initialRect.height() == it._value.y)
+					score += 1;
+			}
+
+			// The index the cells carry, as a tie-breaker only. It is right when
+			// nobody inserted a library in front of the artwork afterwards, and
+			// wrong in both titles we measured, so it may not outweigh a member
+			// that is actually there.
+			if (cellLib >= 0 && libs[i] == cellLib + 2)
+				score += 1;
+
+			if (score > bestScore) {
+				bestScore = score;
+				best = casts->getVal(libs[i]);
+			}
+		}
+
+		debugC(3, kDebugImages, "FilmLoopCastMember::castForCellLib(): cast %d: %d cells spell castLib %d; %s wins with %d points",
+				_castId, (int)wanted.size(), cellLib,
+				best ? best->getCastName().c_str() : "nobody", bestScore);
+	}
+
+	_cellCasts[cellLib] = best;
+	return best;
 }
 
 Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, uint frame, int parentInk, uint32 parentForeColor, uint32 parentBackColor) {
@@ -282,11 +378,17 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			// leaves it blank -- so those keep being dropped.
 			bool ownCast = src._castId.castLib == -1;
 			bool indexed = src._castId.castLib >= 0 && g_director->getVersion() >= 800;
-			int hintedLib = indexed ? src._castId.castLib + 2 : -1;
 
 			if (ownCast || indexed) {
-				if (ownCast && _cast != nullptr)
+				if (ownCast && _cast != nullptr) {
 					src._cast = _cast->getCastMember(src._castId.member, true);
+				} else if (indexed) {
+					// Decided once for the whole loop, not here: a cell's own
+					// record is too thin to choose on, see castForCellLib().
+					Cast *voted = castForCellLib(src._castId.castLib);
+					if (voted)
+						src._cast = voted->getCastMember(src._castId.member, true);
+				}
 
 				// The loop's own cast is only the first place to look. TKKG 14
 				// keeps 3821 of its film loops in a movie's 74-slot internal cast
@@ -346,13 +448,6 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 								rank += 1;
 							if (found->_initialRect.width() == wantW && found->_initialRect.height() == wantH)
 								rank += 2;
-							// The cell's own index, worth less than a size match so
-							// that a stale one cannot beat the right member. TKKG 11
-							// is why: its index points at MapMenuBar, where member 72
-							// is a sound, while Scene01's 72 is Karl standing still
-							// and 73x47 like the cell says.
-							if (libs[i] == hintedLib)
-								rank += 1;
 
 							// Ties keep the lowest library, as before.
 							if (rank > bestRank) {
