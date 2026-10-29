@@ -228,11 +228,20 @@ public:
 	 * what goes visibly wrong first -- a title set in a wider face overflows
 	 * its box or breaks onto a line that was never meant to exist.
 	 *
+	 * The same goes for how tall a line of it stands. A substitute's ascent
+	 * and descent are its own, and a line set in them is a different height
+	 * from the one the author laid out -- which pushes every line after it
+	 * down and the last one out of the bottom of the box.
+	 *
 	 * @param fontId the id registerFontName() gave the name
 	 * @param widths advance width per character code, in font units
 	 * @param unitsPerEm how many of those units make up the em square
+	 * @param ascent how far the font rises above the baseline, in font units
+	 * @param descent how far it falls below it, as a positive magnitude;
+	 *                pass 0 for both when the file does not say
 	 */
-	void registerFontAdvanceWidths(int fontId, const Common::HashMap<uint32, int32> &widths, int unitsPerEm);
+	void registerFontAdvanceWidths(int fontId, const Common::HashMap<uint32, int32> &widths, int unitsPerEm,
+			int ascent = 0, int descent = 0);
 
 	void forceBuiltinFonts() { _builtInFonts = true; }
 	int parseSlantFromName(const Common::String &name);
@@ -307,6 +316,8 @@ private:
 	struct AdvanceWidths {
 		Common::HashMap<uint32, int32> widths;
 		int unitsPerEm = 0;
+		int ascent = 0;
+		int descent = 0;
 	};
 	Common::HashMap<int, AdvanceWidths *> _advanceWidths;
 
@@ -326,18 +337,35 @@ private:
  * the two errors -- a line measured in the wrong widths overflows its box or
  * breaks where it should not, and that is what a reader notices.
  *
- * Everything but the widths is the inner font's answer. Kerning is dropped on
- * purpose: the inner font's pair adjustments belong to its own widths, not to
- * these.
+ * It answers about its height the same way, when the file said how tall the
+ * font stands. That is what a text layout asks for the height of a line, and
+ * a substitute's own ascent and descent make the line a different height from
+ * the one the author laid out. Director's text Xtra writes the authored
+ * numbers into the document beside every style run, which is how these can be
+ * checked: TKKG 10's title card stores 139 and 33 for its 160 pt line and 84
+ * and 20 for its 96 pt one, and the font's 870 and 208 over 1000 units per em
+ * give exactly those four numbers back.
+ *
+ * Everything else is the inner font's answer. Kerning is dropped on purpose:
+ * the inner font's pair adjustments belong to its own widths, not to these.
  */
 class MeasuredFont : public Font {
 public:
-	MeasuredFont(const Font *glyphs, const Common::HashMap<uint32, int32> *widths, int unitsPerEm, int size)
-			: _glyphs(glyphs), _widths(widths), _unitsPerEm(unitsPerEm), _size(size) {}
+	MeasuredFont(const Font *glyphs, const Common::HashMap<uint32, int32> *widths, int unitsPerEm, int size,
+			int ascent = 0, int descent = 0)
+			: _glyphs(glyphs), _widths(widths), _unitsPerEm(unitsPerEm), _size(size),
+			  _ascent(ascent), _descent(descent) {}
 
-	int getFontHeight() const override { return _glyphs->getFontHeight(); }
-	int getFontAscent() const override { return _glyphs->getFontAscent(); }
-	int getFontDescent() const override { return _glyphs->getFontDescent(); }
+	// Rounded apart and then added, the way the authored numbers come out.
+	int getFontHeight() const override {
+		return hasMetrics() ? scale(_ascent) + scale(_descent) : _glyphs->getFontHeight();
+	}
+	int getFontAscent() const override {
+		return hasMetrics() ? scale(_ascent) : _glyphs->getFontAscent();
+	}
+	int getFontDescent() const override {
+		return hasMetrics() ? scale(_descent) : _glyphs->getFontDescent();
+	}
 	int getFontLeading() const override { return _glyphs->getFontLeading(); }
 	Common::String getFontName() const override { return _glyphs->getFontName(); }
 
@@ -366,6 +394,10 @@ public:
 	}
 
 private:
+	// A font may bring widths without the auxiliary records that carry the
+	// ascent and the descent, and then the inner font keeps answering.
+	bool hasMetrics() const { return _ascent > 0 || _descent > 0; }
+
 	int scale(int32 units) const {
 		// Round to nearest: a title at 170 pt loses a visible amount over a
 		// line of text if every character is truncated downwards.
@@ -382,6 +414,8 @@ private:
 	const Common::HashMap<uint32, int32> *_widths;
 	int _unitsPerEm;
 	int _size;
+	int _ascent;
+	int _descent;
 };
 
 } // End of namespace Graphics
