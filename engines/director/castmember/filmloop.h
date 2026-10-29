@@ -112,6 +112,10 @@ public:
 	Common::HashMap<int, Cast *> _cellCasts;
 	Movie *_cellCastsMovie;
 
+	// The library that movie's own score leans on, worked out with the cache
+	// above and thrown away with it.
+	int _movieTopLib;
+
 	Score *_score;
 };
 

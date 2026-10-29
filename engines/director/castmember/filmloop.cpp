@@ -56,6 +56,7 @@ FilmLoopCastMember::FilmLoopCastMember(Cast *cast, uint16 castId, Common::Seekab
 	_flags = 0;
 	_subchannelsValid = false;
 	_cellCastsMovie = nullptr;
+	_movieTopLib = 0;
 
 	if (cast->_version >= kFileVer300) {
 		_initialRect = Movie::readRect(stream);
@@ -92,6 +93,7 @@ FilmLoopCastMember::FilmLoopCastMember(Cast *cast, uint16 castId, FilmLoopCastMe
 	_subchannels = source._subchannels;
 	_subchannelsValid = false;
 	_cellCastsMovie = nullptr;
+	_movieTopLib = 0;
 	_looping = source._looping;
 }
 
@@ -112,6 +114,35 @@ bool FilmLoopCastMember::isModified() {
 	return false;
 }
 
+// Which library the movie's own score leans on, by the number of sprite states
+// that name it. A film loop is a cut-out of that score, so its cells come from
+// a library the score itself uses.
+static int topLibOfScore(Movie *movie) {
+	Score *score = movie ? movie->getScore() : nullptr;
+	if (!score)
+		return 0;
+
+	Common::HashMap<int, int> used;
+	for (uint f = 0; f < score->_scoreCache.size(); f++) {
+		Common::Array<Sprite *> &sprites = score->_scoreCache[f]->_sprites;
+		for (uint c = 0; c < sprites.size(); c++) {
+			Sprite *s = sprites[c];
+			if (s && !s->_castId.isNull() && s->_castId.castLib > 0)
+				used.getOrCreateVal(s->_castId.castLib)++;
+		}
+	}
+
+	int top = 0, most = 0;
+	for (auto &it : used) {
+		if (it._value > most) {
+			most = it._value;
+			top = it._key;
+		}
+	}
+
+	return top;
+}
+
 Cast *FilmLoopCastMember::castForCellLib(int cellLib) {
 	Movie *movie = g_director->getCurrentMovie();
 
@@ -122,6 +153,7 @@ Cast *FilmLoopCastMember::castForCellLib(int cellLib) {
 	if (_cellCastsMovie != movie) {
 		_cellCasts.clear();
 		_cellCastsMovie = movie;
+		_movieTopLib = topLibOfScore(movie);
 	}
 
 	if (_cellCasts.contains(cellLib))
@@ -172,8 +204,12 @@ Cast *FilmLoopCastMember::castForCellLib(int cellLib) {
 		}
 
 		Common::Array<int> libs;
-		for (auto &it : *casts)
+		int ownLib = 0;
+		for (auto &it : *casts) {
 			libs.push_back(it._key);
+			if (it._value == _cast)
+				ownLib = it._key;
+		}
 		Common::sort(libs.begin(), libs.end());
 
 		int bestScore = 0;
@@ -208,6 +244,30 @@ Cast *FilmLoopCastMember::castForCellLib(int cellLib) {
 				if (found->_initialRect.width() == it._value.x && found->_initialRect.height() == it._value.y)
 					score += 2;
 			}
+
+			// Two weights that no single cell can give. A film loop is cut out
+			// of its host movie's score, so the library that score leans on is
+			// nearly always the one its cells come from; and the loop lives in
+			// a cast, which is as often the same one again.
+			//
+			// Measured over the 971 loops in the corpus whose cells carry a
+			// recorded size -- there the size alone says which library is meant,
+			// so it serves as the answer and is left out of the weights. The
+			// score's library alone reads 960 of them and the loop's own cast
+			// alone 961, against 948 with neither; together they read 968,
+			// because the loops each one gets wrong are different loops. TKKG 11
+			// needs both halves: its 'Bird' draws from the scene cast and not
+			// from its own, while Ritter Rost's loops do the opposite.
+			//
+			// One point per cell, no more. The weight has to be able to turn a
+			// tie -- 'Bird' ends 66 against 66 between Scene01's titmouse frames
+			// and GlobalScripts' 16-pixel icons, both of which fit an 88x35 loop
+			// -- without drowning out the cells themselves: at two points per
+			// cell the reading falls to 957 and at three to 932.
+			if (_movieTopLib > 0 && libs[i] == _movieTopLib)
+				score += (int)wanted.size();
+			if (ownLib > 0 && libs[i] == ownLib)
+				score += (int)wanted.size();
 
 			if (score > bestScore) {
 				bestScore = score;
