@@ -1737,6 +1737,50 @@ void LC::call(const Common::String &name, int nargs, bool allowRetVal) {
 				return;
 			}
 		}
+
+		// A sprite reference as the receiver: `GetSymbol(sprite 195)`, which is
+		// what `sprite(195).GetSymbol()` compiles to. Director hands that to the
+		// sprite's own behaviour instances, so the handler runs with `me` bound
+		// to the instance and can read its properties.
+		//
+		// Without this the name resolves against the archive-global handler
+		// table -- every script's handlers are aggregated there -- and runs with
+		// the sprite reference where `me` belongs, which is not an object. The
+		// first property access then yields VOID, and TKKG 11's question buttons
+		// are where that shows: `playQ` asks the button for its symbol, gets
+		// VOID, and `SetKP(gKPObj, VOID, 1)` enables nothing, so the KP Checker
+		// guard stops every click on the button. 234 times in one run through a
+		// dialogue scene, and not a single question asked.
+		if (firstArg.type == SPRITEREF) {
+			Movie *movie = g_director->getCurrentMovie();
+			Score *score = movie ? movie->getScore() : nullptr;
+			Channel *channel = score ? score->getChannelById(firstArg.u.i) : nullptr;
+
+			if (channel) {
+				// A sprite that has not been announced yet carries its
+				// behaviours but no instances, the same way sendSprite() finds
+				// it.
+				if (channel->_scriptInstanceList.empty() && channel->_sprite
+						&& !channel->_sprite->_behaviors.empty())
+					score->createScriptInstances(score->getCurrentFrameNum());
+
+				for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
+					Datum instance = channel->_scriptInstanceList[i];
+					if (instance.type != OBJECT)
+						continue;
+
+					funcSym = instance.u.obj->getMethod(name);
+					if (funcSym.type == VOIDSYM)
+						continue;
+
+					debugC(3, kDebugLingoExec, "Sprite method '%s' called on sprite %d: <%s>",
+							name.c_str(), firstArg.u.i, instance.asString(true).c_str());
+					g_lingo->_state->stack[g_lingo->_state->stack.size() - nargs] = instance;
+					call(funcSym, nargs, allowRetVal);
+					return;
+				}
+			}
+		}
 	}
 
 	// Lingo builtin functions in the "List" category have very strange override mechanics.
