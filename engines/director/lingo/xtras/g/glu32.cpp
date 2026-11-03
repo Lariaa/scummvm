@@ -175,6 +175,14 @@ void GLU32Xtra::m_GLUCall(int nargs) {
 			g_lingo->push(Datum(Common::String("37211457"))); // TODO: Check with the game
 			return;
 		}
+		if (gameId == "kommissar2") {
+			g_lingo->push(Datum(Common::String("25847524"))); // TODO: Check with the game
+			return;
+		}
+		if (gameId == "kommissar3") {
+			g_lingo->push(Datum(Common::String("25847524"))); // TODO: Check with the game
+			return;
+		}
 		if (gameId == "loewe4") {
 			g_lingo->push(Datum(Common::String("13665984"))); // TODO: Check with the game
 			return;
