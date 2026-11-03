@@ -124,6 +124,7 @@ Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 		return Datum(SoundChannelXtra::xlibName);
 
 	DirectorSound *sound = _channel > 0 ? g_director->getCurrentWindow()->getSoundManager() : nullptr;
+	debugC(3, kDebugSound, "SoundChannelXtraObject::getProp(): this=%p, _channel=%d, sound=%p", this, _channel, sound);
 	if (!sound)
 		return Datum();
 
@@ -158,6 +159,8 @@ Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 		// own cue points, which it never asks for. Printing the wall clock beside
 		// the value is what makes a stall visible: two reads far apart in time
 		// with the same number are the case that breaks the lip sync.
+		debugC(3, kDebugSound, "SoundChannelObject::getProp(): channel %d, %s = %d ms, read at %d ms",
+				_channel, propName.c_str(), elapsed, (int)g_system->getMillis());
 
 		return Datum(elapsed);
 	}
@@ -186,6 +189,8 @@ Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 					SoundCastMember *soundCast = static_cast<SoundCastMember *>(member);
 					if (soundCast->_audio) {
 						int duration = (int)soundCast->_audio->getDuration();
+						debugC(3, kDebugSound, "SoundChannelObject::getProp(): channel %d, endTime = %d ms (duration), read at %d ms",
+							_channel, duration, (int)g_system->getMillis());
 						return Datum(duration);
 					}
 				}
@@ -195,11 +200,17 @@ Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 		if (last.type == kSoundFile) {
 			SoundChannel *channel = sound->getChannel(_channel);
 			if (channel && channel->lastFileDuration > 0) {
+				debugC(3, kDebugSound, "SoundChannelObject::getProp(): channel %d, endTime = %d ms (file duration), read at %d ms",
+					_channel, channel->lastFileDuration, (int)g_system->getMillis());
 				return Datum((int)channel->lastFileDuration);
 			}
 		} else {
+			debugC(3, kDebugSound, "SoundChannelObject::getProp(): channel %d, endTime: last.type=%d (NOT kSoundFile=%d), trying fallback",
+				_channel, last.type, kSoundFile);
 		}
 		int elapsed = (int)sound->getChannelElapsedTime(_channel);
+		debugC(3, kDebugSound, "SoundChannelObject::getProp(): channel %d, endTime = %d ms (elapsed fallback), read at %d ms",
+			_channel, elapsed, (int)g_system->getMillis());
 		return Datum(elapsed);
 	}
 
@@ -235,6 +246,7 @@ void SoundChannelXtraObject::setProp(const Common::String &propName, const Datum
 
 	// status, elapsedTime and the loop counters are read-only per the dictionary;
 	// the rest we accept and drop rather than raise an error mid-playback.
+	debugC(3, kDebugXObj, "SoundChannelXtra::setProp: ignoring '%s' on channel %d", propName.c_str(), _channel);
 }
 
 void SoundChannelXtra::open(ObjectType type, const Common::Path &path) {
@@ -347,6 +359,8 @@ static bool readQueueEntry(const Datum &d, SoundQueueEntry &entry) {
 		entry.linkedPath = cast->getCast()->getLinkedPath(entry.member.member);
 
 		if (!entry.linkedPath.empty())
+			debugC(5, kDebugSound, "SoundChannelXtra: queued %s as '%s'",
+					entry.member.asString().c_str(), entry.linkedPath.c_str());
 	}
 
 	return true;
@@ -477,6 +491,7 @@ void SoundChannelXtra::m_isBusy(int nargs) {
 	int channel = receiverChannel();
 	DirectorSound *sound = channelSound(channel);
 	bool isBusy = (sound && sound->isChannelActive(channel) && !sound->isQueuePaused(channel));
+	debugC(3, kDebugSound, "SoundChannelXtra::m_isBusy(): frame=%d, channel %d -> %s", g_director->getCurrentMovie()->getScore()->getCurrentFrameNum(), channel, isBusy ? "TRUE" : "FALSE");
 	g_lingo->push(Datum(isBusy ? 1 : 0));
 }
 
