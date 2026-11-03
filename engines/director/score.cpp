@@ -555,7 +555,18 @@ void Score::updateCurrentFrame() {
 			// Escape, Alt-F4 and the close box are all sealed. Wrapping to
 			// frame 1 restarted the credits forever and the games could not be
 			// left.
-			if (!debugChannelSet(-1, kDebugLoopScore)) {
+			// But only once a frame has actually played. A score that holds no
+			// playable frame at all reaches this on its very first load --
+			// `startPlay()` calls us to fetch frame 1, `_newMovieStarted` is
+			// still set, and `_numFrames` is 1 because `loadFrames()` counts
+			// until the first failure. Stopping there happens before the stage
+			// is up and before `startMovie` runs, and `Lingo::processEvents()`
+			// then drops every event but `stopMovie`, so the movie never gets
+			// the one chance its script had. Loewenzahn 5's projector movie is
+			// exactly that: an empty score whose `startMovie` searches the CD
+			// drives and switches to the real movie; measured 03.11.2026, the
+			// game quit before its first frame.
+			if (!_window->_newMovieStarted && !debugChannelSet(-1, kDebugLoopScore)) {
 				_playState = kPlayStopped;
 				processFrozenScripts();
 				return;
