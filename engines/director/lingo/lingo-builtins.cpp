@@ -2544,10 +2544,29 @@ void LB::b_call(int nargs) {
 	if (script.type == OBJECT) {
 		result = callBehaviorHandler(script, msgName, extraArgs);
 	} else if (script.type == ARRAY) {
+		// Only an object that actually carries the handler may answer. The
+		// list form is routinely used as a finder over a mixed list -- TKKG 11
+		// and 14 ask `call(#mGetSoundObj, the actorList)` for the one sound
+		// manager among everything else parked in the actor list, and only
+		// Soundplay_Obj answers it. Letting every object overwrite the result
+		// means the last one in the list has the last word, and if that one
+		// does not know the handler the call reports VOID. The game then
+		// believes no manager exists and quietly builds a second one: two
+		// subscriber lists, and the cue points that drive the mouths go to the
+		// figure that is not speaking.
+		//
+		// callAncestor is documented to pass over a missing handler without
+		// complaint when it is given a list rather than a single object
+		// (Director 8 Demystified, lexicon), so the list form is meant to be
+		// read this way.
 		for (uint i = 0; i < script.u.farr->arr.size(); i++) {
 			Datum instance = script.u.farr->arr[i];
-			if (instance.type == OBJECT)
-				result = callBehaviorHandler(instance, msgName, extraArgs);
+			if (instance.type != OBJECT)
+				continue;
+			if (instance.u.obj->getMethod(msgName).type == VOIDSYM)
+				continue;
+
+			result = callBehaviorHandler(instance, msgName, extraArgs);
 		}
 	} else {
 		warning("b_call: expected OBJECT or list for script argument");
