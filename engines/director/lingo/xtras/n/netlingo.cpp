@@ -145,7 +145,26 @@ XOBJSTUB(NetLingoXtra::m_getNetText, 0)
 XOBJSTUB(NetLingoXtra::m_gotoNetMovie, 0)
 XOBJSTUB(NetLingoXtra::m_preloadNetThing, 0)
 XOBJSTUB(NetLingoXtra::m_netAbort, 0)
-XOBJSTUB(NetLingoXtra::m_gotoNetPage, 0)
+void NetLingoXtra::m_gotoNetPage(int nargs) {
+	if (nargs < 1) {
+		warning("NetLingo::gotoNetPage: expected >=1 arg, got %d", nargs);
+		return;
+	}
+	// gotoNetPage URL -- opens URL in default browser, returns 1 for success, 0 for failure
+	Common::String url = g_lingo->pop().asString();
+	if (url.empty()) {
+		warning("NetLingo::gotoNetPage: empty URL");
+		g_lingo->push(Datum(0));
+		return;
+	}
+	debugC(1, kDebugLingoThe, "NetLingo::gotoNetPage: opening '%s'", url.c_str());
+	if (g_system->openUrl(url)) {
+		g_lingo->push(Datum(1));
+	} else {
+		warning("NetLingo::gotoNetPage: failed to open '%s'", url.c_str());
+		g_lingo->push(Datum(0));
+	}
+}
 XOBJSTUB(NetLingoXtra::m_getLatestNetID, 0)
 XOBJSTUB(NetLingoXtra::m_netError, "OK")
 XOBJSTUB(NetLingoXtra::m_netDone, 1)

@@ -104,6 +104,24 @@ void OpenURLXtra::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-XOBJSTUB(OpenURLXtra::m_gsOpenURL, 0)
+void OpenURLXtra::m_gsOpenURL(int nargs) {
+	if (nargs != 1) {
+		warning("OpenURL::gsOpenURL: expected 1 arg, got %d", nargs);
+		return;
+	}
+	Common::String url = g_lingo->pop().asString();
+	if (url.empty()) {
+		warning("OpenURL::gsOpenURL: empty URL");
+		g_lingo->push(Datum(0));
+		return;
+	}
+	debugC(1, kDebugLingoThe, "OpenURL::gsOpenURL: opening '%s'", url.c_str());
+	if (g_system->openUrl(url)) {
+		g_lingo->push(Datum(1));
+	} else {
+		warning("OpenURL::gsOpenURL: failed to open '%s'", url.c_str());
+		g_lingo->push(Datum(0));
+	}
+}
 
 }
