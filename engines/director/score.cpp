@@ -537,7 +537,25 @@ void Score::updateCurrentFrame() {
 			}
 			nextFrameNumberToLoad = ref.frameI;
 		} else {
-			if (debugChannelSet(-1, kDebugNoLoop)) {
+			// Director does not wrap. "Loop On/Off dictates whether playback
+			// simply proceeds to the end of the Score and then stops or
+			// continuously repeats" (Director 8 Demystified) -- and that Loop
+			// switch is a Control Panel setting of the authoring session, not a
+			// movie property: saving the same movie with Loop on and with Loop
+			// off differs only in the config chunk's obfuscation field and its
+			// checksum, so a projector has no flag to honour. Measured in
+			// Director MX with a twelve-frame probe: authoring with Loop off
+			// halts on frame 12, a projector built from the same movie reaches
+			// frame 12 and closes itself, and the same projector with a
+			// `go(the frame)` on frame 12 stays open and keeps counting.
+			//
+			// TKKG 11, 13 and 14 end this way and no other: their quit dialog
+			// goes to the credits, which run out of frames with no `quit` and no
+			// `halt` anywhere on the path, while `the exitLock` is set, so
+			// Escape, Alt-F4 and the close box are all sealed. Wrapping to
+			// frame 1 restarted the credits forever and the games could not be
+			// left.
+			if (!debugChannelSet(-1, kDebugLoopScore)) {
 				_playState = kPlayStopped;
 				processFrozenScripts();
 				return;

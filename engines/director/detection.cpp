@@ -83,7 +83,7 @@ static const DebugChannelDef debugFlagList[] = {
 	{Director::kDebugLingoStrict, "lingostrict", "Drop into debugger on Lingo error"},
 	{Director::kDebugLoading, "loading", "Loading"},
 	{Director::kDebugNoBytecode, "nobytecode", "Do not execute Lscr bytecode"},
-	{Director::kDebugNoLoop, "noloop", "Do not loop the playback"},
+	{Director::kDebugLoopScore, "loopscore", "Wrap back to frame 1 at the end of the score"},
 	{Director::kDebugParse, "parse", "Lingo code parsing"},
 	{Director::kDebugPreprocess, "preprocess", "Lingo preprocessing"},
 	{Director::kDebugScreenshot, "screenshot", "screenshot each frame"},

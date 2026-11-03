@@ -78,7 +78,7 @@ enum {
 	kDebugCompileOnly,
 	kDebugSlow,
 	kDebugFast,
-	kDebugNoLoop,
+	kDebugLoopScore,
 	kDebugNoBytecode,
 	kDebugFewFramesOnly,
 	kDebugPreprocess,
