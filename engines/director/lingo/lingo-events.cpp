@@ -1250,6 +1250,26 @@ void Score::createScriptInstances(int frameNum) {
 		}
 	}
 
+	// Director has the whole frame standing before it sends any beginSprite:
+	// every sprite of the frame exists for the whole frame, so a behaviour may
+	// talk to any other sprite from its own beginSprite. Creating a channel's
+	// instances and immediately sending it beginSprite, channel by channel,
+	// breaks that -- a handler reaching forwards finds an empty channel.
+	//
+	// TKKG 11's question buttons are the case. Channels 195 and 196 of sc40
+	// each carry four behaviours (QuestionsScript, MemberScript, KP Checker,
+	// CursorScript), and MemberScript's beginSprite asks the other button for
+	// its symbol with sendSprite(196, #GetSymbol). Run channel by channel, 196
+	// is still empty when 195 asks: b_sendSprite finds no instance that answers
+	// and falls back on the archive-global handler, which runs KP Checker's
+	// GetSymbol with no `me`. `the pSymbol` then reads VOID, SetKP enables
+	// nothing, and KP Checker swallows every click on the button -- 336 times
+	// in one run, and not a single question answered.
+	//
+	// So collect the channels that take on instances here and send beginSprite
+	// to them afterwards.
+	Common::Array<int> entered;
+
 	for (int i = 0; i < (int)_channels.size(); i++) {
 		Channel *channel = _channels[i];
 		Sprite *sprite = channel->_sprite;
@@ -1318,6 +1338,19 @@ void Score::createScriptInstances(int frameNum) {
 
 			channel->_scriptInstanceList.push_back(instance);
 		}
+
+		entered.push_back(i);
+	}
+
+	// Now the frame stands, and beginSprite can reach any of it.
+	for (uint e = 0; e < entered.size(); e++) {
+		int i = entered[e];
+
+		// A beginSprite handler may jump the playback head, which rebuilds the
+		// channels under us. Only the ones still holding what we gave them are
+		// ours to announce.
+		if (i >= (int)_channels.size() || _channels[i]->_scriptInstanceList.empty())
+			continue;
 
 		bool prevDis = _disableGoPlayUpdateStage;
 		_disableGoPlayUpdateStage = true;
