@@ -98,7 +98,8 @@ struct ExternalSoundID {
 
 enum SoundIDType {
 	kSoundCast,
-	kSoundExternal
+	kSoundExternal,
+	kSoundFile
 };
 
 struct SoundID {
@@ -129,6 +130,9 @@ struct SoundID {
 		case kSoundExternal:
 			u.external.menu = a;
 			u.external.submenu = b;
+			break;
+		case kSoundFile:
+			break;
 		}
 	}
 	SoundID(CastMemberID memberID) {
@@ -146,6 +150,8 @@ struct SoundID {
 			return u.cast.member == b.u.cast.member && u.cast.castLib == b.u.cast.castLib;
 		case kSoundExternal:
 			return u.external.menu == b.u.external.menu && u.external.submenu == b.u.external.submenu;
+		case kSoundFile:
+			return true;
 		}
 
 		return false;
@@ -207,11 +213,22 @@ struct SoundChannel {
 	int loopsRemaining;
 	bool playListActive;
 	bool paused;
+	// Duration of the last file played via playFile() (in ms), 0 if not a file.
+		uint32 lastFileDuration;
 
-	SoundChannel(): handle(), lastPlayedSound(SoundID()), stopOnZero(true), fromLastMovie(false), volume(255), originalRate(-1),
-		pitchShiftPercent(100), fade(nullptr), puppet(SoundID()), newPuppet(false), movieChanged(false), loopPtr(nullptr),
-		lastCuePointIndex(-1), streamStartTime(0), cueWaitPolls(0), cuePumpTicksAtStart(0), cueVisits(0), loopsRemaining(0),
-		playListActive(false), paused(false) {}
+		// For precise isBusy(): when the current sound started (system ms) and its expected duration.
+			// Updated in setLastPlayedSound() for file-based sounds.
+			uint32 currentSoundStartTime;
+			uint32 currentSoundDuration;
+			// Grace period support: when sound logically ended (mixerElapsed >= duration),
+			// currentSoundStartTime is set to UINT32_MAX and currentSoundEndTime holds the
+			// wall-clock end time. isChannelActive() stays FALSE for 100ms after that.
+			uint32 currentSoundEndTime;
+
+			SoundChannel(): handle(), lastPlayedSound(SoundID()), stopOnZero(true), fromLastMovie(false), volume(255), originalRate(-1),
+				pitchShiftPercent(100), fade(nullptr), puppet(SoundID()), newPuppet(false), movieChanged(false), loopPtr(nullptr),
+				lastCuePointIndex(-1), streamStartTime(0), cueWaitPolls(0), cuePumpTicksAtStart(0), cueVisits(0), loopsRemaining(0),
+				playListActive(false), paused(false), lastFileDuration(0), currentSoundStartTime(0), currentSoundDuration(0), currentSoundEndTime(0) {}
 };
 
 class DirectorSound {

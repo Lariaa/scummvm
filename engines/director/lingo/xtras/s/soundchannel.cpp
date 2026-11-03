@@ -24,6 +24,7 @@
 #include "director/director.h"
 #include "director/cast.h"
 #include "director/castmember/castmember.h"
+#include "director/castmember/sound.h"
 #include "director/movie.h"
 #include "director/score.h"
 #include "director/sound.h"
@@ -157,8 +158,6 @@ Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 		// own cue points, which it never asks for. Printing the wall clock beside
 		// the value is what makes a stall visible: two reads far apart in time
 		// with the same number are the case that breaks the lip sync.
-		debugC(3, kDebugSound, "SoundChannelObject::getProp(): channel %d, %s = %d ms, read at %d ms",
-				_channel, propName.c_str(), elapsed, (int)g_system->getMillis());
 
 		return Datum(elapsed);
 	}
@@ -177,8 +176,32 @@ Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 			|| propName.equalsIgnoreCase("startTime") || propName.equalsIgnoreCase("sampleCount"))
 		return Datum(0);
 
-	if (propName.equalsIgnoreCase("endTime"))
-		return Datum((int)sound->getChannelElapsedTime(_channel));
+	if (propName.equalsIgnoreCase("endTime")) {
+		SoundID last = sound->getChannelLastPlayed(_channel);
+		if (last.type == kSoundCast) {
+			Cast *cast = g_director->getCurrentMovie()->getCast(CastMemberID(last.u.cast.member, last.u.cast.castLib));
+			if (cast) {
+				CastMember *member = cast->getCastMember(last.u.cast.member);
+				if (member && member->_type == kCastSound) {
+					SoundCastMember *soundCast = static_cast<SoundCastMember *>(member);
+					if (soundCast->_audio) {
+						int duration = (int)soundCast->_audio->getDuration();
+						return Datum(duration);
+					}
+				}
+			}
+		}
+		// File-based sound (playFile): return stored duration
+		if (last.type == kSoundFile) {
+			SoundChannel *channel = sound->getChannel(_channel);
+			if (channel && channel->lastFileDuration > 0) {
+				return Datum((int)channel->lastFileDuration);
+			}
+		} else {
+		}
+		int elapsed = (int)sound->getChannelElapsedTime(_channel);
+		return Datum(elapsed);
+	}
 
 	if (propName.equalsIgnoreCase("channelCount"))
 		return Datum(2);
@@ -212,7 +235,6 @@ void SoundChannelXtraObject::setProp(const Common::String &propName, const Datum
 
 	// status, elapsedTime and the loop counters are read-only per the dictionary;
 	// the rest we accept and drop rather than raise an error mid-playback.
-	debugC(3, kDebugXObj, "SoundChannelXtra::setProp: ignoring '%s' on channel %d", propName.c_str(), _channel);
 }
 
 void SoundChannelXtra::open(ObjectType type, const Common::Path &path) {
@@ -325,8 +347,6 @@ static bool readQueueEntry(const Datum &d, SoundQueueEntry &entry) {
 		entry.linkedPath = cast->getCast()->getLinkedPath(entry.member.member);
 
 		if (!entry.linkedPath.empty())
-			debugC(5, kDebugSound, "SoundChannelXtra: queued %s as '%s'",
-					entry.member.asString().c_str(), entry.linkedPath.c_str());
 	}
 
 	return true;
@@ -456,7 +476,8 @@ void SoundChannelXtra::m_isBusy(int nargs) {
 	g_lingo->dropStack(nargs);
 	int channel = receiverChannel();
 	DirectorSound *sound = channelSound(channel);
-	g_lingo->push(Datum((sound && sound->isChannelActive(channel) && !sound->isQueuePaused(channel)) ? 1 : 0));
+	bool isBusy = (sound && sound->isChannelActive(channel) && !sound->isQueuePaused(channel));
+	g_lingo->push(Datum(isBusy ? 1 : 0));
 }
 
 // fadeIn() drops the channel to silence at once and brings it back up to its

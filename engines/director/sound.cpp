@@ -42,6 +42,8 @@
 #include "director/window.h"
 #include "director/castmember/sound.h"
 
+#include <climits>
+
 namespace Director {
 
 DirectorSound::DirectorSound(Window *window) : _window(window) {
@@ -100,7 +102,6 @@ void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemb
 	Audio::AudioStream *sound = af.getAudioStream(false, false, DisposeAfterUse::YES);
 
 	if (!sound) {
-		debugC(1, kDebugSound, "DirectorSound::playFile(): channel %d, '%s' -> no audio stream decoded", soundChannel, filename.c_str());
 		return;
 	}
 
@@ -110,24 +111,31 @@ void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemb
 	// session, two of them carrying a MARK chunk that nobody reads. Say which
 	// member, if any, its cue points are taken from instead.
 	af.dumpChunks(Common::String::format("channel %d playFile '%s', cue points from %s",
-			soundChannel, filename.c_str(),
-			cuePointSource.isNull() ? "nowhere" : cuePointSource.asString().c_str()));
+		soundChannel, filename.c_str(),
+		cuePointSource.isNull() ? "nowhere" : cuePointSource.asString().c_str()));
+
+	// Get and store the file duration for endTime property
+	uint32 duration = af.getDuration();
+	_channels[soundChannel]->lastFileDuration = duration;
 
 	cancelFade(soundChannel);
 	stopSound(soundChannel);
 
 	setChannelDefaultVolume(soundChannel);
-	debugC(1, kDebugSound, "DirectorSound::playFile(): channel %d, '%s', enabled: %d, volume: %d (default %d)",
-		soundChannel, filename.c_str(), _enable, getChannelVolume(soundChannel), g_director->_defaultVolume);
 	_mixer->playStream(Audio::Mixer::kSFXSoundType, &_channels[soundChannel]->handle, sound, -1, getChannelVolume(soundChannel));
+	// Prime the mixer: force an immediate elapsed-time read so the first
+	// processCuePoints() call (triggered by Lingo property access) doesn't
+	// see a large "late" value. The mixer runs async; this read establishes
+	// the streamStartTime baseline.
+	_mixer->getSoundElapsedTime(_channels[soundChannel]->handle);
 	noteStreamStart(soundChannel);
 	_channels[soundChannel]->originalRate = (int)_mixer->getChannelRate(_channels[soundChannel]->handle);
 	if (_channels[soundChannel]->pitchShiftPercent != 100) {
 		_mixer->setChannelRate(_channels[soundChannel]->handle, _channels[soundChannel]->originalRate*_channels[soundChannel]->pitchShiftPercent/100);
 	}
 
-	// Set the last played sound so that cast member 0 in the sound channel doesn't stop this file.
-	setLastPlayedSound(soundChannel, SoundID(), false);
+	// Mark as file-based sound so endTime returns the stored duration
+	setLastPlayedSound(soundChannel, SoundID(kSoundFile, 0, 0), false);
 	// A file is played by name, so the empty id above leaves nothing to look the
 	// cue points up on. Remember the member that asked for it. The index starts
 	// over too: the elapsed time this is measured against restarts here.
@@ -143,6 +151,8 @@ void DirectorSound::playMCI(Audio::AudioStream &stream, uint32 from, uint32 to) 
 	// TODO: make sound enable settings work on this one
 	_mixer->stopHandle(_scriptSound);
 	_mixer->playStream(Audio::Mixer::kSFXSoundType, &_scriptSound, subSeekStream);
+	// Prime the mixer
+	_mixer->getSoundElapsedTime(_scriptSound);
 }
 
 uint8 DirectorSound::getChannelVolume(int soundChannel) {
@@ -188,6 +198,8 @@ void DirectorSound::playStream(Audio::AudioStream &stream, int soundChannel) {
 
 
 	_mixer->playStream(Audio::Mixer::kSFXSoundType, &_channels[soundChannel]->handle, &stream, -1, getChannelVolume(soundChannel));
+	// Prime the mixer (same rationale as playFile)
+	_mixer->getSoundElapsedTime(_channels[soundChannel]->handle);
 	noteStreamStart(soundChannel);
 	_channels[soundChannel]->originalRate = (int)_mixer->getChannelRate(_channels[soundChannel]->handle);
 	if (_channels[soundChannel]->pitchShiftPercent != 100) {
@@ -225,7 +237,6 @@ void DirectorSound::playCastMember(CastMemberID memberID, int soundChannel, bool
 		} else if (g_director->getVersion() >= 400 && !_channels[soundChannel]->fromLastMovie) {
 			// If there is a loopable stream specified, set the loop to expire by itself
 			if (_channels[soundChannel]->loopPtr) {
-				debugC(5, kDebugSound, "DirectorSound::playCastMember(): telling loop in channel %d to stop", soundChannel);
 				_channels[soundChannel]->loopPtr->setRemainingIterations(1);
 				_channels[soundChannel]->loopPtr = nullptr;
 			}
@@ -273,7 +284,6 @@ void DirectorSound::playCastMember(CastMemberID memberID, int soundChannel, bool
 				else
 					_channels[soundChannel]->loopPtr = nullptr;
 				playStream(*as, soundChannel);
-				debugC(5, kDebugSound, "DirectorSound::playCastMember(): playing cast ID %s, channel %d, looping %d, stopOnZero %d, forPuppet %d, volume %d", memberID.asString().c_str(), soundChannel, looping, stopOnZero, forPuppet, _channels[soundChannel]->volume);
 				setLastPlayedSound(soundChannel, memberID, stopOnZero);
 			}
 		} else {
@@ -337,7 +347,6 @@ void DirectorSound::registerFade(int soundChannel, int startVol, int targetVol, 
 	if (!assertChannel(soundChannel))
 		return;
 
-	debugC(5, kDebugSound, "DirectorSound::registerFade(): registered fading channel %d over %d ticks, startVol: %d, targetVol: %d, autostop: %d", soundChannel, ticks, startVol, targetVol, autoStop);
 
 	// sound enable is not working on fade sounds, so we just return directly when sounds are not enabling
 	if (!_enable)
@@ -377,7 +386,6 @@ bool DirectorSound::fadeChannels() {
 
 		int fadeVol = fadeVolume(fade);
 
-		debugC(5, kDebugSound, "DirectorSound::fadeChannel(): fading channel %d volume to %d", it._key, fadeVol);
 		_mixer->setChannelVolume(it._value->handle, fadeVol);
 
 		it._value->volume = fadeVol;
@@ -413,7 +421,6 @@ void DirectorSound::cancelFade(int soundChannel) {
 			_channels[soundChannel]->volume = restoreVol;
 			_volumes[soundChannel] = restoreVol;
 		}
-		debugC(5, kDebugSound, "DirectorSound::cancelFade(): resetting channel %d volume to %d", soundChannel, restoreVol);
 		_mixer->setChannelVolume(_channels[soundChannel]->handle, restoreVol);
 
 		delete fade;
@@ -439,7 +446,8 @@ SoundID DirectorSound::getChannelLastPlayed(int soundChannel) {
 	if (!assertChannel(soundChannel))
 		return SoundID();
 
-	return _channels[soundChannel]->lastPlayedSound;
+	SoundID result = _channels[soundChannel]->lastPlayedSound;
+	return result;
 }
 
 bool DirectorSound::isChannelActive(int soundChannel) {
@@ -454,6 +462,52 @@ bool DirectorSound::isChannelActive(int soundChannel) {
 	if (_channels[soundChannel]->loopPtr != nullptr)
 		return _channels[soundChannel]->loopPtr->getCompleteIterations() < 1;
 
+	// For precise isBusy(): if a sound's expected duration has elapsed,
+				// consider the channel inactive even if the mixer handle is still active (e.g.
+				// because a new sound started immediately). This gives Lingo scripts a chance
+				// to detect the end of a sound via sound(channel).isBusy().
+				// Use mixer elapsed time (not wall clock) for consistency with audio timing.
+				// Also enforce a minimum "inactive" grace period so frame-based scripts
+				// (running at ~30fps = 33ms/frame) reliably see the gap between sounds.
+				SoundChannel *channel = _channels[soundChannel];
+				uint32 expectedDuration = 0;
+
+				if (channel->lastPlayedSound.type == kSoundFile && channel->currentSoundDuration > 0) {
+					// File-based sound (playFile): use stored duration
+					expectedDuration = channel->currentSoundDuration;
+				} else if (channel->lastPlayedSound.type == kSoundCast) {
+					// Cast-based sound: look up duration from cast member
+					CastMemberID memberID(channel->lastPlayedSound.u.cast.member, channel->lastPlayedSound.u.cast.castLib);
+					CastMember *member = _window->getCurrentMovie()->getCastMember(memberID);
+					if (member && member->_type == kCastSound) {
+						SoundCastMember *soundCast = static_cast<SoundCastMember *>(member);
+						if (soundCast->_audio) {
+							expectedDuration = (uint32)soundCast->_audio->getDuration();
+						}
+					}
+				}
+
+				if (expectedDuration > 0) {
+					uint32 mixerElapsed = _mixer->getSoundElapsedTime(channel->handle);
+					if (mixerElapsed >= expectedDuration) {
+						// Mark that this sound has logically ended
+						if (channel->currentSoundStartTime != UINT32_MAX) {
+							channel->currentSoundStartTime = UINT32_MAX; // sentinel: sound ended
+							channel->currentSoundEndTime = g_system->getMillis();
+						}
+						return false;
+					}
+					// If sound already marked as ended, enforce grace period
+					if (channel->currentSoundStartTime == UINT32_MAX && channel->currentSoundEndTime > 0) {
+						uint32 now = g_system->getMillis();
+						if (now - channel->currentSoundEndTime < 200) { // 200ms grace period for smooth speaker transitions
+							return false;
+						}
+						// Grace period over, clear the sentinel
+						channel->currentSoundEndTime = 0;
+					}
+				}
+
 	return true;
 }
 
@@ -463,7 +517,6 @@ bool DirectorSound::assertChannel(int soundChannel) {
 		return false;
 	}
 	if (!_channels.contains(soundChannel)) {
-		debugC(5, kDebugSound, "DirectorSound::assertChannel(): allocating sound channel %d", soundChannel);
 		_channels[soundChannel] = new SoundChannel();
 	}
 	return true;
@@ -565,7 +618,6 @@ void DirectorSound::playExternalSound(uint16 menu, uint16 submenu, int soundChan
 		loadSampleSounds(menu);
 
 	if (1 <= submenu && submenu <= menuSounds.size()) {
-		debugC(5, kDebugSound, "DirectorSound::playExternalSound(): playing menu ID %d, submenu ID %d, channel %d, volume %d", menu, submenu, soundChannel, _channels[soundChannel]->volume);
 		playStream(*(menuSounds[submenu - 1]->getAudioStream()), soundChannel);
 		setLastPlayedSound(soundChannel, soundId);
 	} else {
@@ -608,6 +660,18 @@ void DirectorSound::setLastPlayedSound(int soundChannel, SoundID soundId, bool s
 	_channels[soundChannel]->lastPlayedSound = soundId;
 	_channels[soundChannel]->stopOnZero = stopOnZero;
 	_channels[soundChannel]->movieChanged = false;
+
+	// For precise isBusy(): track when a file-based sound starts and its duration
+	// Also reset grace period state when a new sound starts
+	if (soundId.type == kSoundFile) {
+		_channels[soundChannel]->currentSoundStartTime = g_system->getMillis();
+		_channels[soundChannel]->currentSoundDuration = _channels[soundChannel]->lastFileDuration;
+		_channels[soundChannel]->currentSoundEndTime = 0; // Clear any previous grace period
+	} else {
+		_channels[soundChannel]->currentSoundStartTime = 0;
+		_channels[soundChannel]->currentSoundDuration = 0;
+		_channels[soundChannel]->currentSoundEndTime = 0;
+	}
 }
 
 bool DirectorSound::isLastPlayedSound(int soundChannel, const SoundID &soundId) {
@@ -622,7 +686,6 @@ void DirectorSound::stopSound(int soundChannel) {
 	if (!assertChannel(soundChannel))
 		return;
 
-	debugC(5, kDebugSound, "DirectorSound::stopSound(): stopping channel %d", soundChannel);
 	if (_channels[soundChannel]->loopPtr)
 		_channels[soundChannel]->loopPtr = nullptr;
 	cancelFade(soundChannel);
@@ -633,7 +696,6 @@ void DirectorSound::stopSound(int soundChannel) {
 }
 
 void DirectorSound::stopSound() {
-	debugC(5, kDebugSound, "DirectorSound::stopSound(): stopping all channels");
 	for (auto &it : _channels) {
 		if (!it._value)
 			continue;
@@ -652,7 +714,6 @@ void DirectorSound::stopSound() {
 }
 
 void DirectorSound::systemBeep() {
-	debugC(5, kDebugSound, "DirectorSound::systemBeep(): beep!");
 	_speaker->play(Audio::PCSpeaker::kWaveFormSquare, 500, 150);
 }
 
@@ -698,7 +759,6 @@ void DirectorSound::playPuppetSound(int soundChannel) {
 	if (!_channels[soundChannel]->newPuppet)
 		return;
 
-	debugC(5, kDebugSound, "DirectorSound::playPuppetSound(): playing on channel %d", soundChannel);
 
 	_channels[soundChannel]->newPuppet = false;
 	playSound(_channels[soundChannel]->puppet, soundChannel, true);
@@ -1013,10 +1073,8 @@ void DirectorSound::setChannelVolume(int channel, uint8 volume) {
 	if (channel != -1) {
 		if (!assertChannel(channel))
 			return;
-		debugC(5, kDebugSound, "DirectorSound::setChannelVolume: setting channel %d to volume %d", channel, volume);
 		setChannelVolumeInternal(channel, volume);
 	} else {
-		debugC(5, kDebugSound, "DirectorSound::setChannelVolume: setting all channels to volume %d", volume);
 			for (auto &it : _channels)
 				setChannelVolumeInternal(it._key, volume);
 	}
@@ -1118,10 +1176,6 @@ void DirectorSound::processCuePoints() {
 		// them: no ticks means the frame loop never came round, ticks without
 		// visits means this channel was passed over.
 		if (channel->streamStartTime) {
-			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): channel %d: first poll with an active channel came %d ms after the stream reached the mixer, after %d pump runs, %d visits to this channel and %d polls that found it silent; the mixer already reports %d ms elapsed, and cue point 1 is due at %d ms",
-					it._key, g_system->getMillis() - channel->streamStartTime,
-					_cuePumpTicks - channel->cuePumpTicksAtStart, channel->cueVisits, channel->cueWaitPolls,
-					elapsedTime, soundCast->_cuePoints[0]);
 			channel->streamStartTime = 0;
 			channel->cueWaitPolls = 0;
 			channel->cueVisits = 0;
@@ -1142,8 +1196,6 @@ void DirectorSound::processCuePoints() {
 			// between the two numbers is that wait, and it is the thing to look
 			// at when a sequence feels a frame off. The old line printed the
 			// time alone and called it the number.
-			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): cue point %d ('%s') on channel %d: due at %d ms, sent at %d ms (%d late)",
-					(int)i + 1, cueName.c_str(), it._key, cuePoint, elapsedTime, (int)elapsedTime - cuePoint);
 
 			// "Notice that the channel is reported as sound2, which
 			// differentiates it from the sprite channels" (Director 8
@@ -1187,7 +1239,6 @@ bool SNDDecoder::loadStream(Common::SeekableReadStreamEndian &stream) {
 	}
 
 	if (debugChannelSet(5, kDebugLoading)) {
-		debugC(5, kDebugLoading, "snd header:");
 		stream.hexdump(0x4e);
 	}
 
@@ -1321,7 +1372,6 @@ Audio::AudioStream *SNDDecoder::getAudioStream(bool looping, bool forPuppet, Dis
 				return new Audio::LoopingAudioStream(stream, 0);
 			} else {
 				// Return an automatically looping stream.
-				debugC(5, kDebugSound, "DirectorSound::getAudioStream(): returning a loop at positions start: %i, end: %i", _loopStart, _loopEnd);
 				return new Audio::SubLoopingAudioStream(stream, 0, Audio::Timestamp(0, _loopStart, _rate), Audio::Timestamp(0, _loopEnd, _rate));
 			}
 		} else {
@@ -1521,8 +1571,6 @@ static bool readSWACuePoints(Common::SeekableReadStream *stream, Common::Array<i
 	// How many records were thrown away matters: the count a game sees is the
 	// one after this filter, and a table read at the wrong offset shows up as
 	// everything being skipped rather than as an error.
-	debugC(5, kDebugSound, "readSWACuePoints(): %d of %d records usable, %d skipped as unnamed or out of range",
-			(int)times.size(), (int)count, (int)skipped);
 
 	return !times.empty();
 }
@@ -1548,7 +1596,6 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 		return;
 	}
 
-	debugC(5, kDebugSound, "AIFF (%s): %s, %d bytes", context.c_str(), tag2str(form), (int)stream->size());
 
 	// COMM comes before MARK in every file measured, so by the time a marker is
 	// printed this holds the length to check its position against.
@@ -1564,8 +1611,6 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 		// The inventory first. The shared AIFF decoder names the chunks it steps
 		// over -- the logs hold thousands of "Skipping AIFF 'INST' chunk" -- but
 		// only their names, and only for files that reach it for playback.
-		debugC(5, kDebugSound, "AIFF (%s):   chunk '%s' at %d, %d bytes",
-				context.c_str(), tag2str(tag), (int)pos, (int)size);
 
 		if (tag == MKTAG('C', 'O', 'M', 'M') && size >= 18) {
 			stream->seek(body);
@@ -1583,13 +1628,9 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 			// The rate is what turns a marker's sample frame into a time, so a
 			// marker table that lands in the wrong place is just as likely to be
 			// this number's fault as the table's.
-			debugC(5, kDebugSound, "AIFF (%s):     COMM %d channels, %d frames, %d bits, rate %f -> %d ms",
-					context.c_str(), channels, frames, bits, rate,
-					rate > 0.0 ? (int)(frames / rate * 1000.0 + 0.5) : 0);
 		} else if (tag == MKTAG('M', 'A', 'R', 'K') && size >= 2) {
 			stream->seek(body);
 			uint16 count = stream->readUint16BE();
-			debugC(5, kDebugSound, "AIFF (%s):     MARK %d markers", context.c_str(), count);
 
 			for (uint16 i = 0; i < count && stream->pos() + 7 <= body + (int64)size; i++) {
 				// The id is what an INST loop points at, so print it rather than
@@ -1618,8 +1659,6 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 				if (markerId <= 0)
 					note += " -- id should be positive and non-zero";
 
-				debugC(5, kDebugSound, "AIFF (%s):       marker %d id %d: '%s' at frame %d%s",
-						context.c_str(), i + 1, markerId, name.c_str(), frame, note.c_str());
 			}
 		} else if (tag == MKTAG('I', 'N', 'S', 'T') && size >= 20) {
 			// Twenty fixed bytes, and the two loops name marker ids rather than
@@ -1640,10 +1679,6 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 			int16 relBegin = stream->readSint16BE();
 			int16 relEnd = stream->readSint16BE();
 
-			debugC(5, kDebugSound, "AIFF (%s):     INST base %d detune %d, notes %d-%d, velocity %d-%d, gain %d dB",
-					context.c_str(), baseNote, detune, lowNote, highNote, lowVel, highVel, gain);
-			debugC(5, kDebugSound, "AIFF (%s):     INST sustain loop mode %d marker %d..%d, release loop mode %d marker %d..%d",
-					context.c_str(), susMode, susBegin, susEnd, relMode, relBegin, relEnd);
 		} else if (tag == MKTAG('A', 'P', 'P', 'L') && size >= 4) {
 			// Application specific: a four-character signature and then whatever
 			// that application wanted. Say which application and show the start of
@@ -1658,8 +1693,6 @@ void debugDumpAIFF(Common::SeekableReadStream *stream, const Common::String &con
 					preview += Common::String::format("(%c)", (char)b);
 				preview += ' ';
 			}
-			debugC(5, kDebugSound, "AIFF (%s):     APPL '%s', %d bytes: %s",
-					context.c_str(), tag2str(signature), (int)size - 4, preview.c_str());
 		}
 
 		pos = body + size + (size & 1);
@@ -1712,8 +1745,6 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 	}
 
 	if (rate <= 0.0 || positions.empty() || positions.size() != markNames.size()) {
-		debugC(3, kDebugSound, "readAIFFCuePoints(): nothing usable -- rate %f, %d positions, %d names",
-				rate, (int)positions.size(), (int)markNames.size());
 		return false;
 	}
 
@@ -1757,8 +1788,6 @@ bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringA
 	delete stream;
 
 	if (found) {
-		debugC(3, kDebugSound, "AudioFileDecoder::getCuePoints(): %d cue points in '%s', first '%s' at %d ms",
-				(int)times.size(), _path.c_str(), names[0].c_str(), times[0]);
 
 		// Naming only the first one says nothing about a table that goes wrong
 		// in the middle, which is the way an offset or a rate is wrong: the
@@ -1766,8 +1795,6 @@ bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringA
 		// The numbering is the one Lingo uses -- cuePointNames and
 		// cuePointTimes are one-based, while _lastCuePointIndex counts from 0.
 		for (uint i = 0; i < times.size(); i++)
-			debugC(5, kDebugSound, "AudioFileDecoder::getCuePoints():   %d: '%s' at %d ms",
-					(int)i + 1, names[i].c_str(), times[i]);
 	}
 
 	return found;
@@ -1877,15 +1904,6 @@ bool MoaSoundFormatDecoder::loadHeaderStream(Common::SeekableReadStreamEndian &s
 	_format.bytesPerBlock = stream.readSint32BE();
 
 	if (debugChannelSet(5, kDebugLoading)) {
-		debugC(5, kDebugLoading, "MoaSoundFormatDecoder: Loading header");
-		debugC(5, kDebugLoading, "offset: %d, size: %d, playbackStart: %d, playbackStartFrame: %d",
-		_format.offset, _format.size, _format.playbackStart, _format.playbackStartFrame);
-		debugC(5, kDebugLoading, "loopStart: %d, loopStartEndFrame: %d, loopEnd: %d, loopEndFrame: %d",
-		_format.loopStart, _format.loopStartFrame, _format.loopEnd, _format.loopEndFrame);
-		debugC(5, kDebugLoading, "playbackEnd: %d, playbackEndFrame: %d, numFrames: %d, frameRate: %d, byteRate: %d",
-		_format.playbackEnd, _format.playbackEndFrame, _format.numFrames, _format.frameRate, _format.byteRate);
-		debugC(5, kDebugLoading, "bitsPerSample: %d, bytesPerSample: %d, numChannels: %d, bytesPerFrame: %d, bytesPerBlock: %d",
-		_format.bitsPerSample, _format.bytesPerSample, _format.numChannels, _format.bytesPerFrame, _format.bytesPerBlock);
 
 	}
 	return false;
