@@ -43,6 +43,7 @@ struct Node;
 struct Picture;
 class AbstractObject;
 class Cast;
+class Channel;
 class ScriptContext;
 class DirectorEngine;
 class Frame;
@@ -121,10 +122,13 @@ struct PArray {
 struct FArray {
 	bool _sorted;
 	DatumArray arr;
+	// For scriptInstanceList reference tracking: if non-null, this FArray is a reference
+	// to a channel's _scriptInstanceList and modifications should be written back.
+	class Channel *_scriptInstanceListChannel;
 
-	FArray() : _sorted(false) {}
+	FArray() : _sorted(false), _scriptInstanceListChannel(nullptr) {}
 
-	FArray(int size) : _sorted(false), arr(size) {}
+	FArray(int size) : _sorted(false), arr(size), _scriptInstanceListChannel(nullptr) {}
 };
 
 

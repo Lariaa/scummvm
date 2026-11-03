@@ -2031,9 +2031,12 @@ Datum Lingo::getTheSprite(Datum &id1, int field) {
 		d = (int)(sprite->_colorcode & 0x7);
 		break;
 	case kTheScriptInstanceList:
-		warning("STUB: Getting the scriptInstanceList");
-		d.type = PARRAY;
-		d.u.parr = new PArray;
+		d.type = ARRAY;
+		d.u.farr = new FArray;
+		d.u.farr->_scriptInstanceListChannel = channel;
+		for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
+			d.u.farr->arr.push_back(channel->_scriptInstanceList[i]);
+		}
 		break;
 	case kTheScriptNum:
 		if (g_director->getVersion() >= 600) {
@@ -2417,8 +2420,17 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 
 		break;
 	case kTheScriptInstanceList:
-		warning("STUB: Setting the scriptInstanceList");
+	{
+		channel->_scriptInstanceList.clear();
+		if (d.type == ARRAY) {
+			for (uint i = 0; i < d.u.farr->arr.size(); i++)
+				channel->_scriptInstanceList.push_back(d.u.farr->arr[i]);
+		} else if (d.type == PARRAY) {
+			for (uint i = 0; i < d.u.parr->arr.size(); i++)
+				channel->_scriptInstanceList.push_back(d.u.parr->arr[i].v);
+		}
 		break;
+	}
 	case kTheStartTime:
 		channel->_startTime = d.asInt();
 		if (sprite->_cast && sprite->_cast->_type == kCastDigitalVideo) {
