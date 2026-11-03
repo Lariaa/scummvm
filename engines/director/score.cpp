@@ -336,23 +336,26 @@ void Score::step() {
 			_movie->processInputEventQueue();
 		}
 		if (_version >= kFileVer300 && !_window->_newMovieStarted && _playState != kPlayStopped) {
-			if (!_skipIdle)
-				_movie->processEvent(kEventIdle);
+		if (!_skipIdle)
+			_movie->processEvent(kEventIdle);
 
-			if (_version >= kFileVer600) {
-				if (_movie->_currentHoveredSpriteId) {
-					_movie->processEvent(kEventMouseWithin, _movie->_currentHoveredSpriteId);
-				}
-
-				_soundManager->processCuePoints();
-			} else 	if (_version >= kFileVer500) {
-				// In D5, these events are only generated if a mouse button is pressed
-				bool isButtonDown = !Director::DT::isMouseInputIgnored() && (g_system->getEventManager()->getButtonState() != 0);
-				if (_movie->_currentHoveredSpriteId && isButtonDown) {
-					_movie->processEvent(kEventMouseWithin, _movie->_currentHoveredSpriteId);
-				}
+		if (_version >= kFileVer600) {
+			if (_movie->_currentHoveredSpriteId) {
+				_movie->processEvent(kEventMouseWithin, _movie->_currentHoveredSpriteId);
+			}
+		} else if (_version >= kFileVer500) {
+			// In D5, these events are only generated if a mouse button is pressed
+			bool isButtonDown = !Director::DT::isMouseInputIgnored() && (g_system->getEventManager()->getButtonState() != 0);
+			if (_movie->_currentHoveredSpriteId && isButtonDown) {
+				_movie->processEvent(kEventMouseWithin, _movie->_currentHoveredSpriteId);
 			}
 		}
+
+		// Process cue points every frame for lip-sync (not just on hover).
+		// TKKG 14 and other games use cue points (MB/ME markers) for mouth animation
+		// timing. Processing them only on mouse hover causes 100-200ms delays.
+		_soundManager->processCuePoints();
+	}
 	}
 
 	update();
@@ -1990,10 +1993,14 @@ uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 // The same walk, but for a click: it stops at the topmost sprite that handles
 // clicks and runs past the ones that only roll over. Measured in Director MX
 // (D-7f) -- see Sprite::scriptHandlesClick().
+// However, some scripts (like TKKG's QuestionsScript) only implement mouseUp
+// without mouseDown. To support those, we also check for rollover handlers
+// as a fallback -- a sprite with mouseUp but no mouseDown should still be
+// a click target.
 uint16 Score::getClickSpriteIDFromPos(Common::Point pos) {
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
-		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToClick() || instancesHandleMouse(_channels[i], true)))
+		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToClick() || instancesHandleMouse(_channels[i], true) || instancesHandleMouse(_channels[i], false)))
 			return i;
 		else if (test == kCollisionHole)
 			break;
@@ -2355,7 +2362,9 @@ void Score::loadFrames(Common::SeekableReadStreamEndian &stream, uint16 version,
 
 	// partically by channels, hence we keep it and read the score from left to right
 	// TODO Merge it with shared cast
-	_currentFrame = new Frame(this, _numChannelsDisplayed);
+	// Use _numChannels (actual channel count from file) not _numChannelsDisplayed (display limit).
+	// Some D6 games (e.g. TKKG11) have channels > 120 (e.g. 195, 196).
+	_currentFrame = new Frame(this, _numChannels);
 
 	_currentTempo = 0;
 	_currentPaletteId = CastMemberID(0, 0);
@@ -2689,7 +2698,8 @@ Frame *Score::getFrameData(int frameNum){
 	bool isFrameRead = loadFrame(frameNum, false);
 	Frame *tempFrame = _currentFrame;
 
-	_currentFrame = new Frame(this, _numChannelsDisplayed);
+	// Use _numChannels (actual channel count) for frame size to support channels > 120
+	_currentFrame = new Frame(this, _numChannels);
 	loadFrame(frameNum, true);
 	Frame *frame = _currentFrame;
 
