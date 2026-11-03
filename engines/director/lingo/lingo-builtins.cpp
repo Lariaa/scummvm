@@ -1019,6 +1019,14 @@ void LB::b_add(int nargs) {
 		list.u.farr->arr.push_back(value);
 		list.u.farr->_sorted = false;		// Drop the sorted flag
 	}
+
+	// If this is a scriptInstanceList reference, write back to the channel
+	if (list.u.farr->_scriptInstanceListChannel) {
+		Channel *channel = list.u.farr->_scriptInstanceListChannel;
+		channel->_scriptInstanceList.clear();
+		for (uint i = 0; i < list.u.farr->arr.size(); i++)
+			channel->_scriptInstanceList.push_back(list.u.farr->arr[i]);
+	}
 }
 
 void LB::b_addAt(int nargs) {
@@ -1036,6 +1044,14 @@ void LB::b_addAt(int nargs) {
 			list.u.farr->arr.push_back(Datum(0));
 	}
 	list.u.farr->arr.insert_at(index - 1, value);
+
+	// If this is a scriptInstanceList reference, write back to the channel
+	if (list.u.farr->_scriptInstanceListChannel) {
+		Channel *channel = list.u.farr->_scriptInstanceListChannel;
+		channel->_scriptInstanceList.clear();
+		for (uint i = 0; i < list.u.farr->arr.size(); i++)
+			channel->_scriptInstanceList.push_back(list.u.farr->arr[i]);
+	}
 }
 
 void LB::b_addProp(int nargs) {
@@ -1073,6 +1089,14 @@ void LB::b_append(int nargs) {
 
 	list.u.farr->arr.push_back(value);
 	list.u.farr->_sorted = false;		// Drop the sorted flag
+
+	// If this is a scriptInstanceList reference, write back to the channel
+	if (list.u.farr->_scriptInstanceListChannel) {
+		Channel *channel = list.u.farr->_scriptInstanceListChannel;
+		channel->_scriptInstanceList.clear();
+		for (uint i = 0; i < list.u.farr->arr.size(); i++)
+			channel->_scriptInstanceList.push_back(list.u.farr->arr[i]);
+	}
 }
 
 // The four chunk symbols Lingo accepts wherever a chunk expression can be named
@@ -1173,6 +1197,14 @@ void LB::b_deleteAll(int nargs) {
 	default:
 		break;
 	}
+
+	// If this is a scriptInstanceList reference, write back to the channel
+	if (list.type == ARRAY && list.u.farr->_scriptInstanceListChannel) {
+		Channel *channel = list.u.farr->_scriptInstanceListChannel;
+		channel->_scriptInstanceList.clear();
+		for (uint i = 0; i < list.u.farr->arr.size(); i++)
+			channel->_scriptInstanceList.push_back(list.u.farr->arr[i]);
+	}
 }
 
 void LB::b_deleteAt(int nargs) {
@@ -1204,6 +1236,14 @@ void LB::b_deleteAt(int nargs) {
 	default:
 		break;
 	}
+
+	// If this is a scriptInstanceList reference, write back to the channel
+	if (list.type == ARRAY && list.u.farr->_scriptInstanceListChannel) {
+		Channel *channel = list.u.farr->_scriptInstanceListChannel;
+		channel->_scriptInstanceList.clear();
+		for (uint i = 0; i < list.u.farr->arr.size(); i++)
+			channel->_scriptInstanceList.push_back(list.u.farr->arr[i]);
+	}
 }
 
 void LB::b_deleteOne(int nargs) {
@@ -1232,6 +1272,14 @@ void LB::b_deleteOne(int nargs) {
 	}
 	default:
 		TYPECHECK2(list, ARRAY, PARRAY);
+	}
+
+	// If this is a scriptInstanceList reference, write back to the channel
+	if (list.type == ARRAY && list.u.farr->_scriptInstanceListChannel) {
+		Channel *channel = list.u.farr->_scriptInstanceListChannel;
+		channel->_scriptInstanceList.clear();
+		for (uint i = 0; i < list.u.farr->arr.size(); i++)
+			channel->_scriptInstanceList.push_back(list.u.farr->arr[i]);
 	}
 }
 
