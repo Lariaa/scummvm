@@ -929,8 +929,14 @@ bool Window::loadNextMovie() {
 }
 
 bool Window::step() {
-	// finish last movie
-	if (_currentMovie && _currentMovie->getScore()->_playState == kPlayStopped) {
+	// finish last movie -- once. Only the stage's step() return reaches the main
+	// loop (director.cpp:385 drops a window's), so a movie in a window that stops
+	// stays stopped and gets stepped again on the next pass. stopPlay() guards
+	// itself, but the rest of this block did not: TKKG 10's score window logged
+	// "Finished playback" 2806 times in a two-minute run, once per frame, and
+	// requeueLingoPlayState() ran just as often.
+	if (_currentMovie && _currentMovie->getScore()->_playState == kPlayStopped
+			&& !_currentMovie->getScore()->_stopPlayCalled) {
 		// attempt to thaw the lingo play state, if required
 		// For movie switches, we want to run it in the context of the new movie.
 		if (_nextMovie.movie.empty() && getLingoPlayState())
