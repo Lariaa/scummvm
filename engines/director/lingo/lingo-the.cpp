@@ -2019,6 +2019,9 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 			channel->setNeedsDraw();
 		}
 		channel->setPosition(d.asPoint().x, d.asPoint().y);
+
+		sprite->setAutoPuppet(kAPLoc, true);
+
 		break;
 	case kTheLocH:
 		if (d.asInt() != channel->getPosition().x) {
@@ -2074,6 +2077,7 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		if (!d.asInt()) {
 			// TODO: Properly reset sprite properties after puppet disabled.
 			sprite->_moveable = false;
+			sprite->_autoPuppet = kAPNone;
 		}
 		break;
 	case kTheRect:

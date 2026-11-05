@@ -511,12 +511,15 @@ void Score::updateCurrentFrame() {
 		// This copies in the frame data and updates _curFrameNumber.
 		loadFrame(nextFrameNumberToLoad, true);
 
-		for (uint ch = 0; ch < _channels.size(); ch++)
-			_channels[ch]->_sprite->releaseAutoPuppet(_currentFrame->_sprites[ch]->_copyBackMask);
+		for (uint ch = 0; ch < _channels.size(); ch++) {
+			uint32 copyBackMask = _currentFrame->_sprites[ch]->_copyBackMask;
+			if (copyBackMask != static_cast<uint32>(kSCBNoMask))
+				_channels[ch]->_sprite->releaseAutoPuppet(copyBackMask);
+		}
 
 		// Finally, update the channels and buffer any dirty rectangles.
 		// This will ignore any channel data that is overridden with the puppet flag.
-		updateSprites(kRenderModeNormal, true);
+		updateSprites(kRenderModeNormal, true, true);
 	} else if (!_window->_playbackPaused) {
 		// Loading the same frame; e.g. "go to frame".
 		// This is mostly a no-op, however any sprite changes for
@@ -962,7 +965,7 @@ void Score::incrementFilmLoops() {
 	}
 }
 
-void Score::updateSprites(RenderMode mode, bool withClean) {
+void Score::updateSprites(RenderMode mode, bool withClean, bool frameChanged) {
 	if (_window->_newMovieStarted)
 		mode = kRenderForceUpdate;
 
@@ -978,6 +981,16 @@ void Score::updateSprites(RenderMode mode, bool withClean) {
 		Channel *channel = _channels[i];
 		Sprite *currentSprite = channel->_sprite;
 		Sprite *nextSprite = _currentFrame->_sprites[i];
+
+		bool autoPuppetContested = frameChanged && currentSprite && nextSprite &&
+			!currentSprite->_puppet && currentSprite->_autoPuppet &&
+			currentSprite->_castId != nextSprite->_castId;
+		bool ownsLiveSpan = nextSprite && channel->_startFrame != -1 &&
+			channel->_startFrame == nextSprite->_spriteInfo.startFrame;
+
+		if (autoPuppetContested && !ownsLiveSpan && (nextSprite->_copyBackMask & kSCBCastId)) {
+			currentSprite->_autoPuppet = 0;
+		}
 
 		// widget content has changed and needs a redraw.
 		// this doesn't include changes in dimension or position!
