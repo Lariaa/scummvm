@@ -348,6 +348,15 @@ bool Sprite::getEditable() {
 	return _editable || _cast->isEditable();
 }
 
+static bool scriptHandlesMouse(ScriptContext *script) {
+	return script && (script->_eventHandlers.contains(kEventMouseDown)
+				   || script->_eventHandlers.contains(kEventMouseUp)
+				   || script->_eventHandlers.contains(kEventMouseWithin)
+				   || script->_eventHandlers.contains(kEventMouseEnter)
+				   || script->_eventHandlers.contains(kEventMouseLeave)
+				   || script->_eventHandlers.contains(kEventMouseUpOutSide));
+}
+
 bool Sprite::respondsToMouse() {
 	if (_moveable)
 		return true;
@@ -360,21 +369,20 @@ bool Sprite::respondsToMouse() {
 	if (_cast && _cast->_type == kCastMovie)
 		return ((MovieCastMember *)_cast)->_enableScripts;
 
-	// TODO: Check if we need to check against individual events like below
 	if (g_director->getVersion() >= 600) {
-		if (_behaviors.size() > 0)
-			return true;
+		for (uint i = 0; i < _behaviors.size(); i++) {
+			if (scriptHandlesMouse(_movie->getScriptContext(kScoreScript, _behaviors[i].memberID)))
+				return true;
+		}
 	}
 
 	ScriptContext *spriteScript = _movie->getScriptContext(kScoreScript, _scriptId);
 	if (spriteScript && (spriteScript->_eventHandlers.contains(kEventGeneric)
-					|| spriteScript->_eventHandlers.contains(kEventMouseDown)
-					|| spriteScript->_eventHandlers.contains(kEventMouseUp)))
+					  || scriptHandlesMouse(spriteScript)))
 		return true;
 
 	ScriptContext *castScript = _movie->getScriptContext(kCastScript, _castId);
-	if (castScript && (castScript->_eventHandlers.contains(kEventMouseDown)
-					|| castScript->_eventHandlers.contains(kEventMouseUp)))
+	if (scriptHandlesMouse(castScript))
 		return true;
 
 	return false;
@@ -385,6 +393,9 @@ bool Sprite::isActive() {
 		return true;
 
 	if (_cast && _cast->_type == kCastButton)
+		return true;
+
+	if (g_director->getVersion() >= 600 && _behaviors.size() > 0)
 		return true;
 
 	return (_movie->getScriptContext(kScoreScript, _scriptId) != nullptr)
