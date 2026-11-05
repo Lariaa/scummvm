@@ -1,0 +1,89 @@
+-- ============================================================================
+-- getOne() / getPos() ARRAY & PARRAY comparison -- version behaviour check
+-- ============================================================================
+--
+-- How getOne(list, value) and getPos(list, value) match a value that is
+-- itself a list / property list:
+--
+--   * Director 4 and 5 : match by OBJECT IDENTITY  -> a freshly built,
+--                        value-equal list never matches.
+--   * Director 6 and 7 : match by CONTENTS (element-wise, recursive; strings
+--                        stay case-sensitive) -> a value-equal list matches
+--                        even when freshly built.
+--
+-- Exercises LC::eqDataStrict (engines/director/lingo/lingo-code.cpp), which
+-- switches behaviour at getVersion() >= 600. Expected values were confirmed
+-- on real Director 4/5/6/7 (2026-07-04); see the verification matrix in
+-- array-getpos-version-results.md. The manual Message-Window protocol used
+-- for that run is kept as the handler at the bottom of this file.
+-- ============================================================================
+
+set save to the scummvmVersion
+
+-- --- D4/D5: object identity, fresh value-equal lists never match ---
+
+set the scummvmVersion to 400
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [20, 5]), 0)
+scummvmAssertEqual(getOne([#a, #b, [1, 2, 3]], [1, 2, 3]), 0)
+scummvmAssertEqual(getPos([#x: [1, 2], #y: [3, 4]], [3, 4]), 0)
+scummvmAssertEqual(getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]]), 0)
+
+set the scummvmVersion to 500
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [20, 5]), 0)
+scummvmAssertEqual(getOne([#a, #b, [1, 2, 3]], [1, 2, 3]), 0)
+scummvmAssertEqual(getPos([#x: [1, 2], #y: [3, 4]], [3, 4]), 0)
+scummvmAssertEqual(getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]]), 0)
+
+-- --- D6/D7: contents comparison, recursive, value-equal lists match ---
+
+set the scummvmVersion to 600
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [20, 5]), 2)
+scummvmAssertEqual(getOne([#a, #b, [1, 2, 3]], [1, 2, 3]), 3)
+scummvmAssertEqual(getPos([#x: [1, 2], #y: [3, 4]], [3, 4]), 2)
+scummvmAssertEqual(getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]]), 2)
+
+set the scummvmVersion to 700
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [20, 5]), 2)
+scummvmAssertEqual(getOne([#a, #b, [1, 2, 3]], [1, 2, 3]), 3)
+scummvmAssertEqual(getPos([#x: [1, 2], #y: [3, 4]], [3, 4]), 2)
+scummvmAssertEqual(getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]]), 2)
+
+-- --- controls: identical in every version ---
+
+set the scummvmVersion to 400
+set sub to [1, 2, 3]
+scummvmAssertEqual(getOne([#a, #b, sub], sub), 3)
+scummvmAssertEqual(getPos([5, 10, 15], 10), 2)
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [99, 99]), 0)
+scummvmAssertEqual(getOne([#a, "urgh", "URGH"], "URGH"), 3)
+scummvmAssertEqual(getOne([#a, "urgh"], "URGH"), 0)
+
+set the scummvmVersion to 700
+set sub to [1, 2, 3]
+scummvmAssertEqual(getOne([#a, #b, sub], sub), 3)
+scummvmAssertEqual(getPos([5, 10, 15], 10), 2)
+scummvmAssertEqual(getPos([[13, 14], [20, 5], [7, 7]], [99, 99]), 0)
+scummvmAssertEqual(getOne([#a, "urgh", "URGH"], "URGH"), 3)
+scummvmAssertEqual(getOne([#a, "urgh"], "URGH"), 0)
+
+-- all test files share one engine state: always restore the version
+set the scummvmVersion to save
+
+-- ============================================================================
+-- Manual protocol for real Director (Message Window / .DIR movie): type
+-- testArrayVersioning in the Message Window. Expected results per version
+-- are listed in array-getpos-version-results.md.
+-- ============================================================================
+on testArrayVersioning
+  put "--- getOne/getPos ARRAY compare (D4/D5 = identity, D6+ = contents) ---"
+  put "A1 getPos coord [20,5]  =>" && getPos([[13, 14], [20, 5], [7, 7]], [20, 5])
+  put "A2 getOne [1,2,3]       =>" && getOne([#a, #b, [1, 2, 3]], [1, 2, 3])
+  put "A3 getPos parray [3,4]  =>" && getPos([#x: [1, 2], #y: [3, 4]], [3, 4])
+  put "A4 getPos nested        =>" && getPos([[1, [2, 3]], [4, [5, 6]]], [4, [5, 6]])
+  set sub to [1, 2, 3]
+  put "C1 same object (=>3)    =>" && getOne([#a, #b, sub], sub)
+  put "C2 scalar 10 (=>2)      =>" && getPos([5, 10, 15], 10)
+  put "C3 not found (=>0)      =>" && getPos([[13, 14], [20, 5], [7, 7]], [99, 99])
+  put "S1 case exact (=>3)     =>" && getOne([#a, "urgh", "URGH"], "URGH")
+  put "S2 case mismatch (=>0)  =>" && getOne([#a, "urgh"], "URGH")
+end
