@@ -148,7 +148,9 @@ public:
 	}
 
 	void setVisible(bool visible, bool silent = false);
-	bool setNextMovie(Common::String &movieFilenameRaw);
+	// `branching` false means "a window now points at this file", which must not
+	// reload the movie that is already running. See MovieReference::branch.
+	bool setNextMovie(Common::String &movieFilenameRaw, bool branching = true);
 
 	void ensureMovieIsLoaded();
 
