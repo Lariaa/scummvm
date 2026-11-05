@@ -257,4 +257,8 @@ scummvmAssert(not(v1 = "what"))
 scummvmAssert(v1 < "what")
 scummvmAssert(not(v1 > "what"))
 
+-- All test files share one engine state: leaving the version at 500 makes
+-- later files run (and miscompile field refs) under D5 semantics.
+set the scummvmVersion to 400
+
 
