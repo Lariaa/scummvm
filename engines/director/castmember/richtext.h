@@ -46,6 +46,13 @@ public:
 	void setField(int field, const Datum &value) override;
 
 	Common::String getText() { return Common::String(_plainText); }
+
+	// The colour this member paints its own background in, expressed in the
+	// current output format. Background-transparent ink masks out a real colour,
+	// so it has to key this rather than the sprite's backColor (see
+	// Channel::getPlotData()).
+	uint32 getBackgroundColor();
+
 	uint32 getCastDataSize() override;
 	void writeCastData(Common::SeekableWriteStream *writeStream) override;
 	bool canWriteCastData() override;
