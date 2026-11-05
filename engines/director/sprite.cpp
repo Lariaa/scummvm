@@ -661,6 +661,9 @@ void Sprite::setCast(CastMemberID memberID, bool replaceDims) {
 				_height = dims.height();
 				break;
 			}
+
+			if (_width < 0 || _height < 0)
+				warning("Sprite::setCast(): %s has a negative extent %dx%d", memberID.asString().c_str(), _width, _height);
 		}
 
 	} else {
