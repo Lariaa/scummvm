@@ -329,6 +329,22 @@ bool Window::render(bool forceRedraw, Graphics::ManagedSurface *blitTo) {
 	if (g_director->_debugDraw & kDebugDrawFrame)
 		drawFrameCounter(blitTo);
 
+	// [TEMP] Credits experiment (TKKG 6): the stage is opaque, but MacWindow::draw()
+	// skips alpha-0 pixels of the compose surface, so any pixel a keyed ink leaves at
+	// alpha 0 would let the previous frame show through.
+	if (blitTo->format.bytesPerPixel == 4 && blitTo->format.aBits() > 0) {
+		const uint32 aMask = (0xFFu >> blitTo->format.aLoss) << blitTo->format.aShift;
+		for (const Common::Rect &dr : dirtyRects) {
+			Common::Rect c = dr;
+			c.clip(blitTo->getBounds());
+			for (int y = c.top; y < c.bottom; y++) {
+				uint32 *p = (uint32 *)blitTo->getBasePtr(c.left, y);
+				for (int x = c.left; x < c.right; x++, p++)
+					*p |= aMask;
+			}
+		}
+	}
+
 	debugC(7, kDebugImages, "Window::render(): Draw cycle finished in %d ms, %d dirty rects",  g_system->getMillis() - renderStartTime, dirtyRects.size());
 
 	dirtyRects.clear();
