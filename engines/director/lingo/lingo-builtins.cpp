@@ -3327,6 +3327,9 @@ void LB::b_puppetSprite(int nargs) {
 			Sprite *target = sc->getSpriteById(spriteId);
 			bool val = (bool)state.asInt();
 			target->_puppet = val;
+			if (!val) {
+				target->_autoPuppet = kAPNone;
+			}
 		} else {
 			warning("b_puppetSprite: sprite index out of bounds");
 		}
