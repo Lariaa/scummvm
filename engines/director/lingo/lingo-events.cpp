@@ -1011,9 +1011,24 @@ void Score::createScriptInstances(int frameNum) {
 		Channel *channel = _channels[i];
 		Sprite *sprite = channel->_sprite;
 
-		// The frame does not belong to the range
-		if (frameNum < channel->_startFrame || frameNum > channel->_endFrame)
+		// The frame does not belong to the range.
+
+		if (channel->_startFrame == -1) {
+			if (i < (int)_currentFrame->_sprites.size()) {
+				Sprite *nextSprite = _currentFrame->_sprites[i];
+				if (nextSprite && nextSprite->_spriteInfo.startFrame == frameNum) {
+					sprite = nextSprite;
+					channel->_startFrame = nextSprite->_spriteInfo.startFrame;
+					channel->_endFrame   = nextSprite->_spriteInfo.endFrame;
+				} else {
+					continue;
+				}
+			} else {
+				continue;
+			}
+		} else if (frameNum < channel->_startFrame || frameNum > channel->_endFrame) {
 			continue;
+		}
 
 		// We create scriptInstance only for new sprites
 		if (channel->_scriptInstanceList.size() != 0)
