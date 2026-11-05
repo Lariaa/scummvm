@@ -776,7 +776,7 @@ void Score::update() {
 		if (_version >= kFileVer600) {
 			bool prevDis = _disableGoPlayUpdateStage;
 			_disableGoPlayUpdateStage = true;
-
+			createScriptInstances(_curFrameNumber);
 			_movie->broadcastEvent(kEventPrepareFrame);
 
 			_disableGoPlayUpdateStage = prevDis;
