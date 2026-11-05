@@ -529,6 +529,25 @@ void Channel::setClean(Sprite *nextSprite, bool partial) {
 		if (_sprite->_puppet || _sprite->_autoPuppet || (!nextSprite->isQDShape() && partial)) {
 			// Updating scripts, etc. does not require a full re-render
 			_sprite->_scriptId = nextSprite->_scriptId;
+
+			if (!_sprite->_puppet && _sprite->getAutoPuppet(kAPCast) &&
+					_sprite->_castId != nextSprite->_castId &&
+					!_sprite->getAutoPuppet(kAPLoc) && !_sprite->getAutoPuppet(kAPLocH) &&
+					!_sprite->getAutoPuppet(kAPLocV) && !_sprite->getAutoPuppet(kAPBbox) &&
+					!_sprite->getAutoPuppet(kAPRect) &&
+					(nextSprite->_copyBackMask & kSCBStartPoint) &&
+					_sprite->_startPoint != nextSprite->_startPoint) {
+
+				Common::Point regOff = _sprite->_cast ?
+					_sprite->_cast->getRegistrationOffset(_sprite->_width, _sprite->_height) :
+					Common::Point(0, 0);
+				int newLeft = nextSprite->_startPoint.x - regOff.x;
+				int newTop = nextSprite->_startPoint.y - regOff.y;
+				if (newLeft > -_sprite->_width / 2 && newTop > -_sprite->_height / 2) {
+					_sprite->_startPoint = nextSprite->_startPoint;
+					setDirty();
+				}
+			}
 		} else {
 			previousCastId = _sprite->_castId;
 			replaceSprite(nextSprite);
