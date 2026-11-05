@@ -33,6 +33,7 @@
 #include "director/castmember/digitalvideo.h"
 #include "director/castmember/filmloop.h"
 #include "director/castmember/movie.h"
+#include "director/castmember/richtext.h"
 #include "director/castmember/text.h"
 
 #include "graphics/macgui/mactext.h"
@@ -178,6 +179,17 @@ DirectorPlotData Channel::getPlotData() {
 		}
 	}
 
+	// A RichText member renders its own background, in the *member's* bgColor.
+	// Background-transparent ink masks out a real colour, and the sprite's backColor
+	// need not be the colour the member actually painted: TKKG6's credits are white
+	// text on a black member background while the sprite's backColor is white, so
+	// keying the sprite's colour knocked out the glyphs instead of the background and
+	// left nothing but their anti-aliased outlines. Key what the member painted.
+	if (_sprite->_cast && _sprite->_cast->_type == kCastRichText
+			&& _sprite->_ink == kInkTypeBackgndTrans) {
+		pd.backColor = ((RichTextCastMember *)_sprite->_cast)->getBackgroundColor();
+	}
+
 	return pd;
 }
 
@@ -230,6 +242,28 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 		} else {
 			return nullptr;
 		}
+	} else if (_sprite->_ink == kInkTypeBackgndTrans && _sprite->_cast->_type == kCastBitmap &&
+			((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 32) {
+		// Background Transparent on a 32-bit source does two things in Director,
+		// measured in Director MX with a 32-bit probe: the alpha channel is
+		// composited *and* the sprite's background colour is keyed out. ScummVM
+		// only ever did the second, because this ink is not in the needsMatte
+		// list above, so the blitter fell through to `src == backColor` and the
+		// alpha plane was never looked at.
+		//
+		// That is what leaves the black boxes around Loewenzahn 8's treasure
+		// chests. Its artwork is 32-bit (5510 of 5758 bitmaps) with the
+		// background already marked clear by alpha (0x00f0f0f0 in the probe
+		// data), and 31042 of its sprites use this ink. The colour key cannot
+		// help there: the score stores background colour *index 0* for 30834 of
+		// them, which transformColor() turns into white, while the opaque
+		// artwork behind it is 240-grey, black or wood brown.
+		//
+		// Only 32-bit sources: at 1 and 8 bits there is no alpha plane, and a
+		// flood-fill matte would be a guess where the colour key is the real
+		// mechanism. The key itself is kept -- see the srfMask branch of
+		// kInkTypeBackgndTrans in graphics.cpp.
+		return ((BitmapCastMember *)_sprite->_cast)->getMatte(bbox);
 	} else if (_sprite->_ink == kInkTypeMask) {
 		CastMemberID maskID(_sprite->_castId.member + 1, _sprite->_castId.castLib);
 		CastMember *member = g_director->getCurrentMovie()->getCastMember(maskID);
