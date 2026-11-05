@@ -297,12 +297,20 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			}
 
 			if (_vm->getVersion() >= 600) {
-				event.scriptType = kScoreScript;
-				event.scriptId = scriptId;
+				AbstractObject *scriptInstance = nullptr;
 				if (event.behaviorIndex >= 0 && event.behaviorIndex < (int)_score->_channels[event.channelId]->_scriptInstanceList.size())
-					event.scriptInstance = _score->_channels[event.channelId]->_scriptInstanceList[event.behaviorIndex].u.obj;
+					scriptInstance = _score->_channels[event.channelId]->_scriptInstanceList[event.behaviorIndex].u.obj;
 				else
 					warning("resolveScriptEvent: behaviorIndex %d out of range", event.behaviorIndex);
+
+				const char *evName = _lingo->_eventHandlerTypes[event.event];
+				bool hasHandler = evName && scriptInstance && scriptInstance->getMethod(evName).type != VOIDSYM;
+
+				if (hasHandler) {
+					event.scriptType = kScoreScript;
+					event.scriptId = scriptId;
+					event.scriptInstance = scriptInstance;
+				}
 				return;
 			}
 
@@ -638,9 +646,26 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 			queue.push(LingoEvent(event, eventId, kCastHandler, false, pos, channelId));
 			// fall through
 
-		case kEventIdle:
 		case kEventEnterFrame:
 		case kEventExitFrame:
+
+			if ((event == kEventEnterFrame || event == kEventExitFrame) && _vm->getVersion() >= 600) {
+				for (uint ch = 1; ch < _score->_channels.size(); ch++) {
+					Channel *channel = _score->_channels[ch];
+					if (!channel || !channel->_sprite || channel->_sprite->_behaviors.empty())
+						continue;
+
+					// Generate an event for each behavior. Pass through by
+					// default so the message continues to the remaining
+					// behaviors and ultimately the frame and movie scripts,
+					// unless a behavior explicitly calls dontPassEvent.
+					for (uint i = 0; i < channel->_scriptInstanceList.size(); i++)
+						queue.push(LingoEvent(event, eventId, kSpriteHandler, true, pos, ch, i));
+				}
+			}
+			// fall through
+
+		case kEventIdle:
 		case kEventTimeout:
 			queue.push(LingoEvent(event, eventId, kFrameHandler, false, pos, channelId));
 			// fall through
