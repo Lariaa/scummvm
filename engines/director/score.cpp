@@ -46,6 +46,7 @@
 #include "director/channel.h"
 #include "director/sprite.h"
 #include "director/window.h"
+#include "director/lingo/lingo-object.h"
 #include "director/castmember/castmember.h"
 #include "director/castmember/filmloop.h"
 #include "director/castmember/movie.h"
@@ -1700,10 +1701,26 @@ uint16 Score::getSpriteIDFromPos(Common::Point pos) {
 	return 0;
 }
 
+static bool instancesHandleMouse(Channel *channel) {
+	static const LEvent mouseEvents[] = { kEventMouseDown, kEventMouseUp, kEventMouseWithin,
+										  kEventMouseEnter, kEventMouseLeave, kEventMouseUpOutSide };
+	for (uint i = 0; i < channel->_scriptInstanceList.size(); i++) {
+		const Datum &scriptInstance = channel->_scriptInstanceList[i];
+		if (scriptInstance.type != OBJECT || !scriptInstance.u.obj)
+			continue;
+		for (int j = 0; j < ARRAYSIZE(mouseEvents); j++) {
+			const char *name = g_lingo->_eventHandlerTypes[mouseEvents[j]];
+			if (name && scriptInstance.u.obj->getMethod(name).type != VOIDSYM)
+				return true;
+		}
+	}
+	return false;
+}
+
 uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
-		if (test == kCollisionYes && _channels[i]->_sprite->respondsToMouse())
+		if (test == kCollisionYes && (_channels[i]->_sprite->respondsToMouse() || instancesHandleMouse(_channels[i])))
 			return i;
 		else if (test == kCollisionHole)
 			break;
@@ -1715,7 +1732,7 @@ uint16 Score::getMouseSpriteIDFromPos(Common::Point pos) {
 uint16 Score::getActiveSpriteIDFromPos(Common::Point pos) {
 	for (int i = _channels.size() - 1; i >= 0; i--) {
 		CollisionTest test = _channels[i]->isMouseIn(pos);
-		if (test == kCollisionYes && _channels[i]->_sprite->isActive())
+		if (test == kCollisionYes && (_channels[i]->_sprite->isActive() || !_channels[i]->_scriptInstanceList.empty()))
 			return i;
 		else if (test == kCollisionHole)
 			break;
