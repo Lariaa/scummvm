@@ -1132,20 +1132,20 @@ Common::Path findPath(const Common::String &path, bool currentFolder, bool searc
 	return Common::Path();
 }
 
-Common::Path findMoviePath(const Common::String &path, bool currentFolder, bool searchPaths, Common::String currentPath) {
+Common::Path findMoviePath(const Common::String &path, bool currentFolder, bool searchPaths, Common::String currentPath, bool preferCast) {
 	const char *extsD3[] = { ".MMM", nullptr };
 	const char *extsD4[] = { ".DIR", ".DXR", ".EXE", nullptr };
 	const char *extsD5[] = { ".DIR", ".DXR", ".CST", ".CXT", ".EXE", nullptr };
 	const char *extsD6[] = { ".DIR", ".DXR", ".CST", ".CXT", ".EXE", ".DCR", ".DCT", ".CCT", nullptr };
 
 	// When resolving an external cast reference (the path already carries a cast
-	// extension), prefer cast archives over movie archives. Otherwise a cast like
+	// extension, or the caller wants a cast), prefer cast archives over movie archives. Otherwise a cast like
 	// "Sz01.cst" would resolve to the "Sz01.dxr" movie (tried before ".CXT") instead
 	// of the intended "Sz01.cxt" cast, loading a wrong/short cast and leaving sprites
 	// unable to find their members.
 	const char *castExtsD5[] = { ".CST", ".CXT", ".DIR", ".DXR", ".EXE", nullptr };
 	const char *castExtsD6[] = { ".CST", ".CXT", ".DIR", ".DXR", ".EXE", ".DCR", ".DCT", ".CCT", nullptr };
-	const bool isCastRef = path.hasSuffixIgnoreCase(".cst") || path.hasSuffixIgnoreCase(".cxt");
+	const bool isCastRef = preferCast || path.hasSuffixIgnoreCase(".cst") || path.hasSuffixIgnoreCase(".cxt");
 
 	const char **exts = nullptr;
 	if (g_director->getVersion() < 400) {
