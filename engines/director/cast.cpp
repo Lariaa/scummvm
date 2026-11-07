@@ -806,8 +806,17 @@ void Cast::loadCast() {
 	if (_isExternal) {
 		libResourceId = 1024;
 		Common::Array<uint16> casStar = _castArchive->getResourceIDList(MKTAG('C', 'A', 'S', '*'));
-		if (!casStar.empty())
-			libResourceId = _castArchive->getResourceDetail(MKTAG('C', 'A', 'S', '*'), casStar[0]).libResourceId;
+		// The resource map is unordered and may hold empty leftovers of
+		// removed casts, so take the lowest id among the non-empty ones.
+		bool found = false;
+		for (auto &id : casStar) {
+			Resource res = _castArchive->getResourceDetail(MKTAG('C', 'A', 'S', '*'), id);
+			if (res.size == 0)
+				continue;
+			if (!found || res.libResourceId < libResourceId)
+				libResourceId = res.libResourceId;
+			found = true;
+		}
 	}
 
 	// The font maps belong to the cast LIBRARY, not to the movie. In D7-style
