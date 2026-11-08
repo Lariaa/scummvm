@@ -217,6 +217,9 @@ bool Movie::processSysEvent(Common::Event &event) {
 				pos = _draggingSpriteOffset + event.mouse;
 				_currentDraggedChannel->setPosition(pos.x, pos.y, true);
 				_currentDraggedChannel->setDirty();
+				debugC(3, kDebugEvents, "Movie::processSysEvent(): dragging member %s to %d,%d, landed at %d,%d",
+						_currentDraggedChannel->_sprite->_castId.asString().c_str(), pos.x, pos.y,
+						_currentDraggedChannel->getPosition().x, _currentDraggedChannel->getPosition().y);
 			} else {
 				_currentDraggedChannel = nullptr;
 			}

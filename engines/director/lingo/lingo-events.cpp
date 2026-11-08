@@ -195,6 +195,11 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 				if (cast && cast->_type == kCastButton)
 					_mouseDownWasInButton = true;
 
+				debugC(3, kDebugEvents, "Movie::processEvent(mouseDown): channel %d, member %s, moveable %d, constraint %d",
+						event.channelId, _score->_channels[event.channelId]->_sprite->_castId.asString().c_str(),
+						_score->_channels[event.channelId]->_sprite->_moveable,
+						_score->_channels[event.channelId]->_constraint);
+
 				if (_score->_channels[event.channelId]->_sprite->_moveable) {
 					_draggingSpriteOffset = _score->_channels[event.channelId]->getPosition() - event.mousePos;
 					_currentDraggedChannel = _score->_channels[event.channelId];
