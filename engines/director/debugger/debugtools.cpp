@@ -439,6 +439,16 @@ ImGuiImage getShapeID(CastMember *castMember) {
 
 	ShapeCastMember *shapeMember = (ShapeCastMember *)castMember;
 
+	Common::Rect bbox(castMember->getBbox());
+
+	// A shape can carry a degenerate rect: TKKG 14's BagMenuBar member 5
+	// "scroll_line" is a rectangle 0 pixels wide and 157 tall, which still
+	// draws as a line. The surface below then holds no pixels and
+	// getImGuiTexture() asserts, so leave the thumbnail out, as the bitmap
+	// and text paths do when their widget has none.
+	if (bbox.isEmpty())
+		return {};
+
 	// Make a temporary Sprite
 	Sprite *sprite = new Sprite();
 	sprite->_movie = g_director->getCurrentMovie();
@@ -451,8 +461,6 @@ ImGuiImage getShapeID(CastMember *castMember) {
 
 	// Make a temporary channel to blit the shape from
 	Channel *channel = new Channel(nullptr, sprite);
-
-	Common::Rect bbox(castMember->getBbox());
 
 	// Manually set the bbox of the channel to the bbox of cast member
 	// Even though the BBox of the channel and cast member are the same, the channel's bbox is offset to a non zero origin
