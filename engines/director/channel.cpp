@@ -1131,6 +1131,11 @@ void Channel::setPosition(int x, int y, bool force) {
 	Common::Point newPos(x, y);
 	if (_constraint > 0 && _score && _constraint <= _score->_channels.size()) {
 		Common::Rect constraintBbox = _score->_channels[_constraint]->getRollOverBbox();
+		debugC(3, kDebugEvents, "Channel::setPosition(): constraint channel %d, member %s, sprite %dx%d at %d,%d, bbox %d,%d..%d,%d",
+				_constraint, _score->_channels[_constraint]->_sprite->_castId.asString().c_str(),
+				_score->_channels[_constraint]->_sprite->_width, _score->_channels[_constraint]->_sprite->_height,
+				_score->_channels[_constraint]->getPosition().x, _score->_channels[_constraint]->getPosition().y,
+				constraintBbox.left, constraintBbox.top, constraintBbox.right, constraintBbox.bottom);
 		newPos.x = MIN(constraintBbox.right, MAX(constraintBbox.left, newPos.x));
 		newPos.y = MIN(constraintBbox.bottom, MAX(constraintBbox.top, newPos.y));
 	}
