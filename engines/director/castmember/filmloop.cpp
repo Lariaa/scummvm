@@ -122,13 +122,30 @@ static int topLibOfScore(Movie *movie) {
 	if (!score)
 		return 0;
 
+	const Common::HashMap<int, Cast *> *casts = movie->getCasts();
+
 	Common::HashMap<int, int> used;
 	for (uint f = 0; f < score->_scoreCache.size(); f++) {
 		Common::Array<Sprite *> &sprites = score->_scoreCache[f]->_sprites;
 		for (uint c = 0; c < sprites.size(); c++) {
 			Sprite *s = sprites[c];
-			if (s && !s->_castId.isNull() && s->_castId.castLib > 0)
-				used.getOrCreateVal(s->_castId.castLib)++;
+			if (!s || s->_castId.isNull() || s->_castId.castLib <= 0)
+				continue;
+
+			// A film loop sprite is a container, not a cell, so it says nothing
+			// about where cells come from. Counting it makes a cast that holds
+			// little else look like the artwork library: 4332 of the 4417 sprite
+			// frames the internal cast fills in TKKG 14's sc80 are loop hosts,
+			// which puts it ahead of the scene cast on 4114 -- and 'Waves' then
+			// drew the internal cast's 1-bit hotspot marks instead of the wave
+			// frames next door.
+			if (casts && casts->contains(s->_castId.castLib)) {
+				CastMember *cm = casts->getVal(s->_castId.castLib)->getCastMember(s->_castId.member, false);
+				if (cm && (cm->_type == kCastFilmLoop || cm->_type == kCastMovie))
+					continue;
+			}
+
+			used.getOrCreateVal(s->_castId.castLib)++;
 		}
 	}
 
