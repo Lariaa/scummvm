@@ -1099,8 +1099,11 @@ void Score::killScriptInstances(int frameNum) {
 
 			channel->_scriptInstanceList.clear();
 			channel->_sprite->_behaviors.clear();
+			// `_channels[i]` IS Lingo channel i, as createScriptInstances() above
+			// already says. Printing i + 1 here named a channel one higher, so a
+			// span read as 63 on the way in was reported as 64 on the way out.
 			debugC(1, kDebugLingoExec, "Score::killScriptInstances(): Killed script instances for channel %d. frame %d [%d-%d]",
-					i + 1, frameNum, channel->_startFrame, channel->_endFrame);
+					i, frameNum, channel->_startFrame, channel->_endFrame);
 
 			channel->_startFrame = channel->_endFrame = -1;
 		}
