@@ -26,6 +26,7 @@
 
 #include "director/types.h"
 #include "director/castmember/castmember.h"
+#include "director/lingo/xtras-cast/textxtra.h"
 
 namespace Director {
 
@@ -40,6 +41,7 @@ public:
 	void load() override;
 
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
+	void buildFormattedText();
 
 	bool hasField(int field) override;
 	Datum getField(int field) override;
@@ -60,6 +62,11 @@ public:
 	Common::String formatInfo() override;
 
 	Common::U32String _plainText;
+
+	// Windows draws the text itself from the Paige style in RTE0 instead of
+	// showing the bitmap the authoring machine rendered into RTE2.
+	TextXtra::StyleRuns _styles;
+	Common::U32String _ftext;
 	Graphics::PixelFormat _pf32;
 	Picture *_picture;
 	Picture *_pictureWithBg;
