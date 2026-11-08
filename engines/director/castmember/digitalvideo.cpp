@@ -146,6 +146,7 @@ DigitalVideoCastMember::DigitalVideoCastMember(Cast *cast, uint16 castId, Common
 	_enableSound = _vflags & 0x08;
 	_crop = !(_vflags & 0x02);
 	_center = _vflags & 0x01;
+	_scaleX = _scaleY = 100;
 	_dirty = false;
 	_emptyFile = false;
 	_externalDurationMs = 0;
