@@ -142,21 +142,27 @@ void RichTextCastMember::load() {
 	} else {
 		warning("RichTextCastMember::load(): rte0tid %i isn't loaded", rte0id);
 	}
+	Common::U32String macText;
 	if (_cast->_loadedRTE1s.contains(rte1id)) {
 		const RTE1 *rte1 =  _cast->_loadedRTE1s.getVal(rte1id);
-		if (!rte1->data.empty())
+		if (!rte1->data.empty()) {
 			_plainText = Common::U32String((const char *)&rte1->data[0], rte1->data.size(), g_director->getPlatformEncoding());
+			macText = Common::U32String((const char *)&rte1->data[0], rte1->data.size(), Common::kMacRoman);
+		}
 	} else {
 		warning("RichTextCastMember::load(): rte1tid %i isn't loaded, no plain text!", rte1id);
 	}
 	// The Windows player sets the text again with its own fonts, so a face the
 	// author had on the Mac (Safecracker's menu is RussellSquare) comes out in
 	// whatever Windows substituted. The RTE2 bitmap only keeps the Mac look.
+	//
+	// The text bytes are Mac Roman whatever the file is stamped with: 0xAA is the
+	// trademark sign in Safecracker's menu, which Windows-1252 turns into a feminine ordinal.
 	_styles = TextXtra::StyleRuns();
 	_ftext.clear();
-	if (g_director->getPlatform() == Common::kPlatformWindows && rte0 && !rte0->data.empty() && !_plainText.empty()) {
+	if (g_director->getPlatform() == Common::kPlatformWindows && rte0 && !rte0->data.empty() && !macText.empty()) {
 		if (TextXtra::readXMEDStyles(rte0->data, _styles) && !_styles.runs.empty())
-			buildFormattedText();
+			buildFormattedText(macText);
 		else
 			debugC(3, kDebugText, "RichTextCastMember::load(): RTE0 %d has no readable styles, keeping the bitmap", rte0id);
 	}
@@ -187,16 +193,16 @@ void RichTextCastMember::load() {
 
 
 // Same formatting codes as TextXtraCastMember::buildFormattedText().
-void RichTextCastMember::buildFormattedText() {
+void RichTextCastMember::buildFormattedText(const Common::U32String &text) {
 	_ftext.clear();
 
 	for (uint i = 0; i < _styles.runs.size(); i++) {
 		uint32 from = _styles.runs[i].offset;
-		if (from >= _plainText.size())
+		if (from >= text.size())
 			break;
 
-		uint32 to = (i + 1 < _styles.runs.size()) ? _styles.runs[i + 1].offset : _plainText.size();
-		to = MIN<uint32>(to, _plainText.size());
+		uint32 to = (i + 1 < _styles.runs.size()) ? _styles.runs[i + 1].offset : text.size();
+		to = MIN<uint32>(to, text.size());
 		if (to <= from)
 			continue;
 
@@ -208,9 +214,9 @@ void RichTextCastMember::buildFormattedText() {
 				fontId, s.slant, s.size, s.r << 8, s.g << 8, s.b << 8);
 
 		for (uint32 c = from; c < to; c++) {
-			if (_plainText[c] == '\001')
+			if (text[c] == '\001')
 				_ftext += '\001';
-			_ftext += _plainText[c];
+			_ftext += text[c];
 		}
 	}
 }

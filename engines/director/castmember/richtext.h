@@ -41,7 +41,7 @@ public:
 	void load() override;
 
 	Graphics::MacWidget *createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) override;
-	void buildFormattedText();
+	void buildFormattedText(const Common::U32String &text);
 
 	bool hasField(int field) override;
 	Datum getField(int field) override;
