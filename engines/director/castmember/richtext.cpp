@@ -20,6 +20,8 @@
  */
 
 #include "common/stream.h"
+#include "graphics/macgui/macfontmanager.h"
+#include "graphics/macgui/mactext.h"
 #include "graphics/macgui/macwidget.h"
 
 #include "director/director.h"
@@ -92,6 +94,8 @@ RichTextCastMember::RichTextCastMember(Cast *cast, uint16 castId, RichTextCastMe
 	_initialRect = source._initialRect;
 	_boundingRect = source._boundingRect;
 	_bgColor = source._bgColor;
+	_styles = source._styles;
+	_ftext = source._ftext;
 	if (cast == source._cast)
 		_children = source._children;
 
@@ -132,9 +136,9 @@ void RichTextCastMember::load() {
 		}
 	}
 
+	const RTE0 *rte0 = nullptr;
 	if (_cast->_loadedRTE0s.contains(rte0id)) {
-		// TODO: Copy the formatted text data
-		// There doesn't appear to be a way of using it outside of the Director editor.
+		rte0 = _cast->_loadedRTE0s.getVal(rte0id);
 	} else {
 		warning("RichTextCastMember::load(): rte0tid %i isn't loaded", rte0id);
 	}
@@ -145,6 +149,18 @@ void RichTextCastMember::load() {
 	} else {
 		warning("RichTextCastMember::load(): rte1tid %i isn't loaded, no plain text!", rte1id);
 	}
+	// The Windows player sets the text again with its own fonts, so a face the
+	// author had on the Mac (Safecracker's menu is RussellSquare) comes out in
+	// whatever Windows substituted. The RTE2 bitmap only keeps the Mac look.
+	_styles = TextXtra::StyleRuns();
+	_ftext.clear();
+	if (g_director->getPlatform() == Common::kPlatformWindows && rte0 && !rte0->data.empty() && !_plainText.empty()) {
+		if (TextXtra::readXMEDStyles(rte0->data, _styles) && !_styles.runs.empty())
+			buildFormattedText();
+		else
+			debugC(3, kDebugText, "RichTextCastMember::load(): RTE0 %d has no readable styles, keeping the bitmap", rte0id);
+	}
+
 	if (_cast->_loadedRTE2s.contains(rte2id)) {
 		_picture = new Picture();
 		const RTE2 *rte2 = _cast->_loadedRTE2s.getVal(rte2id);
@@ -170,7 +186,58 @@ void RichTextCastMember::load() {
 }
 
 
+// Same formatting codes as TextXtraCastMember::buildFormattedText().
+void RichTextCastMember::buildFormattedText() {
+	_ftext.clear();
+
+	for (uint i = 0; i < _styles.runs.size(); i++) {
+		uint32 from = _styles.runs[i].offset;
+		if (from >= _plainText.size())
+			break;
+
+		uint32 to = (i + 1 < _styles.runs.size()) ? _styles.runs[i + 1].offset : _plainText.size();
+		to = MIN<uint32>(to, _plainText.size());
+		if (to <= from)
+			continue;
+
+		const TextXtra::TextStyle &s = _styles.runs[i].style;
+		int fontId = s.font.empty() ? (int)Graphics::kMacFontSystem : g_director->_wm->_fontMan->registerFontName(s.font);
+
+		// The parser keeps the high byte of each 16 bit colour component.
+		_ftext += Common::String::format("\001\016%04x%02x%04x%04x%04x%04x",
+				fontId, s.slant, s.size, s.r << 8, s.g << 8, s.b << 8);
+
+		for (uint32 c = from; c < to; c++) {
+			if (_plainText[c] == '\001')
+				_ftext += '\001';
+			_ftext += _plainText[c];
+		}
+	}
+}
+
 Graphics::MacWidget *RichTextCastMember::createWidget(Common::Rect &bbox, Channel *channel, SpriteType spriteType) {
+	if (!_ftext.empty() && bbox.width() && bbox.height()) {
+		const TextXtra::TextStyle &first = _styles.runs[0].style;
+		Graphics::MacFont macFont(g_director->_wm->_fontMan->registerFontName(first.font), first.size, first.slant);
+
+		Graphics::TextAlign align = Graphics::kTextAlignLeft;
+		if (_styles.align == 1)
+			align = Graphics::kTextAlignCenter;
+		else if (_styles.align == 2)
+			align = Graphics::kTextAlignRight;
+
+		byte r, g, b;
+		_pf32.colorToRGB(_bgColor, r, g, b);
+		uint32 fg = g_director->_wm->findBestColor(first.r, first.g, first.b);
+		uint32 bg = g_director->_wm->findBestColor(r, g, b);
+
+		Graphics::MacText *text = new Graphics::MacText(g_director->getCurrentWindow()->getMacWindow(),
+				bbox.left, bbox.top, bbox.width(), bbox.height(), g_director->_wm,
+				_ftext, &macFont, fg, bg, _initialRect.width(), align);
+		text->draw();
+		return text;
+	}
+
 	if (!_pictureWithBg) {
 		warning("RichTextCastMember::createWidget: No picture");
 		return nullptr;
