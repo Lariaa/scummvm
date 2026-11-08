@@ -2141,10 +2141,12 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 				channel->setDirty();
 			}
 
-			if (d.asInt() == 0)
-				sprite->_thickness &= ~kTHasBlend;
-			else
-				sprite->_thickness |= kTHasBlend;
+			// A blend of 0 means fully transparent, not "no blend at all":
+			// clearing the flag made getPlotData() drop the value and draw the
+			// sprite solid. TKKG 14's BlendRollover hides its highlight with
+			// `blend = 0` on mouseLeave, and the score parks those same sprites
+			// at 0xff with the flag set.
+			sprite->_thickness |= kTHasBlend;
 
 			// Based on Director in a Nutshell, page 15
 			sprite->setAutoPuppet(kAPBlend, true);
