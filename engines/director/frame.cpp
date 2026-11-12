@@ -398,10 +398,15 @@ void readSpriteDataD2(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 		}
 	}
 
-	// Sometimes removed sprites leave garbage in the channel
-	// We set it to zero, so then could skip
-	if (sprite._width <= 0 || sprite._height <= 0)
-		sprite._width = sprite._height = 0;
+	// Sometimes removed sprites leave garbage in the channel, so clamp it away --
+	// but one axis at a time. A sprite degenerate in a single axis is a line, and
+	// games use it: TKKG 14's VolumeLine is a shape 0 pixels wide and 86 tall,
+	// and the menu's volume knob is constrained to it. Zeroing both axes left the
+	// rail a point, so the knob could not move and the game read an empty range
+	// from sprite.top and sprite.bottom. Same shape of bug as 281876fdc03 fixed
+	// in Sprite::setBbox() for the Lingo side.
+	sprite._width = MAX<int16>(0, sprite._width);
+	sprite._height = MAX<int16>(0, sprite._height);
 }
 
 
@@ -747,10 +752,15 @@ void readSpriteDataD4(Common::SeekableReadStreamEndian &stream, Sprite &sprite, 
 		}
 	}
 
-	// Sometimes removed sprites leave garbage in the channel
-	// We set it to zero, so then could skip
-	if (sprite._width <= 0 || sprite._height <= 0)
-		sprite._width = sprite._height = 0;
+	// Sometimes removed sprites leave garbage in the channel, so clamp it away --
+	// but one axis at a time. A sprite degenerate in a single axis is a line, and
+	// games use it: TKKG 14's VolumeLine is a shape 0 pixels wide and 86 tall,
+	// and the menu's volume knob is constrained to it. Zeroing both axes left the
+	// rail a point, so the knob could not move and the game read an empty range
+	// from sprite.top and sprite.bottom. Same shape of bug as 281876fdc03 fixed
+	// in Sprite::setBbox() for the Lingo side.
+	sprite._width = MAX<int16>(0, sprite._width);
+	sprite._height = MAX<int16>(0, sprite._height);
 }
 
 void writeSpriteDataD4(Common::SeekableWriteStream *writeStream, Sprite &sprite) {
@@ -1023,10 +1033,15 @@ void Frame::readSpriteD5(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		error("Frame::readSpriteD5(): Read %" PRId64 " extra bytes", stream.pos() - finishPosition);
 	}
 
-	// Sometimes removed sprites leave garbage in the channel
-	// We set it to zero, so then could skip
-	if (sprite._width <= 0 || sprite._height <= 0)
-		sprite._width = sprite._height = 0;
+	// Sometimes removed sprites leave garbage in the channel, so clamp it away --
+	// but one axis at a time. A sprite degenerate in a single axis is a line, and
+	// games use it: TKKG 14's VolumeLine is a shape 0 pixels wide and 86 tall,
+	// and the menu's volume knob is constrained to it. Zeroing both axes left the
+	// rail a point, so the knob could not move and the game read an empty range
+	// from sprite.top and sprite.bottom. Same shape of bug as 281876fdc03 fixed
+	// in Sprite::setBbox() for the Lingo side.
+	sprite._width = MAX<int16>(0, sprite._width);
+	sprite._height = MAX<int16>(0, sprite._height);
 }
 
 void readSpriteDataD5(Common::SeekableReadStreamEndian &stream, Sprite &sprite, int startPosition, int finishPosition) {
@@ -1500,10 +1515,15 @@ void Frame::readSpriteD6(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		error("Frame::readSpriteD6(): Read %" PRId64 " extra bytes", stream.pos() - finishPosition);
 	}
 
-	// Sometimes removed sprites leave garbage in the channel
-	// We set it to zero, so then could skip
-	if (sprite._width <= 0 || sprite._height <= 0)
-		sprite._width = sprite._height = 0;
+	// Sometimes removed sprites leave garbage in the channel, so clamp it away --
+	// but one axis at a time. A sprite degenerate in a single axis is a line, and
+	// games use it: TKKG 14's VolumeLine is a shape 0 pixels wide and 86 tall,
+	// and the menu's volume knob is constrained to it. Zeroing both axes left the
+	// rail a point, so the knob could not move and the game read an empty range
+	// from sprite.top and sprite.bottom. Same shape of bug as 281876fdc03 fixed
+	// in Sprite::setBbox() for the Lingo side.
+	sprite._width = MAX<int16>(0, sprite._width);
+	sprite._height = MAX<int16>(0, sprite._height);
 }
 
 void readSpriteDataD6(Common::SeekableReadStreamEndian &stream, Sprite &sprite, int startPosition, int finishPosition) {
@@ -1982,10 +2002,15 @@ void Frame::readSpriteD7(Common::MemoryReadStreamEndian &stream, uint16 offset, 
 		error("Frame::readSpriteD7(): Read %" PRId64 " extra bytes", stream.pos() - finishPosition);
 	}
 
-	// Sometimes removed sprites leave garbage in the channel
-	// We set it to zero, so then could skip
-	if (sprite._width <= 0 || sprite._height <= 0)
-		sprite._width = sprite._height = 0;
+	// Sometimes removed sprites leave garbage in the channel, so clamp it away --
+	// but one axis at a time. A sprite degenerate in a single axis is a line, and
+	// games use it: TKKG 14's VolumeLine is a shape 0 pixels wide and 86 tall,
+	// and the menu's volume knob is constrained to it. Zeroing both axes left the
+	// rail a point, so the knob could not move and the game read an empty range
+	// from sprite.top and sprite.bottom. Same shape of bug as 281876fdc03 fixed
+	// in Sprite::setBbox() for the Lingo side.
+	sprite._width = MAX<int16>(0, sprite._width);
+	sprite._height = MAX<int16>(0, sprite._height);
 }
 
 void readSpriteDataD7(Common::SeekableReadStreamEndian &stream, Sprite &sprite, int startPosition, int finishPosition) {
