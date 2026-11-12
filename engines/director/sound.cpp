@@ -451,6 +451,15 @@ uint32 DirectorSound::getChannelElapsedTime(int soundChannel) {
 	if (!assertChannel(soundChannel))
 		return 0;
 
+	// A queued sound that play() could not start yet is the channel's current
+	// sound as far as Lingo is concerned, and it is at its beginning. Handing
+	// out the mixer's clock here would be the outgoing sound's position: TKKG 14
+	// seeds its own lip-sync clock from this read right after play(), and 3069 ms
+	// of the previous line made it fire three of the next line's four cue points
+	// at once.
+	if (_channels[soundChannel]->startPending)
+		return 0;
+
 	return _mixer->getSoundElapsedTime(_channels[soundChannel]->handle);
 }
 
@@ -831,6 +840,7 @@ void DirectorSound::startQueueEntry(int soundChannel, const SoundQueueEntry &ent
 	channel->current = entry;
 	channel->loopsRemaining = entry.loopCount;
 	channel->paused = false;
+	channel->startPending = false;
 
 	// A fade started before play() -- queue(), fadeIn(), play() is the order the
 	// Director 8.5 reference gives -- belongs to the channel, not to the sound, so
@@ -883,6 +893,8 @@ void DirectorSound::playQueue(int soundChannel) {
 	channel->playListActive = true;
 	if (!isChannelActive(soundChannel) && !channel->playList.empty())
 		startQueueEntry(soundChannel, channel->playList.remove_at(0));
+	else if (!channel->playList.empty())
+		channel->startPending = true;
 }
 
 void DirectorSound::playNow(int soundChannel, const SoundQueueEntry &entry) {
@@ -917,6 +929,7 @@ void DirectorSound::stopQueue(int soundChannel) {
 	SoundChannel *channel = _channels[soundChannel];
 	channel->playListActive = false;
 	channel->paused = false;
+	channel->startPending = false;
 	channel->current = SoundQueueEntry();
 	channel->loopsRemaining = 0;
 	stopSound(soundChannel);

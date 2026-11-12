@@ -220,6 +220,11 @@ struct SoundChannel {
 	int loopsRemaining;
 	bool playListActive;
 	bool paused;
+	// play() was called while the previous sound still had a moment to run, so
+	// the queued entry waits. Until it starts, the channel's clock still belongs
+	// to the sound going out, and a game reading it would time the new line
+	// against the old one's position.
+	bool startPending;
 	// Duration of the last file played via playFile() (in ms), 0 if not a file.
 		uint32 lastFileDuration;
 
@@ -235,7 +240,7 @@ struct SoundChannel {
 			SoundChannel(): handle(), lastPlayedSound(SoundID()), stopOnZero(true), fromLastMovie(false), volume(255), originalRate(-1),
 				pitchShiftPercent(100), fade(nullptr), puppet(SoundID()), newPuppet(false), movieChanged(false), loopPtr(nullptr),
 				lastCuePointIndex(-1), streamStartTime(0), cueWaitPolls(0), cuePumpTicksAtStart(0), cueVisits(0), loopsRemaining(0),
-				playListActive(false), paused(false), lastFileDuration(0), currentSoundStartTime(0), currentSoundDuration(0), currentSoundEndTime(0) {}
+				playListActive(false), paused(false), startPending(false), lastFileDuration(0), currentSoundStartTime(0), currentSoundDuration(0), currentSoundEndTime(0) {}
 };
 
 class DirectorSound {
