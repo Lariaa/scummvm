@@ -124,7 +124,7 @@ Datum SoundChannelXtraObject::getProp(const Common::String &propName) {
 		return Datum(SoundChannelXtra::xlibName);
 
 	DirectorSound *sound = _channel > 0 ? g_director->getCurrentWindow()->getSoundManager() : nullptr;
-	debugC(3, kDebugSound, "SoundChannelXtraObject::getProp(): this=%p, _channel=%d, sound=%p", this, _channel, sound);
+	debugC(3, kDebugSound, "SoundChannelXtraObject::getProp(): this=%p, _channel=%d, sound=%p", (void *)this, _channel, (void *)sound);
 	if (!sound)
 		return Datum();
 

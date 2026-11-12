@@ -58,7 +58,7 @@ Window::Window(int id, bool scrollable, bool resizable, bool editable, Graphics:
 	_isStage = isStage;
 	_stageColor = _wm->_colorBlack;
 	_puppetTransition = nullptr;
-	debugC(3, kDebugSound, "Window::Window(): this=%p, creating DirectorSound", this);
+	debugC(3, kDebugSound, "Window::Window(): this=%p, creating DirectorSound", (void *)this);
 	_soundManager = new DirectorSound(this);
 	_lingoState = new LingoState;
 	_lingoPlayState = nullptr;

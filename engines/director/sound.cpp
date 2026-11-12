@@ -47,7 +47,7 @@
 namespace Director {
 
 DirectorSound::DirectorSound(Window *window) : _window(window) {
-	debugC(3, kDebugSound, "DirectorSound::DirectorSound(): this=%p, window=%p", this, window);
+	debugC(3, kDebugSound, "DirectorSound::DirectorSound(): this=%p, window=%p", (void *)this, (void *)window);
 	uint numChannels = 2;
 	if (g_director->getVersion() >= 300) {
 		numChannels = 4;
@@ -93,7 +93,7 @@ void DirectorSound::noteStreamStart(int soundChannel) {
 }
 
 void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemberID cuePointSource) {
-	debugC(3, kDebugSound, "DirectorSound::playFile(): this=%p, channel %d, filename='%s'", this, soundChannel, filename.c_str());
+	debugC(3, kDebugSound, "DirectorSound::playFile(): this=%p, channel %d, filename='%s'", (void *)this, soundChannel, filename.c_str());
 	if (!assertChannel(soundChannel))
 		return;
 
@@ -229,6 +229,9 @@ void DirectorSound::playSound(SoundID soundID, int soundChannel, bool forPuppet)
 		break;
 	case kSoundExternal:
 		playExternalSound(soundID.u.external.menu, soundID.u.external.submenu, soundChannel);
+		break;
+	case kSoundFile:
+		// Played by name through playFile(), never through a SoundID.
 		break;
 	}
 }
@@ -693,7 +696,7 @@ void DirectorSound::changingMovie() {
 }
 
 void DirectorSound::setLastPlayedSound(int soundChannel, SoundID soundId, bool stopOnZero) {
-	debugC(3, kDebugSound, "DirectorSound::setLastPlayedSound(): this=%p, channel %d, type=%d, stopOnZero=%d", this, soundChannel, soundId.type, stopOnZero);
+	debugC(3, kDebugSound, "DirectorSound::setLastPlayedSound(): this=%p, channel %d, type=%d, stopOnZero=%d", (void *)this, soundChannel, soundId.type, stopOnZero);
 	_channels[soundChannel]->lastPlayedSound = soundId;
 	_channels[soundChannel]->stopOnZero = stopOnZero;
 	_channels[soundChannel]->movieChanged = false;
