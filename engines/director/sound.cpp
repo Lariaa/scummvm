@@ -147,6 +147,13 @@ void DirectorSound::playFile(Common::String filename, int soundChannel, CastMemb
 	_channels[soundChannel]->cuePointSource = cuePointSource;
 	_channels[soundChannel]->lastCuePointIndex = -1;
 	_channels[soundChannel]->fromLastMovie = false;
+	// Take the cue points from the file that is starting, not from the member
+	// later on: by then Lingo may have aimed it at the next line.
+	_channels[soundChannel]->fileCuePoints.clear();
+	_channels[soundChannel]->fileCuePointNames.clear();
+	af.getCuePoints(_channels[soundChannel]->fileCuePoints,
+			_channels[soundChannel]->fileCuePointNames,
+			Common::String::format("channel %d, '%s'", soundChannel, filename.c_str()));
 }
 
 void DirectorSound::playMCI(Audio::AudioStream &stream, uint32 from, uint32 to) {
@@ -198,6 +205,8 @@ void DirectorSound::playStream(Audio::AudioStream &stream, int soundChannel) {
 	// An embedded sound is looked up through lastPlayedSound, so drop whatever a
 	// linked file left behind.
 	_channels[soundChannel]->cuePointSource = CastMemberID();
+	_channels[soundChannel]->fileCuePoints.clear();
+	_channels[soundChannel]->fileCuePointNames.clear();
 
 	setChannelDefaultVolume(soundChannel);
 
@@ -1152,28 +1161,35 @@ void DirectorSound::processCuePoints() {
 		// looked at can be told from one the pump never reached at all.
 		channel->cueVisits++;
 
-		// A linked file names the member it was played for; everything else is
-		// found through the sound that last started on the channel.
-		CastMemberID memberID = channel->cuePointSource;
-		if (memberID.member == 0) {
-			const SoundID &lastPlayedSound = channel->lastPlayedSound;
-			if (lastPlayedSound.type != kSoundCast)
+		// A file played by name carries the cue points read when it started;
+		// only an embedded sound is looked up through a member.
+		const Common::Array<int32> *cuePoints = &channel->fileCuePoints;
+		const Common::StringArray *cueNames = &channel->fileCuePointNames;
+
+		if (cuePoints->empty()) {
+			CastMemberID memberID = channel->cuePointSource;
+			if (memberID.member == 0) {
+				const SoundID &lastPlayedSound = channel->lastPlayedSound;
+				if (lastPlayedSound.type != kSoundCast)
+					continue;
+				memberID = CastMemberID(lastPlayedSound.u.cast.member, lastPlayedSound.u.cast.castLib);
+			}
+
+			CastMember *member = _window->getCurrentMovie()->getCastMember(memberID);
+
+			// The sound channel can reference a cast member that is not (or no
+			// longer) a sound -- e.g. when the member ID resolves to a bitmap.
+			// Guard the downcast; otherwise we read _cuePoints off an unrelated
+			// object (here a BitmapCastMember) and crash in a release build.
+			if (!member || member->_type != kCastSound)
 				continue;
-			memberID = CastMemberID(lastPlayedSound.u.cast.member, lastPlayedSound.u.cast.castLib);
+
+			SoundCastMember *soundCast = (SoundCastMember *)member;
+			cuePoints = &soundCast->_cuePoints;
+			cueNames = &soundCast->_cuePointNames;
 		}
 
-		CastMember *member = _window->getCurrentMovie()->getCastMember(memberID);
-
-		// The sound channel can reference a cast member that is not (or no
-		// longer) a sound -- e.g. when the member ID resolves to a bitmap.
-		// Guard the downcast; otherwise we read _cuePoints off an unrelated
-		// object (here a BitmapCastMember) and crash in a release build.
-		if (!member || member->_type != kCastSound)
-			continue;
-
-		SoundCastMember *soundCast = (SoundCastMember *)member;
-
-		if (soundCast->_cuePoints.empty())
+		if (cuePoints->empty())
 			continue;
 
 		uint32 elapsedTime = _mixer->getSoundElapsedTime(channel->handle);
@@ -1195,19 +1211,19 @@ void DirectorSound::processCuePoints() {
 			debugC(3, kDebugSound, "DirectorSound::processCuePoints(): channel %d: first poll with an active channel came %d ms after the stream reached the mixer, after %d pump runs, %d visits to this channel and %d polls that found it silent; the mixer already reports %d ms elapsed, and cue point 1 is due at %d ms",
 					it._key, g_system->getMillis() - channel->streamStartTime,
 					_cuePumpTicks - channel->cuePumpTicksAtStart, channel->cueVisits, channel->cueWaitPolls,
-					elapsedTime, soundCast->_cuePoints[0]);
+					elapsedTime, (*cuePoints)[0]);
 			channel->streamStartTime = 0;
 			channel->cueWaitPolls = 0;
 			channel->cueVisits = 0;
 		}
 
-		for (uint i = channel->lastCuePointIndex + 1; i < soundCast->_cuePoints.size(); i++) {
-			int32 cuePoint = soundCast->_cuePoints[i];
+		for (uint i = channel->lastCuePointIndex + 1; i < cuePoints->size(); i++) {
+			int32 cuePoint = (*cuePoints)[i];
 
 			if (cuePoint > (int32)elapsedTime)
 				break;
 
-			Common::String cueName = i < soundCast->_cuePointNames.size() ? soundCast->_cuePointNames[i] : Common::String();
+			Common::String cueName = i < cueNames->size() ? (*cueNames)[i] : Common::String();
 
 			// The number, the time it is authored at, and the time it actually
 			// went out -- the last two are what decides whether a mouth moves

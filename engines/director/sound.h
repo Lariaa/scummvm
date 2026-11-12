@@ -193,6 +193,13 @@ struct SoundChannel {
 	// lastPlayedSound, but a linked file is played by name and deliberately
 	// leaves that empty, so the member is remembered here instead.
 	CastMemberID cuePointSource;
+	// The cue points of the file now playing, read from the file itself when it
+	// started. A member says where it points *now*, and TKKG 13 and 14 re-aim
+	// the same placeholder at the next line while the current one still plays:
+	// the member then hands out the next file's cue points, so a line gets a
+	// stranger's mouth timing and its own cues are used up before it is heard.
+	Common::Array<int32> fileCuePoints;
+	Common::StringArray fileCuePointNames;
 
 	// a non-zero sound ID if the channel is a puppet. i.e. it's controlled by lingo
 	SoundID puppet;
