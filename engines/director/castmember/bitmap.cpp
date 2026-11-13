@@ -1900,6 +1900,11 @@ void BitmapCastMember::setField(int field, const Datum &d) {
 				_pitch = _picture->_surface.pitch;
 				_initialRect = Common::Rect(_picture->_surface.w, _picture->_surface.h);
 				_boundingRect = _initialRect;
+				// A new picture brings its own middle. 'stageBitmap' is a 2x2
+				// placeholder registered at 1,1, and keeping that offset drew the
+				// 800x600 grab from the stage centre instead of over the stage.
+				_regX = (_picture->_surface.w + 1) / 2;
+				_regY = (_picture->_surface.h + 1) / 2;
 				// An 8-bit grab holds indices into the palette that was on screen.
 				_clut = (_bitsPerPixel == 8) ? g_director->_lastPalette : CastMemberID(0, 0);
 				_clutImplicit = false;
