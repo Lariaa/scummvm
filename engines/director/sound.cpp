@@ -1105,7 +1105,14 @@ void DirectorSound::playFPlaySound(const Common::Array<Common::String> &fplayLis
 }
 
 void DirectorSound::setChannelVolumeInternal(int soundChannel, uint8 volume) {
-	if (!(_channels[soundChannel]) || volume == _channels[soundChannel]->volume)
+	if (!(_channels[soundChannel]))
+		return;
+
+	// A fade does not tick inside a handler, so the channel still reports the
+	// level it started from. Setting that level must end the fade all the same:
+	// TKKG 13's map fades every channel to 1 and goToScene() sets 255 at once.
+	bool fading = _channels[soundChannel]->fade != nullptr;
+	if (!fading && volume == _channels[soundChannel]->volume)
 		return;
 
 	cancelFade(soundChannel);
