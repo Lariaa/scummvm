@@ -1125,6 +1125,11 @@ void Channel::replaceSprite(Sprite *nextSprite) {
 
 void Channel::setDirty() {
 	_widgetDirty = true;
+	// _widgetDirty alone is only read by isDirty(), and that runs in
+	// Score::updateSprites() -- which updateStage() skips. TKKG 14's map ramps
+	// `sprite(n).blend` and calls updateStage() each step, so the darkening
+	// reached the screen only where some other sprite forced a repaint.
+	_needsDraw = true;
 }
 
 void Channel::setPosition(int x, int y, bool force) {
