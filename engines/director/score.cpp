@@ -808,9 +808,6 @@ void Score::update() {
 	if (!_window->_playbackPaused)
 		killScriptInstances(_nextFrame ? _nextFrame : _curFrameNumber + 1);
 
-	CastMemberID oldSound1 = _currentFrame->_mainChannels.sound1;
-	CastMemberID oldSound2 = _currentFrame->_mainChannels.sound2;
-
 	// change current frame and load frame data, if required
 	updateCurrentFrame();
 
@@ -909,9 +906,11 @@ void Score::update() {
 		//
 		// We need to check _firstRun, because we come here with the
 		// first frame already loaded.
-		sound1Changed = oldSound1 != _currentFrame->_mainChannels.sound1;
-		sound2Changed = oldSound2 != _currentFrame->_mainChannels.sound2;
+		sound1Changed = _playedSound1 != _currentFrame->_mainChannels.sound1;
+		sound2Changed = _playedSound2 != _currentFrame->_mainChannels.sound2;
 	}
+	_playedSound1 = _currentFrame->_mainChannels.sound1;
+	_playedSound2 = _currentFrame->_mainChannels.sound2;
 
 	_firstRun = false;
 

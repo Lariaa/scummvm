@@ -264,6 +264,11 @@ private:
 
 	int _previousBuildBotBuild = -1;
 	bool _firstRun = true;
+
+	// The sound channels of the frame last played, for the change test.
+	// _currentFrame cannot tell: a go() reads the destination in early.
+	CastMemberID _playedSound1;
+	CastMemberID _playedSound2;
 };
 
 } // End of namespace Director
