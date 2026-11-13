@@ -566,7 +566,13 @@ Graphics::MacWidget *DigitalVideoCastMember::createWidget(Common::Rect &bbox, Ch
 
 		if (frame->getPixels()) {
 			// Video should have the dithering palette set, decode using whatever palette we have now
-			_lastFrame = frame->convertTo(g_director->_pixelformat, _ditheringPalette);
+			if (g_director->_pixelformat.bytesPerPixel == 1 && frame->format.bytesPerPixel != 1) {
+				// The codec could not dither (MS Video 1 in 16 bits, Ritter Rost 2's
+				// trailer), so dither to the stage palette here.
+				_lastFrame = frame->convertTo(g_director->_pixelformat, nullptr, 0, _ditheringPalette, 256);
+			} else {
+				_lastFrame = frame->convertTo(g_director->_pixelformat, _ditheringPalette);
+			}
 		} else {
 			warning("DigitalVideoCastMember::createWidget(): frame has no pixel data");
 		}
