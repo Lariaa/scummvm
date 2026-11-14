@@ -388,9 +388,11 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			if ((event.event == kEventKeyUp) || (event.event == kEventKeyDown))
 				targetCast = _currentKeyDownCastID;
 			// The frame events are broadcast per sprite (see queueEvent()), so
-			// they name their channel as well.
+			// they name their channel as well. So does mouseWithin, which
+			// otherwise ran the script of the last member clicked.
 			if ((event.event == kEventMouseDown) || (event.event == kEventRightMouseDown) ||
 				(event.event == kEventMouseEnter) || (event.event == kEventMouseLeave) ||
+				(event.event == kEventMouseWithin) ||
 				(event.event == kEventEnterFrame) || (event.event == kEventExitFrame)) {
 				if (!event.channelId)
 					return;
