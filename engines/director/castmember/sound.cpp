@@ -189,6 +189,11 @@ void SoundCastMember::load() {
 						_audio = new MoaStreamDecoder(format, sndData);
 						_loaded = true;
 						return;
+					} else if (format.equalsIgnoreCase("kMoaCfFormat_SWA")) {
+						// A whole .swa file, header and MPEG audio.
+						_audio = new MoaStreamDecoder(format, sndData);
+						_loaded = true;
+						return;
 					} else {
 						warning("SoundCastMember::load(): Unsupported ediM format '%s' in sound cast member %d", format.c_str(), _castId);
 					}

@@ -1939,6 +1939,18 @@ Audio::AudioStream *MoaStreamDecoder::getAudioStream(bool looping, bool forPuppe
 	Audio::RewindableAudioStream *stream = nullptr;
 	if (_format.equalsIgnoreCase("kMoaCfFormat_AIFF")) {
 		stream = Audio::makeAIFFStream(_stream, DisposeAfterUse::NO);
+	} else if (_format.equalsIgnoreCase("kMoaCfFormat_SWA")) {
+		int32 mp3Start = findMP3Start(_stream);
+#ifdef USE_MAD
+		if (mp3Start >= 0) {
+			// MAD must see the first MPEG frame at offset 0, see AudioFileDecoder.
+			Common::SeekableReadStream *audio = new Common::SeekableSubReadStream(
+				_stream, mp3Start, _stream->size(), DisposeAfterUse::NO);
+			stream = Audio::makeMP3Stream(audio, DisposeAfterUse::YES);
+		}
+#endif
+		if (!stream)
+			warning("MoaStreamDecoder: cannot play the embedded SWA (MPEG audio at %d)", mp3Start);
 	} else {
 		warning("Unsupported Moa stream type '%s'", _format.c_str());
 		delete _stream;
