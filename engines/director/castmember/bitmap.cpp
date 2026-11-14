@@ -977,6 +977,17 @@ void BitmapCastMember::createMatte() {
 
 	copyStretchImg(&_picture->_surface, &tmp, _initialRect, bbox);
 
+	// Here the alpha plane is not in use, but it is still in the pixels: white
+	// under a clear pixel then misses whiteColor and fences the fill in. The
+	// masks on Loewenzahn 5's login screen kept their rows of clear pixels as
+	// white stripes in the open wagon doors.
+	if (tmp.format.aBits()) {
+		uint32 opaque = tmp.format.ARGBToColor(0xff, 0, 0, 0);
+		for (int y = 0; y < tmp.h; y++)
+			for (int x = 0; x < tmp.w; x++)
+				tmp.setPixel(x, y, tmp.getPixel(x, y) | opaque);
+	}
+
 	_noMatte = true;
 
 	// Searching white color in the corners
