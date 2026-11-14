@@ -950,8 +950,11 @@ void LB::b_value(int nargs) {
 
 	Common::String expr = d.asString();
 	expr.trim();
+	// An empty string does not parse, so it is VOID like any other (Director
+	// Demystified, D4 to D7, "value"). Ritter Rost 2 reads its high scores
+	// with value() and starts an empty list only when voidp() says so.
 	if (expr.empty()) {
-		g_lingo->push(Datum(0));
+		g_lingo->pushVoid();
 		return;
 	}
 
