@@ -130,6 +130,19 @@ void SoundCastMember::load() {
 	uint16 sndId = 0;
 
 	MoaSoundFormatDecoder *sndFormat = nullptr;
+	bool embedded = false;
+
+	// A reload after unload() must not append the cupt a second time.
+	_cuePoints.clear();
+	_cuePointNames.clear();
+
+	// Director's own cupt table wins; without one the sound data's own cue
+	// points count -- AIFF markers or the table in an SWA header.
+	auto readOwnCuePoints = [&](const Common::String &context) {
+		if (!hasCupt && _audio && _audio->getCuePoints(_cuePoints, _cuePointNames, context))
+			debugC(2, kDebugLoading, "SoundCastMember::load(): cast %d takes %d cue points from its sound data",
+					_castId, (int)_cuePoints.size());
+	};
 
 	if (_cast->_version < kFileVer400) {
 		tag = MKTAG('S', 'N', 'D', ' ');
@@ -174,33 +187,22 @@ void SoundCastMember::load() {
 				Common::SeekableReadStreamEndian *sndData = _cast->getResource(it.tag, it.index);
 				Common::String format =  _cast->getCastMemberInfo(_castId)->mediaFormatName.c_str();
 
-				if (!_audio) {
-					if (format.equalsIgnoreCase("kMoaCfFormat_AIFF")) {
-						// Say what the file holds before it disappears into the
-						// decoder. This is the only place an embedded AIFF is
-						// ever opened: the cue point reader runs for linked files
-						// only, so an embedded MARK chunk is read by nobody at
-						// all. TKKG 1 alone skips 3 of them and 25 INST chunks in
-						// one session, and nothing in the log said they existed.
-						debugDumpAIFF(sndData, Common::String::format(
-								"cast %d embedded ediM, %s", _castId,
-								hasCupt ? "with cupt" : "no cupt"));
-
-						_audio = new MoaStreamDecoder(format, sndData);
-						_loaded = true;
-						return;
-					} else if (format.equalsIgnoreCase("kMoaCfFormat_SWA")) {
-						// A whole .swa file, header and MPEG audio.
-						_audio = new MoaStreamDecoder(format, sndData);
-						_loaded = true;
-						return;
-					} else {
-						warning("SoundCastMember::load(): Unsupported ediM format '%s' in sound cast member %d", format.c_str(), _castId);
-					}
-				} else {
+				if (embedded) {
 					warning("SoundCastMember::load(): Multiple ediM resources in sound cast member %d", _castId);
+					delete sndData;
+				} else if (format.equalsIgnoreCase("kMoaCfFormat_AIFF") || format.equalsIgnoreCase("kMoaCfFormat_SWA")) {
+					// A whole sound file, AIFF or SWA. The loop goes on: a cupt
+					// may follow it among the children.
+					debugDumpAIFF(sndData, Common::String::format(
+							"cast %d embedded ediM, %s", _castId,
+							hasCupt ? "with cupt" : "no cupt"));
+					delete _audio;
+					_audio = new MoaStreamDecoder(format, sndData);	// takes sndData
+					embedded = true;
+				} else {
+					warning("SoundCastMember::load(): Unsupported ediM format '%s' in sound cast member %d", format.c_str(), _castId);
+					delete sndData;
 				}
-				delete sndData;
 			} else if (it.tag == MKTAG('c', 'u', 'p', 't')) {
 				Common::SeekableReadStreamEndian *sndData = _cast->getResource(it.tag, it.index);
 
@@ -227,6 +229,15 @@ void SoundCastMember::load() {
 	}
 
 
+	if (embedded) {
+		// An embedded AIFF or SWA from an ediM.
+		delete sndFormat;
+		readOwnCuePoints(Common::String::format("cast %d embedded %s", _castId,
+				_cast->getCastMemberInfo(_castId)->mediaFormatName.c_str()));
+		_loaded = true;
+		return;
+	}
+
 	if (sndFormat) {
 		_audio = sndFormat;
 		_loaded = true;
@@ -250,6 +261,8 @@ void SoundCastMember::load() {
 
 			// Linked sound files always have the loop flag disabled
 			_looping = 0;
+
+			readOwnCuePoints(Common::String::format("cast %d linked '%s', no cupt", _castId, res.c_str()));
 		} else {
 			warning("Sound::load(): no resource or info found for cast member %d, skipping", _castId);
 		}
