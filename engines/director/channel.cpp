@@ -455,6 +455,16 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 			}
 			BitmapCastMember *bitmap = (BitmapCastMember *)member;
 
+			// Director takes 1-bit, greyscale and 32-bit masks (Director 7
+			// Demystified, Mask ink). A 16-bit neighbour is just the next
+			// picture: Steinzeit's cook (131Koch m31) sits in front of another
+			// frame of its animation and is meant to be drawn whole.
+			if (bitmap->_bitsPerPixel == 16) {
+				debugC(4, kDebugImages, "Channel::getMask(): %s is a 16-bit picture, not a mask; drawing %s unmasked",
+						maskID.asString().c_str(), _sprite->_castId.asString().c_str());
+				return nullptr;
+			}
+
 			if (_mask) {
 				delete _mask;
 				_mask = nullptr;
