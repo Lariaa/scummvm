@@ -1046,6 +1046,16 @@ Common::Path findPath(const Common::String &path, bool currentFolder, bool searc
 	// If the path contains relative elements, rectify it with respect to the current folder
 	if (isPathWithRelativeMarkers(testPath)) {
 		testPath = rectifyRelativePath(testPath, current);
+	} else if (!current.empty() && (testPath.hasPrefix("@:") || testPath.hasPrefix("@\\") || testPath.hasPrefix("@/"))) {
+		// "@" is the folder of the current movie (Director 7 Demystified,
+		// "@ (pathname)"), not the game root, which stays as the fallback.
+		// Loewenzahn 5 looks for "data" in the moviePath this leaves.
+		result = resolvePathWithFuzz(testPath, current, directory, exts);
+		if (!result.empty()) {
+			debugCN(1, kDebugPaths, "%s", recIndent());
+			debugC(1, kDebugPaths, "findPath(): resolved \"%s\" in the current movie's folder -> \"%s\"", testPath.c_str(), result.toString().c_str());
+			return result;
+		}
 	}
 
 	// For an absolute path, first check it relative to the filesystem
