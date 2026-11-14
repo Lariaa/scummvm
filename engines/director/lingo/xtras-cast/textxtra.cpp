@@ -741,6 +741,13 @@ TextXtraCastMember::TextXtraCastMember(Cast *cast, uint16 castId, XtraCastMember
 	Common::Rect rect;
 	if (TextXtra::parseXtraData(source.getXtraData(), rect))
 		_initialRect = rect;
+
+	// The payload opens with the authored editable flag: 54 of 9836 members
+	// in the corpus set it, all of them input fields ("input", "nameInputMember",
+	// "UserNameInput-Editible", Ritter Rost 2's "NamensText").
+	const Common::Array<byte> &payload = source.getXtraData();
+	if (payload.size() >= 4)
+		_editable = READ_BE_UINT32(payload.data()) != 0;
 }
 
 TextXtraCastMember::TextXtraCastMember(Cast *cast, uint16 castId, TextXtraCastMember &source)
@@ -752,6 +759,7 @@ TextXtraCastMember::TextXtraCastMember(Cast *cast, uint16 castId, TextXtraCastMe
 	_ftext = source._ftext;
 	_styles = source._styles;
 	_scroll = source._scroll;
+	_editable = source._editable;
 	_loaded = source._loaded;
 	if (cast == source._cast)
 		_children = source._children;
@@ -933,11 +941,9 @@ Graphics::MacWidget *TextXtraCastMember::createWidget(Common::Rect &bbox, Channe
 	// an empty name.
 	//
 	// Three things can say the sprite is to be typed into: the score's own
-	// editable flag, the member's -- which a movie may set from Lingo, as
-	// TextCastMember::createWidget() reads it -- and the movie having given
-	// this channel the keyboard focus. The *authored* flag in the cast data
-	// says nothing either way: the Text Xtra keeps that in its document, and
-	// which bit it is has not been read yet.
+	// editable flag, the member's -- authored in the payload or set from
+	// Lingo, as TextCastMember::createWidget() reads it -- and the movie
+	// having given this channel the keyboard focus.
 	bool editable = channel->_sprite->_editable || _editable;
 	Movie *movie = g_director->getCurrentMovie();
 	if (!editable && movie && movie->_currentEditableTextChannel > 0) {
