@@ -2151,7 +2151,12 @@ void Cast::loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id) {
 		}
 		// fallthrough
 	case 16:
-		ci->mediaFormatName = castInfo.strings[16].readString();
+		{
+			// Usually a Pascal string, but Ritter Rost 2 stores it bare:
+			// "kMoaCfFormat_SWA" lost its 'k' to the length byte it never had.
+			InfoEntry &fmt = castInfo.strings[16];
+			ci->mediaFormatName = fmt.readString(fmt.len > 0 && fmt.data[0] == fmt.len - 1);
+		}
 		dumpS = Common::String::format("mediaFormatName: '%s', ", ci->mediaFormatName.c_str()) + dumpS;
 		// fallthrough
 	case 15:
