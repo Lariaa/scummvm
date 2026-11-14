@@ -24,7 +24,9 @@
 // License: GNU GPL v2 (see COPYING file for details)
 
 #include "audio/audiostream.h"
+#include "common/algorithm.h"
 #include "common/file.h"
+#include "common/hashmap.h"
 #include "common/system.h"
 #include "common/macresman.h"
 #include "common/memstream.h"
@@ -1839,6 +1841,77 @@ static bool readAIFFCuePoints(Common::SeekableReadStream *stream, Common::Array<
 	return true;
 }
 
+// A WAV keeps its cue points in a 'cue ' chunk -- per point an id and a
+// sample offset into the data -- and their names in 'labl' entries of a
+// LIST/adtl chunk, matched by id. Peter entdeckt die Steinzeit drives its
+// talking heads with them ("1" mouth open, "0" closed).
+static bool readWAVCuePoints(Common::SeekableReadStream *stream, Common::Array<int32> &times, Common::StringArray &names) {
+	uint32 rate = 0;
+	Common::Array<uint32> ids, offsets;
+	Common::HashMap<uint32, Common::String> labels;
+
+	int64 pos = 12;
+	while (pos + 8 <= stream->size()) {
+		stream->seek(pos);
+		uint32 tag = stream->readUint32BE();
+		uint32 size = stream->readUint32LE();
+		int64 body = pos + 8;
+		int64 end = MIN<int64>(body + size, stream->size());
+
+		if (tag == MKTAG('f', 'm', 't', ' ') && size >= 8) {
+			stream->skip(4);	// format, channels
+			rate = stream->readUint32LE();
+		} else if (tag == MKTAG('c', 'u', 'e', ' ') && size >= 4) {
+			uint32 count = stream->readUint32LE();
+			for (uint32 i = 0; i < count && stream->pos() + 24 <= end; i++) {
+				ids.push_back(stream->readUint32LE());
+				stream->skip(16);	// position, chunk id, chunk start, block start
+				offsets.push_back(stream->readUint32LE());
+			}
+		} else if (tag == MKTAG('L', 'I', 'S', 'T') && size >= 4 && stream->readUint32BE() == MKTAG('a', 'd', 't', 'l')) {
+			int64 sub = body + 4;
+			while (sub + 8 <= end) {
+				stream->seek(sub);
+				uint32 subTag = stream->readUint32BE();
+				uint32 subSize = stream->readUint32LE();
+				if (subTag == MKTAG('l', 'a', 'b', 'l') && subSize >= 4) {
+					uint32 id = stream->readUint32LE();
+					Common::String name;
+					for (uint32 j = 4; j < subSize; j++) {
+						byte c = stream->readByte();
+						if (!c)
+							break;
+						name += (char)c;
+					}
+					labels[id] = name;
+				}
+				sub += 8 + subSize + (subSize & 1);
+			}
+		}
+
+		pos = body + size + (size & 1);
+	}
+
+	if (!rate || offsets.empty()) {
+		debugC(3, kDebugSound, "readWAVCuePoints(): nothing usable -- rate %d, %d cue points", rate, (int)offsets.size());
+		return false;
+	}
+
+	// The chunk need not list them in time order; the channel walks them in it.
+	Common::Array<uint> order;
+	for (uint i = 0; i < offsets.size(); i++)
+		order.push_back(i);
+	Common::sort(order.begin(), order.end(), [&](uint a, uint b) { return offsets[a] < offsets[b]; });
+
+	for (uint i = 0; i < order.size(); i++) {
+		uint k = order[i];
+		times.push_back((int32)(((uint64)offsets[k] * 1000 + rate / 2) / rate));
+		names.push_back(labels.getValOrDefault(ids[k]));
+	}
+
+	return true;
+}
+
 bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringArray &names,
 		const Common::String &context) {
 	if (_path.empty())
@@ -1864,6 +1937,8 @@ bool AudioFileDecoder::getCuePoints(Common::Array<int32> &times, Common::StringA
 					? Common::String::format("linked '%s'", _path.c_str())
 					: context);
 			found = readAIFFCuePoints(stream, times, names);
+		} else if (magic1 == MKTAG('R', 'I', 'F', 'F') && magic2 == MKTAG('W', 'A', 'V', 'E')) {
+			found = readWAVCuePoints(stream, times, names);
 		} else if (macr == MKTAG('M', 'A', 'C', 'R'))
 			found = readSWACuePoints(stream, times, names);
 	}
