@@ -213,13 +213,17 @@ bool decodeXMED(const Common::Array<byte> &data, Common::String &text) {
 	while (pos + 21 <= size && !(data[pos] == 0x03 && isHexRun(data, pos + 1, 20)))
 		pos++;
 
+	uint32 sections = 0;
+	bool hasTextSection = false;
 	while (pos + 21 <= size && data[pos] == 0x03 && isHexRun(data, pos + 1, 20)) {
 		uint32 id = hexField(data, pos + 1, 4);
 		uint32 sectionLen = hexField(data, pos + 5, 8);
 		if (sectionLen < 1 || pos + 20 + sectionLen > size)
 			break;
 
+		sections++;
 		if (id == 0x0002) {
+			hasTextSection = true;
 			uint32 j = pos + 21;
 			if (j < size && data[j] == 0x00) {
 				j++;
@@ -273,6 +277,13 @@ bool decodeXMED(const Common::Array<byte> &data, Common::String &text) {
 			continue;
 
 		text = Common::String((const char *)&data[j], len);
+		return true;
+	}
+
+	// An empty document has no 0002 section at all, but it is still a
+	// document with fonts and styles: Ritter Rost 2's name field.
+	if (sections > 0 && !hasTextSection) {
+		text.clear();
 		return true;
 	}
 	return false;
