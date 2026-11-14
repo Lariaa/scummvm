@@ -9840,7 +9840,7 @@ static const DirectorGameDescription gameDescriptions[] = {
 
 	WINGAME2t_l("ritterrost", "",  "start.exe",			"9bc3d64be0fe3caa612f070b27c943b8", 2595758,
 								   "data/Rostburg.DXR", "6bf95a48f366bdf8af3a198c7b723c77", 38107269, Common::DE_DEU, 702),
-	WINGAME1t_l("ritterrost2", "", "Post.exe",			"4ca63d069171b374fa85cb17d9bcb755", 9791189, Common::DE_DEU, 702),
+	WINGAME1tf_l("ritterrost2", "", "Post.exe",			"4ca63d069171b374fa85cb17d9bcb755", 9791189, Common::DE_DEU, 702, GF_TRUECOLOR),
 
 	// Just a launcher for the game installer (Dutch release)
 	// Game is not Director
