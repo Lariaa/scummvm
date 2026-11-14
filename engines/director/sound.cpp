@@ -27,6 +27,7 @@
 #include "common/file.h"
 #include "common/system.h"
 #include "common/macresman.h"
+#include "common/memstream.h"
 #include "common/substream.h"
 #include "common/xpfloat.h"
 
@@ -1899,61 +1900,145 @@ void AudioFileDecoder::dumpChunks(const Common::String &context) {
 	delete stream;
 }
 
-uint32 AudioFileDecoder::getDuration() {
-	// A linked sound only knows how long it is once its file has been read, so
-	// decode it, ask, and throw the stream away again. Scripts read this once
-	// per sound to pace themselves against it, not per frame.
-	Audio::AudioStream *stream = getAudioStream(false, false, DisposeAfterUse::YES);
-	if (!stream)
+// Bits per sample as the file states them: the AIFF COMM chunk or the WAV
+// fmt chunk. SWA and MP3 decode to 16-bit samples. 0 when unknown.
+static int readSampleBits(Common::SeekableReadStream *stream) {
+	if (stream->size() < 40)
 		return 0;
 
-	uint32 duration = 0;
+	stream->seek(0);
+	uint32 magic1 = stream->readUint32BE();
+	stream->readUint32BE();
+	uint32 magic2 = stream->readUint32BE();
+
+	if (magic1 == MKTAG('F', 'O', 'R', 'M') &&
+			(magic2 == MKTAG('A', 'I', 'F', 'F') || magic2 == MKTAG('A', 'I', 'F', 'C'))) {
+		int64 pos = 12;
+		while (pos + 8 <= stream->size()) {
+			stream->seek(pos);
+			uint32 tag = stream->readUint32BE();
+			uint32 size = stream->readUint32BE();
+			if (tag == MKTAG('C', 'O', 'M', 'M') && size >= 8) {
+				stream->skip(6);	// numChannels, numSampleFrames
+				return stream->readUint16BE();
+			}
+			pos += 8 + size + (size & 1);
+		}
+		return 0;
+	}
+
+	if (magic1 == MKTAG('R', 'I', 'F', 'F') && magic2 == MKTAG('W', 'A', 'V', 'E')) {
+		int64 pos = 12;
+		while (pos + 8 <= stream->size()) {
+			stream->seek(pos);
+			uint32 tag = stream->readUint32BE();
+			uint32 size = stream->readUint32LE();
+			if (tag == MKTAG('f', 'm', 't', ' ') && size >= 16) {
+				stream->skip(14);	// format, channels, rate, byte rate, block align
+				return stream->readUint16LE();
+			}
+			pos += 8 + size + (size & 1);
+		}
+		return 0;
+	}
+
+	return findMP3Start(stream) >= 0 ? 16 : 0;
+}
+
+// Rate, channel count and length from a decoded stream; the stream is deleted.
+static void describeStream(Audio::AudioStream *stream, SoundFileInfo &info) {
+	if (!stream)
+		return;
+	info.rate = stream->getRate();
+	info.channels = stream->isStereo() ? 2 : 1;
 	Audio::SeekableAudioStream *seekable = dynamic_cast<Audio::SeekableAudioStream *>(stream);
 	if (seekable)
-		duration = seekable->getLength().msecs();
-
+		info.duration = seekable->getLength().msecs();
 	delete stream;
-	return duration;
+}
+
+void AudioFileDecoder::readInfo() {
+	if (_info.read || _path.empty())
+		return;
+	_info.read = true;
+
+	// A linked sound only knows these once its file has been read, so decode
+	// it once, ask, and keep the answers.
+	describeStream(getAudioStream(false, false, DisposeAfterUse::YES), _info);
+
+	Common::SeekableReadStream *stream = Common::MacResManager::openFileOrDataFork(findAudioPath(_path));
+	if (stream) {
+		_info.bits = readSampleBits(stream);
+		delete stream;
+	}
+}
+
+uint32 AudioFileDecoder::getDuration() {
+	readInfo();
+	return _info.duration;
+}
+
+int AudioFileDecoder::getChannelCount() {
+	readInfo();
+	return _info.channels;
+}
+
+int AudioFileDecoder::getSampleRate() {
+	readInfo();
+	return _info.rate;
+}
+
+int AudioFileDecoder::getSampleSize() {
+	readInfo();
+	return _info.bits;
 }
 
 MoaStreamDecoder::MoaStreamDecoder(Common::String &format, Common::SeekableReadStreamEndian *stream)
 		: AudioDecoder() {
 	_format = format;
-	_stream = stream;
-}
-
-MoaStreamDecoder::~MoaStreamDecoder() {
-	if (_stream) {
-		delete _stream;
-		_stream = nullptr;
+	if (stream) {
+		stream->seek(0);
+		_size = stream->size();
+		_data = (byte *)malloc(_size);
+		if (_data)
+			stream->read(_data, _size);
+		else
+			_size = 0;
+		delete stream;
 	}
 }
 
+MoaStreamDecoder::~MoaStreamDecoder() {
+	free(_data);
+	_data = nullptr;
+}
+
 Audio::AudioStream *MoaStreamDecoder::getAudioStream(bool looping, bool forPuppet, DisposeAfterUse::Flag disposeAfterUse) {
-	if (!_stream)
+	if (!_data)
 		return nullptr;
 
-	// Make sure we're at the start of the stream
-	_stream->seek(0, SEEK_SET);
+	Common::SeekableReadStream *data = new Common::MemoryReadStream(_data, _size, DisposeAfterUse::NO);
 
 	Audio::RewindableAudioStream *stream = nullptr;
 	if (_format.equalsIgnoreCase("kMoaCfFormat_AIFF")) {
-		stream = Audio::makeAIFFStream(_stream, DisposeAfterUse::NO);
+		stream = Audio::makeAIFFStream(data, DisposeAfterUse::YES);
 	} else if (_format.equalsIgnoreCase("kMoaCfFormat_SWA")) {
-		int32 mp3Start = findMP3Start(_stream);
+		int32 mp3Start = findMP3Start(data);
 #ifdef USE_MAD
 		if (mp3Start >= 0) {
 			// MAD must see the first MPEG frame at offset 0, see AudioFileDecoder.
 			Common::SeekableReadStream *audio = new Common::SeekableSubReadStream(
-				_stream, mp3Start, _stream->size(), DisposeAfterUse::NO);
+				data, mp3Start, data->size(), DisposeAfterUse::YES);
 			stream = Audio::makeMP3Stream(audio, DisposeAfterUse::YES);
+			data = nullptr;
 		}
 #endif
 		if (!stream)
 			warning("MoaStreamDecoder: cannot play the embedded SWA (MPEG audio at %d)", mp3Start);
+		delete data;
 	} else {
 		warning("Unsupported Moa stream type '%s'", _format.c_str());
-		delete _stream;
+		delete data;
 	}
 
 	if (stream) {
@@ -1966,7 +2051,62 @@ Audio::AudioStream *MoaStreamDecoder::getAudioStream(bool looping, bool forPuppe
 	return nullptr;
 }
 
+void MoaStreamDecoder::readInfo() {
+	if (_info.read || !_data)
+		return;
+	_info.read = true;
+
+	describeStream(getAudioStream(false, false, DisposeAfterUse::YES), _info);
+	Common::MemoryReadStream data(_data, _size, DisposeAfterUse::NO);
+	_info.bits = readSampleBits(&data);
+}
+
+uint32 MoaStreamDecoder::getDuration() {
+	readInfo();
+	return _info.duration;
+}
+
+int MoaStreamDecoder::getChannelCount() {
+	readInfo();
+	return _info.channels;
+}
+
+int MoaStreamDecoder::getSampleRate() {
+	readInfo();
+	return _info.rate;
+}
+
+int MoaStreamDecoder::getSampleSize() {
+	readInfo();
+	return _info.bits;
+}
+
+bool MoaStreamDecoder::getCuePoints(Common::Array<int32> &times, Common::StringArray &names,
+		const Common::String &context) {
+	if (!_data)
+		return false;
+
+	Common::MemoryReadStream data(_data, _size, DisposeAfterUse::NO);
+	bool found = false;
+	if (_format.equalsIgnoreCase("kMoaCfFormat_AIFF"))
+		found = readAIFFCuePoints(&data, times, names);
+	else if (_format.equalsIgnoreCase("kMoaCfFormat_SWA"))
+		found = readSWACuePoints(&data, times, names);
+
+	if (found)
+		debugC(3, kDebugSound, "MoaStreamDecoder::getCuePoints(): %d cue points in %s, first '%s' at %d ms",
+				(int)times.size(), context.c_str(), names[0].c_str(), times[0]);
+	return found;
+}
+
 MoaSoundFormatDecoder::MoaSoundFormatDecoder() {
+	memset(&_format, 0, sizeof(_format));
+}
+
+uint32 MoaSoundFormatDecoder::getDuration() {
+	if (_format.frameRate <= 0 || _format.numFrames <= 0)
+		return 0;
+	return (uint32)((uint64)_format.numFrames * 1000 / _format.frameRate);
 }
 
 MoaSoundFormatDecoder::~MoaSoundFormatDecoder() {

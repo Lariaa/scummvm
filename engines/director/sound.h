@@ -368,6 +368,21 @@ public:
 	// 0 means "not known", which is what Director answers for a member whose
 	// sound has not been streamed yet.
 	virtual uint32 getDuration() { return 0; }
+
+	// Cue points the sound data itself carries -- AIFF markers or the table in
+	// an SWA header -- in milliseconds. Director's own cupt chunk is read by
+	// the cast member, not here.
+	virtual bool getCuePoints(Common::Array<int32> &times, Common::StringArray &names,
+			const Common::String &context = Common::String()) { return false; }
+};
+
+// What a sound file says about itself, read once and kept.
+struct SoundFileInfo {
+	bool read = false;
+	int rate = 0;
+	int channels = 0;
+	int bits = 0;
+	uint32 duration = 0;
 };
 
 class SNDDecoder : public AudioDecoder {
@@ -408,13 +423,16 @@ public:
 
 	Audio::AudioStream *getAudioStream(bool looping = false, bool forPuppet = false, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES) override;
 	uint32 getDuration() override;
+	int getChannelCount() override;
+	int getSampleRate() override;
+	int getSampleSize() override;
 
 	// Read the cue points the file carries, in milliseconds. Both spellings are
 	// understood: an AIFF 'MARK' chunk and the table a Shockwave Audio header
 	// keeps after its fixed part. `context` says, for the log, which member
 	// asked and what else it carries; see debugDumpAIFF().
 	bool getCuePoints(Common::Array<int32> &times, Common::StringArray &names,
-			const Common::String &context = Common::String());
+			const Common::String &context = Common::String()) override;
 
 	// Write out what the file holds, for the paths that never ask it for cue
 	// points -- "sound playFile" opens an AIFF without a cast member anywhere
@@ -422,20 +440,36 @@ public:
 	void dumpChunks(const Common::String &context);
 
 private:
+	void readInfo();
+
 	Common::String _path;
 	Common::MacResManager *_macresman;
+	SoundFileInfo _info;
 };
 
+// A whole sound file kept in an ediM chunk: AIFF or SWA.
 class MoaStreamDecoder : public AudioDecoder {
 public:
+	// Takes the stream and keeps a copy of its bytes, so that playing and
+	// asking for the duration never share a read position.
 	MoaStreamDecoder(Common::String &format, Common::SeekableReadStreamEndian *stream);
 	~MoaStreamDecoder();
 
 	Audio::AudioStream *getAudioStream(bool looping = false, bool forPuppet = false, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES) override;
+	uint32 getDuration() override;
+	int getChannelCount() override;
+	int getSampleRate() override;
+	int getSampleSize() override;
+	bool getCuePoints(Common::Array<int32> &times, Common::StringArray &names,
+			const Common::String &context = Common::String()) override;
 
 private:
+	void readInfo();
+
 	Common::String _format;
-	Common::SeekableReadStreamEndian *_stream;
+	byte *_data = nullptr;
+	uint32 _size = 0;
+	SoundFileInfo _info;
 };
 
 // Source: mixsnd.h in the Director 7 XDK
@@ -476,6 +510,10 @@ public:
 	uint32 _size = 0;
 
 	Audio::AudioStream *getAudioStream(bool looping = false, bool forPuppet = false, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES) override;
+	int getChannelCount() override { return _format.numChannels; }
+	int getSampleRate() override { return _format.frameRate; }
+	int getSampleSize() override { return _format.bitsPerSample; }
+	uint32 getDuration() override;
 };
 
 /**
