@@ -562,6 +562,13 @@ void FileIO::m_readPict(int nargs) {
 	return;
 }
 
+// The file holds text in the platform's encoding, as m_writeString() puts it
+// there; Lingo strings are UTF-8. Ritter Rost 2's high scores lost their
+// umlauts on the way back in: "Präger" came out as "Pr䧥r".
+static Datum fromPlatform(const Common::String &raw) {
+	return Datum(Common::U32String(raw, g_director->getPlatformEncoding()).encode(Common::kUtf8));
+}
+
 bool FileIO::charInMatchString(char ch, const Common::String &matchString) {
 	return matchString.contains(ch);
 }
@@ -585,7 +592,7 @@ void FileIO::m_readToken(int nargs) {
 	do {
 		ch = me->_inStream->readByte();
 		if (me->_inStream->eos() || me->_inStream->err()) {
-			g_lingo->push(Datum(tok));
+			g_lingo->push(fromPlatform(tok));
 			return;
 		}
 	} while (charInMatchString(ch, skipString));
@@ -595,7 +602,7 @@ void FileIO::m_readToken(int nargs) {
 		ch = me->_inStream->readByte();
 
 		if (me->_inStream->eos() || me->_inStream->err()) {
-			g_lingo->push(Datum(tok));
+			g_lingo->push(fromPlatform(tok));
 			return;
 		}
 	}
@@ -607,7 +614,7 @@ void FileIO::m_readToken(int nargs) {
 		me->_inStream->seek(-1, SEEK_CUR);
 	}
 
-	g_lingo->push(Datum(tok));
+	g_lingo->push(fromPlatform(tok));
 }
 
 void FileIO::m_readFile(int nargs) {
@@ -625,7 +632,7 @@ void FileIO::m_readFile(int nargs) {
 		ch = me->_inStream->readByte();
 	}
 
-	g_lingo->push(res);
+	g_lingo->push(fromPlatform(res));
 }
 
 // Write
