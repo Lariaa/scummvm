@@ -2009,9 +2009,10 @@ void Score::loadFrames(Common::SeekableReadStreamEndian &stream, uint16 version,
 		}
 
 		// The index stores numEntries+1 offsets: the trailing one is an
-		// end-of-data sentinel, needed to size the last detail entry
+		// end-of-data sentinel, needed to size the last detail entry.
+		// listSize is the capacity of the index and may be larger.
 		if (numEntries > 0) {
-			if (listSize == numEntries + 1) {
+			if (listSize > numEntries) {
 				uint32 endOff = _framesStream->readUint32();
 				_spriteDetailOffsets.push_back(_frameDataOffset + endOff);
 				_spriteDetailAccessed.push_back(true);
