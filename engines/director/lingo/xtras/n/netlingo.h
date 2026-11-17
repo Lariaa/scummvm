@@ -43,6 +43,7 @@ void close(ObjectType type);
 void m_new(int nargs);
 void m_netStatus(int nargs);
 void m_getNetText(int nargs);
+void m_postNetText(int nargs);
 void m_gotoNetMovie(int nargs);
 void m_preloadNetThing(int nargs);
 void m_netAbort(int nargs);

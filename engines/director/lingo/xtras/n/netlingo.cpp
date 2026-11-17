@@ -80,6 +80,7 @@ static MethodProto xlibMethods[] = {
 static BuiltinProto xlibBuiltins[] = {
 	{ "netStatus", NetLingoXtra::m_netStatus, -1, 0, 500, HBLTIN },
 	{ "getNetText", NetLingoXtra::m_getNetText, -1, 0, 500, HBLTIN },
+	{ "postNetText", NetLingoXtra::m_postNetText, -1, 0, 500, HBLTIN },
 	{ "gotoNetMovie", NetLingoXtra::m_gotoNetMovie, -1, 0, 500, HBLTIN },
 	{ "preloadNetThing", NetLingoXtra::m_preloadNetThing, -1, 0, 500, HBLTIN },
 	{ "netAbort", NetLingoXtra::m_netAbort, -1, 0, 500, HBLTIN },
@@ -142,6 +143,14 @@ void NetLingoXtra::m_new(int nargs) {
 
 XOBJSTUB(NetLingoXtra::m_netStatus, 0)
 XOBJSTUB(NetLingoXtra::m_getNetText, 0)
+
+// Nothing is sent anywhere: the arguments are dropped and a network ID comes
+// back, so a game polling netDone() moves on.
+void NetLingoXtra::m_postNetText(int nargs) {
+	g_lingo->printSTUBWithArglist("NetLingoXtra::m_postNetText", nargs);
+	g_lingo->dropStack(nargs);
+	g_lingo->push(Datum(0));
+}
 XOBJSTUB(NetLingoXtra::m_gotoNetMovie, 0)
 XOBJSTUB(NetLingoXtra::m_preloadNetThing, 0)
 XOBJSTUB(NetLingoXtra::m_netAbort, 0)
