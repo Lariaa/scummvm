@@ -83,6 +83,18 @@ Common::Error Window::loadInitialMovie() {
 		// A valid projector archive, add to SearchMan
 		SearchMan.add(_vm->getRawEXEName(), multiArchive);
 
+		// A projector can carry its Xtras inside: Ritter Rost 2 ships NetLingo
+		// only that way and calls postNetText() on the way out.
+		if (g_director->getVersion() >= 500) {
+			Common::ArchiveMemberList members;
+			multiArchive->listMembers(members);
+			for (auto &it : members) {
+				Common::String name = it->getFileName();
+				if (name.hasSuffixIgnoreCase(".x32") || name.hasSuffixIgnoreCase(".x16"))
+					g_lingo->openXLib(name, kXtraObj, it->getPathInArchive());
+			}
+		}
+
 		if (ConfMan.getBool("dump_scripts"))
 			multiArchive->dumpArchive(Common::Path("./dumps").join(encodePathForDump(movie)));
 
