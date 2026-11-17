@@ -72,6 +72,7 @@ enum TheEntityType {
 	kTheFreeBytes,
 	kTheFrontWindow,
 	kTheFullColorPermit,
+	kTheGlobals,
 	kTheIdleHandlerPeriod,
 	kTheIdleLoadMode,
 	kTheIdleLoadPeriod,

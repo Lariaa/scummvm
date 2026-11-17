@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/algorithm.h"
 #include "common/config-manager.h"
 #include "common/fs.h"
 #include "common/platform.h"
@@ -94,6 +95,7 @@ TheEntity entities[] = {					//	hasId  ver.	isFunction
 	{ kTheFreeBytes,		"freeBytes",		false, 200, true },	// D2 f
 	{ kTheFrontWindow,		"frontWindow",		false, 500, false },//				D5 p
 	{ kTheFullColorPermit,	"fullColorPermit",	false, 200, false },// D2 p
+	{ kTheGlobals,			"globals",			false, 700, true },	//					D7 f
 	{ kTheIdleHandlerPeriod,"idleHandlerPeriod",false, 500, false },//				D5 p
 	{ kTheIdleLoadMode,		"idleLoadMode",		false, 500, false },//				D5 p
 	{ kTheIdleLoadPeriod,	"idleLoadPeriod",	false, 500, false },//				D5 p
@@ -725,6 +727,31 @@ Datum Lingo::getTheEntity(int entity, Datum &id, int field) {
 		break;
 	case kTheFullColorPermit:
 		d = 1;					// We always allow it in ScummVM
+		break;
+	case kTheGlobals: // D7
+		{
+			// All non-void globals as a property list, always with #version
+			// (Director 7 Demystified, "globals"). Ritter Rost 2 saves its game
+			// by walking it. Xtras registered as globals are not variables.
+			d.type = PARRAY;
+			d.u.parr = new PArray;
+			Datum key("version");
+			key.type = SYMBOL;
+			LB::b_version(0);
+			d.u.parr->arr.push_back(PCell(key, pop()));
+
+			Common::StringArray names;
+			for (auto &it : _globalvars) {
+				if (it._value.type != VOID && !it._value.ignoreGlobal && !it._key.equalsIgnoreCase("version"))
+					names.push_back(it._key);
+			}
+			Common::sort(names.begin(), names.end());
+			for (auto &name : names) {
+				Datum sym(name);
+				sym.type = SYMBOL;
+				d.u.parr->arr.push_back(PCell(sym, _globalvars[name]));
+			}
+		}
 		break;
 	case kTheImageDirect:
 		d = 1;					// We always allow it in ScummVM
