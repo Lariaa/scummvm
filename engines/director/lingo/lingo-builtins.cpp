@@ -3325,10 +3325,13 @@ void LB::b_puppetSprite(int nargs) {
 		if ((uint)sprite.asInt() < sc->_channels.size()) {
 			int spriteId = sprite.asInt();
 			Sprite *target = sc->getSpriteById(spriteId);
-			if (state.asInt())
+			if (state.asInt()) {
 				target->_puppet = true;
-			else
-				target->releasePuppet(sc->getOriginalSpriteById(spriteId));
+			} else if (target->releasePuppet(sc->getOriginalSpriteById(spriteId))) {
+				Channel *channel = sc->getChannelById(spriteId);
+				channel->setNeedsDraw();
+				channel->setDirty();
+			}
 		} else {
 			warning("b_puppetSprite: sprite index out of bounds");
 		}

@@ -506,13 +506,20 @@ void Sprite::releaseAutoPuppet(uint32 copyBackMask) {
 			setAutoPuppet(release.property, false);
 }
 
-// Un-puppeting in mid-span hands the position back to the score,
+// Un-puppeting in mid-span hands the position back to the score at once,
 // but Director keeps the member that Lingo put in the channel.
-void Sprite::releasePuppet(const Sprite *scoreSprite) {
+// Returns true if the sprite moved.
+bool Sprite::releasePuppet(const Sprite *scoreSprite) {
 	_puppet = false;
 	_autoPuppet = kAPNone;
-	if (scoreSprite && scoreSprite->_castId.member && _castId != scoreSprite->_castId)
-		setAutoPuppet(kAPCast, true);
+	if (!scoreSprite || !scoreSprite->_castId.member || _castId == scoreSprite->_castId)
+		return false;
+
+	setAutoPuppet(kAPCast, true);
+	if (_startPoint == scoreSprite->_startPoint)
+		return false;
+	_startPoint = scoreSprite->_startPoint;
+	return true;
 }
 
 void Sprite::setWidth(int w) {
