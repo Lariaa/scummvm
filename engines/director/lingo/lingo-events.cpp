@@ -644,6 +644,14 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 				queue.push(LingoEvent(event, eventId, kSpriteHandler, false, pos, channelId));
 			}
 			queue.push(LingoEvent(event, eventId, kCastHandler, false, pos, channelId));
+
+			// An editable text sprite with the cursor captures keyDown: the frame
+			// and movie scripts don't get it. keyUp still goes through.
+			if (event == kEventKeyDown && _vm->getVersion() >= 500 && channelId != 0) {
+				Channel *focused = _score->getChannelById(channelId);
+				if (focused && focused->_widget && focused->_widget->isEditable())
+					break;
+			}
 			// fall through
 
 		case kEventEnterFrame:
