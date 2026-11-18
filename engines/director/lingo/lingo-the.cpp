@@ -2073,11 +2073,12 @@ void Lingo::setTheSprite(Datum &id1, int field, Datum &d) {
 		}
 		break;
 	case kThePuppet:
-		sprite->_puppet = (bool)d.asInt();
-		if (!d.asInt()) {
+		if (d.asInt()) {
+			sprite->_puppet = true;
+		} else {
 			// TODO: Properly reset sprite properties after puppet disabled.
 			sprite->_moveable = false;
-			sprite->_autoPuppet = kAPNone;
+			sprite->releasePuppet(score->getOriginalSpriteById(id));
 		}
 		break;
 	case kTheRect:

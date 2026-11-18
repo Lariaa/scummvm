@@ -506,6 +506,15 @@ void Sprite::releaseAutoPuppet(uint32 copyBackMask) {
 			setAutoPuppet(release.property, false);
 }
 
+// Un-puppeting in mid-span hands the position back to the score,
+// but Director keeps the member that Lingo put in the channel.
+void Sprite::releasePuppet(const Sprite *scoreSprite) {
+	_puppet = false;
+	_autoPuppet = kAPNone;
+	if (scoreSprite && scoreSprite->_castId.member && _castId != scoreSprite->_castId)
+		setAutoPuppet(kAPCast, true);
+}
+
 void Sprite::setWidth(int w) {
 	_width = MAX<int>(w, 0);
 
