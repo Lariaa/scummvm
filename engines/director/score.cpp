@@ -460,6 +460,15 @@ void Score::updateCurrentFrame() {
 	// film loops treat differently from a natural single-frame loop
 	_frameHeldByJump = (_nextFrame != 0);
 
+	// A jump reloads the frame from the score, which drops what a sprite kept
+	// after its puppet was turned off. D6 does so on every jump, D7 and MX only
+	// when jumping back or to the same frame.
+	if (_nextFrame && !_window->_playbackPaused &&
+			(_vm->getVersion() < 700 || nextFrameNumberToLoad <= _curFrameNumber)) {
+		for (auto &channel : _channels)
+			channel->_sprite->dropHeldProperties();
+	}
+
 	_nextFrame = 0;
 	_window->_skipFrameAdvance = false;
 
