@@ -463,8 +463,9 @@ void Score::updateCurrentFrame() {
 	// A jump reloads the frame from the score, which drops what a sprite kept
 	// after its puppet was turned off. D6 does so on every jump, D7 and MX only
 	// when jumping back or to the same frame.
-	if (_nextFrame && !_window->_playbackPaused &&
-			(_vm->getVersion() < 700 || nextFrameNumberToLoad <= _curFrameNumber)) {
+	bool reloadFrame = _nextFrame && !_window->_playbackPaused &&
+		(_vm->getVersion() < 700 || nextFrameNumberToLoad <= _curFrameNumber);
+	if (reloadFrame) {
 		for (auto &channel : _channels)
 			channel->_sprite->dropHeldProperties();
 	}
@@ -522,6 +523,12 @@ void Score::updateCurrentFrame() {
 		// Load the current sprite information into the _currentFrame data store.
 		// This copies in the frame data and updates _curFrameNumber.
 		loadFrame(nextFrameNumberToLoad, true);
+
+		// loadFrame() only collects the changes of a forward jump
+		if (reloadFrame) {
+			for (auto &sprite : _currentFrame->_sprites)
+				sprite->_copyBackMask = static_cast<uint32>(kSCBNoMask);
+		}
 
 		for (uint ch = 0; ch < _channels.size(); ch++) {
 			uint32 copyBackMask = _currentFrame->_sprites[ch]->_copyBackMask;
