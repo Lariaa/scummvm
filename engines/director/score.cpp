@@ -1186,6 +1186,11 @@ void Score::setLastPalette() {
 			return;
 	}
 
+	// An empty palette cell {castLib 0, negative member} is not a palette,
+	// so keep the one in effect.
+	if (currentPalette.castLib == 0 && currentPalette.member < 0)
+		return;
+
 	// If the palette is defined in the frame and doesn't match
 	// the current one, set it
 	bool paletteChanged = (currentPalette != _vm->_lastPalette) && (!currentPalette.isNull());
@@ -1196,9 +1201,14 @@ void Score::setLastPalette() {
 
 		// Switch to a new palette immediately if:
 		// - this is color cycling mode, or
-		// - the cached palette ID is different (i.e. we jumped in the score)
-		if (_currentFrame->_mainChannels.palette.colorCycling || isCachedPalette)
+		// - the cached palette ID is different (i.e. we jumped in the score), or
+		// - this is a normal (non-fade) palette set from the frame.
+		if (_currentFrame->_mainChannels.palette.colorCycling || isCachedPalette
+				|| _currentFrame->_mainChannels.palette.normal) {
 			_vm->setPalette(_vm->_lastPalette);
+			// Redraw the whole stage, not only the dirty rectangles
+			_window->_resetScreen = true;
+		}
 	}
 
 }
