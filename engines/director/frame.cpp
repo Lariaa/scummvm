@@ -860,6 +860,10 @@ void Frame::readMainChannelsD5(Common::MemoryReadStreamEndian &stream, uint16 of
 			break;
 		case 26:
 			_mainChannels.palette.paletteId.member = stream.readSint16();
+			// An empty palette cell is stored as {0, -1} with no other data
+			// (Director 6). It is not the built-in Mac palette.
+			if (_mainChannels.palette.paletteId.castLib == 0 && _mainChannels.palette.paletteId.member < 0)
+				_mainChannels.palette.paletteId = CastMemberID();
 			if (!g_director->hasPalette(_mainChannels.palette.paletteId))
 				_mainChannels.palette.paletteId = CastMemberID();
 			if (!_mainChannels.palette.paletteId.isNull())
@@ -1271,6 +1275,10 @@ void Frame::readMainChannelsD6(Common::MemoryReadStreamEndian &stream, uint16 of
 			break;
 		case 120+2:
 			_mainChannels.palette.paletteId.member = stream.readSint16();
+			// An empty palette cell is stored as {0, -1} with no other data
+			// (Director 6). It is not the built-in Mac palette.
+			if (_mainChannels.palette.paletteId.castLib == 0 && _mainChannels.palette.paletteId.member < 0)
+				_mainChannels.palette.paletteId = CastMemberID();
 			if (!g_director->hasPalette(_mainChannels.palette.paletteId))
 				_mainChannels.palette.paletteId = CastMemberID();
 			if (!_mainChannels.palette.paletteId.isNull())
@@ -1728,6 +1736,10 @@ void Frame::readMainChannelsD7(Common::MemoryReadStreamEndian &stream, uint16 of
 			break;
 		case 240+2:
 			_mainChannels.palette.paletteId.member = stream.readSint16();
+			// An empty palette cell is stored as {0, -1} with no other data
+			// (Director 6). It is not the built-in Mac palette.
+			if (_mainChannels.palette.paletteId.castLib == 0 && _mainChannels.palette.paletteId.member < 0)
+				_mainChannels.palette.paletteId = CastMemberID();
 			if (!g_director->hasPalette(_mainChannels.palette.paletteId))
 				_mainChannels.palette.paletteId = CastMemberID();
 			if (!_mainChannels.palette.paletteId.isNull())
