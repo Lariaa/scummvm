@@ -130,6 +130,8 @@ public:
 	void setAutoPuppet(AutoPuppetProperty property, bool value);
 	bool getAutoPuppet(AutoPuppetProperty property);
 	void releaseAutoPuppet(uint32 copyBackMask);
+	void releasePuppet(const Sprite *scoreSprite);
+	void dropHeldProperties();
 
 	inline int getWidth() { return _width; }
 	void setWidth(int w);
@@ -182,6 +184,7 @@ public:
 	bool _editable;
 	bool _puppet;
 	uint32 _autoPuppet; // autopuppet, based upon Director in a Nutshell, page 15
+	uint32 _heldAutoPuppet; // subset of _autoPuppet left over from a puppet, lost when the score reloads the frame
 	bool _immediate;
 	uint32 _backColor;
 	uint32 _foreColor;
