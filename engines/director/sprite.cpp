@@ -42,6 +42,7 @@ Sprite::Sprite(Frame *frame) {
 	_matte = nullptr;
 	_puppet = false;
 	_autoPuppet = kAPNone; // Based on Director in a Nutshell, page 15
+	_heldAutoPuppet = kAPNone;
 	_cast = nullptr;
 	reset();
 }
@@ -132,6 +133,7 @@ Sprite& Sprite::operator=(const Sprite &sprite) {
 	_editable = sprite._editable;
 	_puppet = sprite._puppet;
 	_autoPuppet = sprite._autoPuppet;
+	_heldAutoPuppet = sprite._heldAutoPuppet;
 	_immediate = sprite._immediate;
 	_backColor = sprite._backColor;
 	_foreColor = sprite._foreColor;
@@ -482,6 +484,7 @@ void Sprite::setAutoPuppet(AutoPuppetProperty property, bool value) {
 		_autoPuppet |= (1 << property);
 	else
 		_autoPuppet &= ~(1 << property);
+	_heldAutoPuppet &= ~(1 << property);
 }
 
 bool Sprite::getAutoPuppet(AutoPuppetProperty property) {
@@ -504,6 +507,37 @@ void Sprite::releaseAutoPuppet(uint32 copyBackMask) {
 	for (auto &release : releases)
 		if (copyBackMask & release.mask)
 			setAutoPuppet(release.property, false);
+}
+
+// Turning the puppet off does not reset the channel: what Lingo changed stays
+// until the score writes that field or reloads the frame (dropHeldProperties()).
+void Sprite::releasePuppet(const Sprite *scoreSprite) {
+	_puppet = false;
+	_autoPuppet = kAPNone;
+	_heldAutoPuppet = kAPNone;
+	if (!scoreSprite || !scoreSprite->_castId.member || g_director->getVersion() < 600)
+		return;
+
+	if (_castId != scoreSprite->_castId)
+		setAutoPuppet(kAPCast, true);
+	if (_startPoint != scoreSprite->_startPoint)
+		setAutoPuppet(kAPLoc, true);
+	if (_ink != scoreSprite->_ink)
+		setAutoPuppet(kAPInk, true);
+	if (_foreColor != scoreSprite->_foreColor)
+		setAutoPuppet(kAPForeColor, true);
+	if (_backColor != scoreSprite->_backColor)
+		setAutoPuppet(kAPBackColor, true);
+	if (_width != scoreSprite->_width)
+		setAutoPuppet(kAPWidth, true);
+	if (_height != scoreSprite->_height)
+		setAutoPuppet(kAPHeight, true);
+	_heldAutoPuppet = _autoPuppet;
+}
+
+void Sprite::dropHeldProperties() {
+	_autoPuppet &= ~_heldAutoPuppet;
+	_heldAutoPuppet = kAPNone;
 }
 
 void Sprite::setWidth(int w) {

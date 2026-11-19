@@ -3325,11 +3325,10 @@ void LB::b_puppetSprite(int nargs) {
 		if ((uint)sprite.asInt() < sc->_channels.size()) {
 			int spriteId = sprite.asInt();
 			Sprite *target = sc->getSpriteById(spriteId);
-			bool val = (bool)state.asInt();
-			target->_puppet = val;
-			if (!val) {
-				target->_autoPuppet = kAPNone;
-			}
+			if (state.asInt())
+				target->_puppet = true;
+			else
+				target->releasePuppet(sc->getOriginalSpriteById(spriteId));
 		} else {
 			warning("b_puppetSprite: sprite index out of bounds");
 		}
