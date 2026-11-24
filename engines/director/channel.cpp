@@ -628,8 +628,13 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 	// Only where the alpha plane actually says something: createMatte() falls
 	// back to the flood fill when it is constant, and that guess belongs to the
 	// inks that asked for a matte, not here.
+	//
+	// Without useAlpha the matte can never come from the alpha plane, so don't
+	// ask for one: that ran the flood fill for every such member only to throw
+	// the result away.
 	if (_sprite->_cast->_type == kCastBitmap
-			&& ((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 32) {
+			&& ((BitmapCastMember *)_sprite->_cast)->_bitsPerPixel == 32
+			&& ((BitmapCastMember *)_sprite->_cast)->_useAlpha) {
 		BitmapCastMember *bitmap = (BitmapCastMember *)_sprite->_cast;
 		const Graphics::Surface *matte = bitmap->getMatte(bbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 
