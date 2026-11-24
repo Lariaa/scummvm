@@ -287,7 +287,10 @@ DirectorPlotData Channel::getPlotData() {
 	// TextCastMember. Without a mask its widget is blitted whole, background and
 	// all -- TKKG 9's credits came out as a black block over the backdrop. The
 	// channel is already holding the widget, so no lookup is needed.
-	bool isTextXtra = _sprite->_cast && dynamic_cast<TextXtraCastMember *>(_sprite->_cast) && _widget;
+	// Test the type first: this runs on every blit, and only Xtra members can
+	// be a Text Xtra.
+	bool isTextXtra = _sprite->_cast && _sprite->_cast->_type == kCastXtra
+		&& dynamic_cast<TextXtraCastMember *>(_sprite->_cast) && _widget;
 
 	if (isTextXtra) {
 		// Always the glyphs, whatever the ink asks for. The widget's background
