@@ -180,22 +180,28 @@ void Cast::releaseCastMemberWidget() {
 // run their raw bytes through Cast::decodeString() once at load time, so `name`
 // here is always UTF-8. Decoding it again with decodeString() would treat the
 // UTF-8 bytes as raw screwed-Mac-Roman/Windows-1252 and corrupt them, so we
-// just parse the UTF-8 directly before case-folding ASCII and Latin-1
-// supplement letters. As long as insertion and lookup fold identically,
-// umlaut names match case-insensitively.
+// just fold the UTF-8 directly: ASCII and Latin-1 supplement letters. As long
+// as insertion and lookup fold identically, umlaut names match
+// case-insensitively.
+//
+// Every `member "name"` lookup comes through here, so work on the bytes
+// rather than decoding to UTF-32 and back.
 Common::String Cast::foldCastName(const Common::String &name) {
-	Common::U32String u = name.decode(Common::kUtf8);
-	Common::U32String folded;
-	for (uint i = 0; i < u.size(); i++) {
-		uint32 c = u[i];
-		if (c >= 'A' && c <= 'Z')
-			c += 0x20;
-		else if (c >= 0x00C0 && c <= 0x00DE && c != 0x00D7)
-			// Latin-1 supplement uppercase letters (À-Þ, excluding ×)
-			c += 0x20;
-		folded += (Common::u32char_type_t)c;
+	Common::String folded(name);
+	for (uint i = 0; i < folded.size(); i++) {
+		byte c = (byte)folded[i];
+		if (c >= 'A' && c <= 'Z') {
+			folded.setChar(c + 0x20, i);
+		} else if (c == 0xC3 && i + 1 < folded.size()) {
+			// À-Þ (U+00C0-U+00DE) are C3 80-9E in UTF-8, × (U+00D7) is C3 97.
+			// Lowercase is 0x20 further on in the same second byte.
+			byte next = (byte)folded[i + 1];
+			if (next >= 0x80 && next <= 0x9E && next != 0x97)
+				folded.setChar(next + 0x20, i + 1);
+			i++;
+		}
 	}
-	return folded.encode(Common::kUtf8);
+	return folded;
 }
 
 CastMember *Cast::getCastMemberByNameAndType(const Common::String &name, CastType type) {
