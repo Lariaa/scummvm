@@ -19,8 +19,6 @@
  *
  */
 
-#include "common/algorithm.h"
-
 #include "director/director.h"
 #include "director/debugger.h"
 #include "director/lingo/lingo.h"
@@ -121,23 +119,19 @@ void Movie::setPrimaryEventHandler(LEvent event, const Common::String &code) {
 	mainArchive->replaceCode(code, kEventScript, event);
 }
 
-static bool resolveMovieScriptEvent(LingoArchive *archive, int castLibId, LingoEvent &event) {
-	// Look for the first movie script in this cast that handles the event.
-	// scriptContexts is an unordered hash map, so the cast member IDs have to
-	// be sorted to get the cast window order Director searches in.
-	Common::Array<int32> scriptIds;
-	for (auto &it : archive->scriptContexts[kMovieScript])
-		scriptIds.push_back(it._key);
-	Common::sort(scriptIds.begin(), scriptIds.end());
-
-	for (auto &scriptId : scriptIds) {
-		if (archive->scriptContexts[kMovieScript].getVal(scriptId)->_eventHandlers.contains(event.event)) {
-			event.scriptType = kMovieScript;
-			event.scriptId = CastMemberID(scriptId, castLibId);
-			return true;
+// The first movie script in this cast that handles the event. scriptContexts
+// is an unordered hash map, so take the lowest member ID to get the cast
+// window order Director searches in. This runs for every idle event, so
+// no sorting.
+static bool firstMovieScriptFor(LingoArchive *archive, LEvent event, int32 &scriptId) {
+	bool found = false;
+	for (auto &it : archive->scriptContexts[kMovieScript]) {
+		if ((!found || it._key < scriptId) && it._value->_eventHandlers.contains(event)) {
+			scriptId = it._key;
+			found = true;
 		}
 	}
-	return false;
+	return found;
 }
 
 void Movie::resolveScriptEvent(LingoEvent &event) {
@@ -468,21 +462,33 @@ void Movie::resolveScriptEvent(LingoEvent &event) {
 			// FIXME: shared cast movie scripts could come before main movie ones
 			// Movie scripts are fixed, so it's fine to look them up in advance.
 
-			// _casts is an unordered hash map as well, so walk the cast libs in
-			// ascending order too.
-			Common::Array<int> castLibIds;
-			for (auto &it : _casts)
-				castLibIds.push_back(it._key);
-			Common::sort(castLibIds.begin(), castLibIds.end());
-
-			for (auto &castLibId : castLibIds) {
-				if (resolveMovieScriptEvent(_casts.getVal(castLibId)->_lingoArchive, castLibId, event))
-					return;
+			// _casts is an unordered hash map as well: the lowest cast lib
+			// with a match wins.
+			bool found = false;
+			int bestCastLib = 0;
+			int32 bestScriptId = 0;
+			for (auto &it : _casts) {
+				if (found && it._key > bestCastLib)
+					continue;
+				int32 scriptId;
+				if (firstMovieScriptFor(it._value->_lingoArchive, event.event, scriptId)) {
+					bestCastLib = it._key;
+					bestScriptId = scriptId;
+					found = true;
+				}
 			}
+			if (found) {
+				event.scriptType = kMovieScript;
+				event.scriptId = CastMemberID(bestScriptId, bestCastLib);
+				return;
+			}
+
 			LingoArchive *sharedArchive = getSharedLingoArch();
-			if (sharedArchive) {
-				if (resolveMovieScriptEvent(sharedArchive, DEFAULT_CAST_LIB, event))
-					return;
+			int32 scriptId;
+			if (sharedArchive && firstMovieScriptFor(sharedArchive, event.event, scriptId)) {
+				event.scriptType = kMovieScript;
+				event.scriptId = CastMemberID(scriptId, DEFAULT_CAST_LIB);
+				return;
 			}
 		}
 		break;
