@@ -555,7 +555,8 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 				// make a copy of the destination rect with the origin at the top left of the mask bitmap
 				Common::Rect srcRect = destRect;
 				srcRect.translate(-destOrigin.x, -destOrigin.y);
-				debugC(8, kDebugImages, "Channel::getMask(): cast mask %s, orig %dx%d, scaled %dx%d, dest %dx%d, crop %d,%d %dx%d",  maskID.asString().c_str(), bitmap->_picture->_surface.w, bitmap->_picture->_surface.h, maskSurface->w, maskSurface->h, bbox.width(), bbox.height(), destRect.left, destRect.top, destRect.width(), destRect.height());
+				if (debugChannelSet(8, kDebugImages))
+					debugC(8, kDebugImages, "Channel::getMask(): cast mask %s, orig %dx%d, scaled %dx%d, dest %dx%d, crop %d,%d %dx%d",  maskID.asString().c_str(), bitmap->_picture->_surface.w, bitmap->_picture->_surface.h, maskSurface->w, maskSurface->h, bbox.width(), bbox.height(), destRect.left, destRect.top, destRect.width(), destRect.height());
 				// The two are aligned by their registration points, and nothing
 				// keeps an author from giving the mask one that puts it clear of
 				// the picture: Loewenzahn 4's EVO.DIR pairs "schlange" 123x254
@@ -599,8 +600,9 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 			// channel for a 32-bit source. A bitmap without an alpha channel is
 			// left alone: there the flood fill would be a guess, and drawing it
 			// opaque is what Director does with an unusable mask.
-			debugC(4, kDebugImages, "Channel::getMask(): cast mask %s not found, using the alpha channel of %s instead",
-					maskID.asString().c_str(), _sprite->_castId.asString().c_str());
+			if (debugChannelSet(4, kDebugImages))
+				debugC(4, kDebugImages, "Channel::getMask(): cast mask %s not found, using the alpha channel of %s instead",
+						maskID.asString().c_str(), _sprite->_castId.asString().c_str());
 			return ((BitmapCastMember *)_sprite->_cast)->getMatte(bbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 		} else {
 			warning("Channel::getMask(): Requested cast mask %s, but was not found", maskID.asString().c_str());
@@ -639,8 +641,9 @@ const Graphics::Surface *Channel::getMask(bool forceMatte) {
 		const Graphics::Surface *matte = bitmap->getMatte(bbox, _sprite->isFlippedH(), _sprite->isFlippedV());
 
 		if (bitmap->_matteFromAlpha) {
-			debugC(4, kDebugImages, "Channel::getMask(): compositing the alpha channel of %s under ink %d",
-					_sprite->_castId.asString().c_str(), _sprite->_ink);
+			if (debugChannelSet(4, kDebugImages))
+				debugC(4, kDebugImages, "Channel::getMask(): compositing the alpha channel of %s under ink %d",
+						_sprite->_castId.asString().c_str(), _sprite->_ink);
 			return matte;
 		}
 	}
@@ -1342,10 +1345,11 @@ Common::Array<Channel> *Channel::getSubChannels() {
 		// Film loop placement diagnostics (--debugflags=images --debuglevel=3):
 		// the score sprite's width/height drive the bbox passed to getSubChannels;
 		// if they differ from the film loop's natural size the figure is scaled.
-		debugC(3, kDebugImages, "Channel::getSubChannels(): filmloop cast %s, sprW/H %dx%d, bbox %dx%d@%d,%d, loopFrame %d, ink %d, stretch %d",
-			_sprite->_castId.asString().c_str(), _sprite->_width, _sprite->_height,
-			bbox.width(), bbox.height(), bbox.left, bbox.top,
-			_filmLoopFrame, _sprite->_ink, _sprite->_stretch);
+		if (debugChannelSet(3, kDebugImages))
+			debugC(3, kDebugImages, "Channel::getSubChannels(): filmloop cast %s, sprW/H %dx%d, bbox %dx%d@%d,%d, loopFrame %d, ink %d, stretch %d",
+				_sprite->_castId.asString().c_str(), _sprite->_width, _sprite->_height,
+				bbox.width(), bbox.height(), bbox.left, bbox.top,
+				_filmLoopFrame, _sprite->_ink, _sprite->_stretch);
 		if (_sprite->_cast->_type == kCastFilmLoop)
 			return ((FilmLoopCastMember *)_sprite->_cast)->getSubChannels(bbox, _filmLoopFrame, _sprite->_ink, _sprite->getForeColor(), _sprite->getBackColor());
 		else if (_sprite->_cast->_type == kCastMovie)

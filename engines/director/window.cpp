@@ -562,11 +562,12 @@ void Window::inkBlitFrom(Channel *channel, Common::Rect destRect, Graphics::Mana
 	// nothing said whose pixels those are: getPlotData() reports only
 	// background-transparent sprites, and the line below sits at level 8, which
 	// buries a single screen under a hundred thousand lines.
-	debugC(3, kDebugImages, "Window::inkBlitFrom(): channel %d, %s, type %s, ink %d, into %d,%d %dx%d",
-			channel->_sprite->_spriteInfo.channelNum,
-			channel->_sprite->_castId.asString().c_str(), castType2str(castType),
-			channel->_sprite->_ink,
-			destRect.left, destRect.top, destRect.width(), destRect.height());
+	if (debugChannelSet(3, kDebugImages))
+		debugC(3, kDebugImages, "Window::inkBlitFrom(): channel %d, %s, type %s, ink %d, into %d,%d %dx%d",
+				channel->_sprite->_spriteInfo.channelNum,
+				channel->_sprite->_castId.asString().c_str(), castType2str(castType),
+				channel->_sprite->_ink,
+				destRect.left, destRect.top, destRect.width(), destRect.height());
 
 	uint32 renderStartTime = 0;
 	if (debugChannelSet(8, kDebugImages)) {
