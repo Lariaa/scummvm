@@ -36,6 +36,7 @@
 #include "director/window.h"
 #include "director/castmember/bitmap.h"
 #include "director/castmember/filmloop.h"
+#include "director/picture.h"
 
 
 namespace Director {
@@ -138,6 +139,13 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 		scaleY = (float)bbox.height() / _initialRect.height();
 	}
 
+	if (debugChannelSet(3, kDebugImages))
+		debugC(3, kDebugImages, "FilmLoopCastMember::getSubChannels(): cast %d, frame %d, %d sprites: filmloop _initialRect %dx%d@%d,%d, placement bbox %dx%d@%d,%d, needToScale %d (scaleX %.3f scaleY %.3f)",
+			_castId, frame, (int)spriteIds.size(),
+			_initialRect.width(), _initialRect.height(), _initialRect.left, _initialRect.top,
+			bbox.width(), bbox.height(), bbox.left, bbox.top,
+			needToScale, scaleX, scaleY);
+
 	// copy the sprites in order to the list
 	for (auto &iter : spriteIds) {
 		Sprite src = *_score->_scoreCache[frame]->_sprites[iter];
@@ -189,6 +197,29 @@ Common::Array<Channel> *FilmLoopCastMember::getSubChannels(Common::Rect &bbox, u
 			}
 
 			debugC(5, kDebugImages, ", no scaling");
+		}
+
+		// The corner and centre pixels tell a keyed margin from a baked-in background
+		if (debugChannelSet(3, kDebugImages)) {
+			Common::Rect natRect = src._cast ? src._cast->_initialRect : Common::Rect();
+			int pTL = -1, pTR = -1, pBL = -1, pBR = -1, pC = -1;
+			if (src._cast && src._cast->_type == kCastBitmap) {
+				Picture *pic = ((BitmapCastMember *)src._cast)->_picture;
+				if (pic && pic->_surface.getPixels() && pic->_surface.format.bytesPerPixel == 1) {
+					const Graphics::Surface &s = pic->_surface;
+					int xr = s.w - 1, yb = s.h - 1, xc = s.w / 2, yc = s.h / 2;
+					pTL = *(const byte *)s.getBasePtr(0, 0);
+					pTR = *(const byte *)s.getBasePtr(xr, 0);
+					pBL = *(const byte *)s.getBasePtr(0, yb);
+					pBR = *(const byte *)s.getBasePtr(xr, yb);
+					pC  = *(const byte *)s.getBasePtr(xc, yc);
+				}
+			}
+			debugC(3, kDebugImages, "  film-loop sub-sprite %d: cast %s, ink %d, blend %d, NAT %dx%d, sprW/H %dx%d, final pos %d,%d, stretch %d, corners[TL=%d TR=%d BL=%d BR=%d C=%d]",
+				iter, src._castId.asString().c_str(), src._ink, src._blendAmount,
+				natRect.width(), natRect.height(), src._width, src._height,
+				src._startPoint.x, src._startPoint.y, src._stretch,
+				pTL, pTR, pBL, pBR, pC);
 		}
 
 		// Film loop frames are constructed as a series of Channels, much like how a normal frame

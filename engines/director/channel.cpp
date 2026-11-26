@@ -888,6 +888,11 @@ bool Channel::hasSubChannels() {
 Common::Array<Channel> *Channel::getSubChannels() {
 	if (_sprite->_cast) {
 		Common::Rect bbox = getBbox();
+		if (debugChannelSet(3, kDebugImages))
+			debugC(3, kDebugImages, "Channel::getSubChannels(): filmloop cast %s, sprW/H %dx%d, bbox %dx%d@%d,%d, loopFrame %d, ink %d, stretch %d",
+				_sprite->_castId.asString().c_str(), _sprite->_width, _sprite->_height,
+				bbox.width(), bbox.height(), bbox.left, bbox.top,
+				_filmLoopFrame, _sprite->_ink, _sprite->_stretch);
 		if (_sprite->_cast->_type == kCastFilmLoop)
 			return ((FilmLoopCastMember *)_sprite->_cast)->getSubChannels(bbox, _filmLoopFrame);
 		else if (_sprite->_cast->_type == kCastMovie)
